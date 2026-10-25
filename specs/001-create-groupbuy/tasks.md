@@ -44,7 +44,7 @@ description: "공구 개설 구현 태스크"
   - `create_guard(member_id BIGINT, fingerprint CHAR(64), created_at DATETIME(6), PRIMARY KEY (member_id, fingerprint))`
   - 파일 상단에 `-- ponytail: Flyway로 올릴 시점은 운영 데이터가 생기는 5단계 전` 주석
 - [ ] T006 [P] `main/member/Member.java`, `main/member/MemberRepository.java`: 필드 `id`, `name`만
-- [ ] T007 [P] `main/participation/Participation.java`, `main/participation/ParticipationRepository.java`: 필드 `id`, `groupBuyId`, `memberId`, `quantity`, `createdAt`. 연관관계 매핑 없이 `Long` 컬럼만 둔다(N+1 비교용 매핑은 조회 기능에서 결정). `id`는 `@GeneratedValue(strategy = GenerationType.IDENTITY)`, `createdAt`은 서비스가 `Instant.now(clock)`으로 설정
+- [ ] T007 [P] `main/groupbuy/Participation.java`, `main/groupbuy/ParticipationRepository.java`: 필드 `id`, `groupBuyId`, `memberId`, `quantity`, `createdAt`. 연관관계 매핑 없이 `Long` 컬럼만 둔다(N+1 비교용 매핑은 조회 기능에서 결정). `id`는 `@GeneratedValue(strategy = GenerationType.IDENTITY)`, `createdAt`은 서비스가 `Instant.now(clock)`으로 설정
 - [ ] T008 `main/groupbuy/GroupBuyStatus.java`(`OPEN`, `COMPLETED`, `CANCELLED`), `main/groupbuy/GroupBuy.java`: data-model.md의 필드 전부, `organizerId`는 `Long` 컬럼, `@Version version`, `status`는 `EnumType.STRING`, `id`는 `@GeneratedValue(strategy = GenerationType.IDENTITY)`. `createdAt`·`updatedAt`은 DB 기본값이나 `@CreatedDate`를 쓰지 않고 서비스가 `Instant.now(clock)`으로 설정한다('개설 시점 +30일' 판정은 이 `createdAt` 기준). 상태 전이 메서드는 US3에서 추가
 - [ ] T009 [P] `main/CamgongApplication.java`에 `Clock` 빈(`Clock.systemUTC()`) 등록
 - [ ] T010 [P] `main/common/ApiException.java`(상태 코드, title, `errors` 목록을 가진 런타임 예외)와 `main/common/ApiExceptionHandler.java`: `ProblemDetail`에 `errors: [{field, message}]` 속성을 담아 응답. `MethodArgumentNotValidException`→400(필드별 메시지), `ApiException`→지정한 상태. contracts의 코드 `DUPLICATE_REQUEST`, `NOT_MODIFIABLE`은 409의 `title`
@@ -125,7 +125,7 @@ description: "공구 개설 구현 태스크"
 ### Implementation for User Story 3
 
 - [ ] T028 [P] [US3] `main/groupbuy/GroupBuyEvents.java`: `GroupBuyChanged(groupBuyId, recipientIds, changedFields)`, `GroupBuyCancelled(groupBuyId, recipientIds)` record
-- [ ] T029 [US3] `main/groupbuy/GroupBuyRepository.java`에 `findByIdForUpdate`(`@Lock(PESSIMISTIC_WRITE)`), `main/participation/ParticipationRepository.java`에 공구별 참여 목록 조회, (공구, 회원)으로 개설자 참여 행 조회
+- [ ] T029 [US3] `main/groupbuy/GroupBuyRepository.java`에 `findByIdForUpdate`(`@Lock(PESSIMISTIC_WRITE)`), `main/groupbuy/ParticipationRepository.java`에 공구별 참여 목록 조회, (공구, 회원)으로 개설자 참여 행 조회
 - [ ] T030 [US3] `main/groupbuy/GroupBuy.java`에 상태 전이 메서드 **(핵심 로직)**: `completeIfFull()`(`securedQuantity == totalQuantity`이면 `COMPLETED`, 이미 `COMPLETED`면 변화 없음), `cancel()`(`OPEN`일 때만 `CANCELLED`). 허용 조건은 `status = OPEN` 이고 `deadline > now`
 - [ ] T031 [US3] `main/groupbuy/GroupBuyService.java`의 `update` **(핵심 로직)**: `findByIdForUpdate`로 락 → data-model.md "수정 시 검증 순서" 그대로(존재 404 → 개설자 403 → `OPEN`·마감 전 아니면 409 `NOT_MODIFIABLE` → 마감 `new ≥ old` & `≤ created_at + 30일` → 수량 `organizerQuantity ≥ 1`, `secured' = secured − old개설자 수량 + new개설자 수량`, `secured' ≤ total'` → 반영 후 `completeIfFull`). 개설자 `Participation`과 `secured_quantity`를 같은 트랜잭션에서 함께 갱신하고 `updatedAt`은 `Instant.now(clock)`으로 설정(30일 상한은 저장된 `createdAt` 기준). 오픈채팅 링크 외 필드(구매처 링크 포함)가 바뀌고 개설자 외 참여자가 있으면 `GroupBuyChanged` 발행
 - [ ] T032 [US3] `main/groupbuy/GroupBuyService.java`의 `cancel` **(핵심 로직)**: 같은 락 → 존재 404 → 개설자 403 → `OPEN`·마감 전 아니면 409 → `cancel()` → 개설자 외 참여자가 있으면 `GroupBuyCancelled` 발행. 행은 지우지 않는다

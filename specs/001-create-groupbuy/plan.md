@@ -76,16 +76,16 @@ build.gradle
 src/main/java/com/camgong/
 ├── CamgongApplication.java
 ├── common/
+│   ├── ApiException.java
 │   └── ApiExceptionHandler.java        # ProblemDetail 변환, 필드 오류 목록
 ├── member/
 │   ├── Member.java
 │   └── MemberRepository.java
-├── participation/
-│   ├── Participation.java
-│   └── ParticipationRepository.java
 └── groupbuy/
     ├── GroupBuy.java                   # 엔티티 + 상태 전이 메서드
     ├── GroupBuyStatus.java             # OPEN, COMPLETED, CANCELLED
+    ├── Participation.java              # 참여 (공구의 일부)
+    ├── ParticipationRepository.java
     ├── GroupBuyRepository.java         # 비관적 락 조회 포함
     ├── CreateGuard.java                # JdbcClient로 가드 INSERT
     ├── GroupBuyService.java            # 개설, 수정, 취소, 조회
@@ -112,7 +112,7 @@ src/test/java/com/camgong/
 ```
 
 **Structure Decision**: 단일 Gradle 모듈, 기능별 패키지. 서비스·리포지토리 인터페이스를 따로 두지 않는다(구현체가 하나뿐이다).
-`participation`, `member`는 이 기능에 필요한 최소 엔티티만 두고 이후 기능에서 확장한다.
+`Participation`은 공구의 일부라 `groupbuy` 패키지에 둔다(확보 수량 불변식과 락이 공구 행 하나에 걸려 있다). `member`는 이 기능에 필요한 최소 엔티티만 두고 이후 기능에서 확장한다.
 
 ## Complexity Tracking
 
