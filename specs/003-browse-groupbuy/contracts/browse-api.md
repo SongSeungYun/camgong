@@ -11,7 +11,7 @@
 
 | 이름 | 값 | 기본 | 설명 |
 |------|-----|------|------|
-| `state` | `OPEN`, `PENDING_CLOSE`, `COMPLETED`, `FAILED` | `OPEN` | 표시 상태 필터. 하나만 |
+| `status` | `OPEN`, `PENDING_CLOSE`, `COMPLETED`, `FAILED` | `OPEN` | 표시 상태 필터. 하나만 |
 | `category` | `FOOD`, `DAILY`, `KITCHEN`, `HEALTH_BEAUTY`, `STATIONERY`, `ETC` | 전체 | 카테고리 필터 |
 | `q` | 문자열 | 없음 | 검색어. 공백으로 나눈 단어(최대 5개)가 모두 제목 또는 상품명에 부분 일치. 앞뒤 공백 무시, 50자 이하. 비어 있으면 검색 안 함 |
 | `sort` | `latest`, `deadline` | `latest` | 최신순(개설 시각 늦은 순) / 마감 임박순(마감 시각 이른 순) |
@@ -32,7 +32,7 @@
       "securedQuantity": 9,
       "totalQuantity": 24,
       "deadline": "2026-11-01T18:00:00+09:00",
-      "state": "OPEN"
+      "status": "OPEN"
     }
   ],
   "nextCursor": "eyJ..."
@@ -45,7 +45,7 @@
 
 | 상태 | 조건 |
 |------|------|
-| 400 | 지원하지 않는 `state`·`category`·`sort`, `size` 범위 밖, `q`가 50자 초과, 커서가 잘못되었거나 `sort`와 맞지 않음 |
+| 400 | 지원하지 않는 `status`·`category`·`sort`, `size` 범위 밖, `q`가 50자 초과, 커서가 잘못되었거나 `sort`와 맞지 않음 |
 
 ## GET /api/groupbuys/{id} — 상세
 
@@ -66,7 +66,7 @@
   "securedQuantity": 15,
   "remainingQuantity": 9,
   "deadline": "2026-11-01T18:00:00+09:00",
-  "state": "OPEN",
+  "status": "OPEN",
   "organizerName": "홍길동",
   "isOrganizer": false,
   "participantCount": 2,

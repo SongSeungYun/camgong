@@ -76,6 +76,7 @@ com.camgong
 
 - 경로는 `/api/...`, 버전 접두사는 두지 않는다(필요해질 때 추가). JSON 필드는 camelCase, DB 컬럼은 snake_case. 상태: 기본값
 - 상태 코드: 400 입력 오류, 401 로그인 필요, 403 권한 없음, 404 없음, 409 상태 충돌. 상태: 기본값
+- 응답의 상태 필드는 `status` 하나이고 값은 `OPEN`, `PENDING_CLOSE`, `COMPLETED`, `FAILED`(표시 상태)다. 취소된 공구는 어떤 API에서도 404다. 상태: 확정(교차 점검)
 - 오류 본문은 RFC 7807 `ProblemDetail`에 `errors: [{field, message}]`를 더한 형식이다. 상태: 확정(001 plan)
 - 목록은 페이지네이션 방식(오프셋/커서)을 003 plan에서 정한다. 상태: 미정
 
@@ -87,7 +88,7 @@ com.camgong
 ### 6.3 이벤트와 알림
 
 - 서비스는 상태가 바뀌면 Spring 이벤트를 발행하고 `AFTER_COMMIT`에서 소비한다. 007이 소비자를 붙인다. 상태: 확정(001 plan)
-- 현재 이벤트: `GroupBuyChanged`, `GroupBuyCancelled`(001). 004와 005가 모집 완료, 모집 실패 이벤트를 추가한다. 상태: 기본값
+- 이벤트: `GroupBuyChanged`, `GroupBuyCancelled`, `GroupBuyCompleted`(001 수정·004 참여), `GroupBuyFailed`(005). 상태: 확정
 - 한계: 커밋 후 프로세스가 죽으면 이벤트가 유실된다. 신뢰성이 필요해지면 아웃박스를 둔다.
 
 ### 6.4 동시성과 트랜잭션
@@ -96,6 +97,8 @@ com.camgong
 - 001 수정·취소는 `SELECT ... FOR UPDATE`로 직렬화한다. 004의 방식은 헌법 II의 4방식 비교(락 없음, 비관적, 낙관적, 조건부 UPDATE)로 정한다. 어떤 방식이 이기든 같은 행의 `secured_quantity`와 `status` 위에서 성립해야 한다. 상태: 확정/비교 예정
 - 상태 변화(`OPEN → COMPLETED/CANCELLED/FAILED`)는 엔티티의 메서드 한 곳에서만 일어난다. 상세는 domain.md. 상태: 기본값
 - DB `CHECK`를 최후 방어선으로 둔다(수량 범위, 가격 범위). 상태: 확정
+- 마감 판정 시각은 요청을 처리하는 순간의 앱 `Clock`이다. 마감 확정(005)만 마감 시각 + 1초 이후에 처리해 시계 오차를 막는다. 상태: 확정
+- 참여 경쟁의 4방식은 `QuantityGate`(004) 뒤에 숨는다. 어떤 방식이든 같은 `group_buy` 행의 `secured_quantity`·`status`·`version` 위에서 001·005와 직렬화된다. 상태: 확정
 
 ### 6.5 보안
 
@@ -134,3 +137,14 @@ com.camgong
 | 프론트 스택, 프론트 저장소 위치 | 4단계 |
 | 배포 대상 | 4단계 |
 | Flyway 도입 시점 | 5단계 전 |
+
+## 9. 스키마 누적 변경 (`schema.sql`)
+
+기능마다 같은 파일을 고치므로 누락을 막으려고 한곳에 모은다. 구현 순서는 001 → 003 → 004 → 005다.
+
+| 기능 | 변경 |
+|------|------|
+| 001 | 테이블 `member`, `group_buy`(카테고리, 구매처 링크, 오픈채팅 링크, `version`, `CHECK` 포함), `participation`(`UNIQUE (group_buy_id, member_id)`), `create_guard` |
+| 003 | 인덱스 `participation (member_id, group_buy_id)`, `group_buy (organizer_id, id)` |
+| 004 | 없음 (`group_buy`·`participation` 그대로 사용) |
+| 005 | 인덱스 `group_buy (status, deadline)`, 상태 값 `FAILED` (컬럼 변경 없음) |

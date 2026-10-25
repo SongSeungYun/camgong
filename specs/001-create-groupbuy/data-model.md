@@ -90,7 +90,7 @@
 
 ## 수정 시 검증 순서 (락을 잡은 뒤)
 
-1. 존재·개설자·`OPEN`·마감 전 확인 (404/403/409)
+1. 존재(취소됨 포함)·개설자·`OPEN`·마감 전 확인 (404/403/409)
 2. 단일 필드 형식은 요청 바인딩 단계에서 이미 통과했다고 본다
 3. 마감: `new ≥ old` 그리고 `new ≤ created_at + 30일`
 4. 수량: `organizerQuantity ≥ 1`, `secured' = secured − old개설자 수량 + new개설자 수량`, `secured' ≤ new total`

@@ -33,7 +33,7 @@
 | `COMPLETED` | 모집 완료 | `status='COMPLETED'` |
 | `FAILED` | 모집 실패 | `status='FAILED'` |
 
-`CANCELLED`는 노출하지 않는다(어떤 조회에서도 `status <> 'CANCELLED'`). 같은 조건이 `state` 필터에 쓰인다.
+`CANCELLED`는 노출하지 않는다(어떤 조회에서도 `status <> 'CANCELLED'`). 같은 조건이 `status` 필터에 쓰인다.
 
 ## 쿼리 모양
 
@@ -42,7 +42,7 @@
 ```sql
 SELECT id, title, item_name, category, unit_price, secured_quantity, total_quantity, deadline, status
 FROM group_buy
-WHERE <state 조건>
+WHERE <status 조건>
   [AND category = :category]
   [AND (title LIKE :w1 ESCAPE '\' OR item_name LIKE :w1 ESCAPE '\')  -- 단어마다 AND, 최대 5개]
   [AND <키셋 조건>]

@@ -53,7 +53,7 @@ NEEDS CLARIFICATION은 없다. 결정 1~3은 사용자가 직접 고른 것이�
   | `COMPLETED` (모집 완료) | `status='COMPLETED'` |
   | `FAILED` (모집 실패) | `status='FAILED'` |
 
-  `CANCELLED`는 어디에도 노출하지 않는다. 상태 필터 `state` 파라미터는 위 네 값 중 하나이며 같은 조건을 쿼리에 쓴다. 기본값은 `OPEN`.
+  `CANCELLED`는 어디에도 노출하지 않는다. 상태 필터 `status` 파라미터는 위 네 값 중 하나이며 같은 조건을 쿼리에 쓴다. 기본값은 `OPEN`.
 - **Rationale**: 프론트가 마감 판정을 따로 구현하지 않고 서버와 같은 시각 기준을 쓴다(spec FR-004, FR-015).
 
 ### 6. 동적 조건은 JPA Criteria API로 짠다

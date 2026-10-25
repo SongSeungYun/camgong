@@ -93,7 +93,7 @@ src/main/java/com/camgong/
     ├── GroupBuyController.java
     ├── GroupBuyRequest.java            # 개설·수정 공용 record
     ├── GroupBuyResponse.java
-    ├── GroupBuyEvents.java             # Changed, Cancelled 이벤트 record
+    ├── GroupBuyEvents.java             # Changed, Cancelled, Completed 이벤트 record
     └── GroupBuyEventLogger.java        # AFTER_COMMIT 로그 (알림 기능 전까지)
 src/main/resources/
 ├── application.yml

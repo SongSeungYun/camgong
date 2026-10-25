@@ -118,18 +118,18 @@ description: "공구 개설 구현 태스크"
 참여자 행은 SQL로 직접 시드한다(`participation` 행과 `group_buy.secured_quantity`를 함께 맞춘다).
 
 - [ ] T023 [P] [US3] `test/groupbuy/UpdateGroupBuyIT.java`: 시나리오 9(가격·개설자 수량 변경, `securedQuantity` 갱신), 10(비개설자 403), 11(마감 단축 400 `deadline`), 12(개설 +30일 초과 연장 400), 13(총 수량을 확보 수량 아래로 400), 14(개설자 수량을 올려 합이 총 수량과 같아지면 `COMPLETED`), 15(완료 후 PUT → 409 `NOT_MODIFIABLE`), 수량 0 거부, 개설자 수량 증가로 합이 총 수량 초과 시 400
-- [ ] T024 [P] [US3] `test/groupbuy/CancelGroupBuyIT.java`: 시나리오 16(204, 이후 GET 404), 17(`MutableClock`을 마감 이후로 → PUT·cancel 409), 비개설자 403, 이미 취소·완료된 공구 409
+- [ ] T024 [P] [US3] `test/groupbuy/CancelGroupBuyIT.java`: 시나리오 16(204, 이후 GET 404), 17(`MutableClock`을 마감 이후로 → PUT·cancel 409), 비개설자 403, 이미 취소된 공구 404, 완료된 공구 409
 - [ ] T025 [P] [US3] `test/groupbuy/LinkVisibilityIT.java`: 시나리오 19 — 개설자·참여자·외부인 × `OPEN`·`COMPLETED` 조합의 `openChatUrl` 노출 표(contracts)를 그대로 검증
-- [ ] T026 [P] [US3] `test/groupbuy/NotificationEventIT.java`: 시나리오 20 — 참여자 2명 있는 공구 수정·취소 시 커밋 후 이벤트 1건, 대상이 개설자 제외 참여자. 오픈채팅 링크만 수정하거나 개설자만 참여한 경우 이벤트 없음. 검증 실패로 롤백된 수정은 이벤트 없음
-- [ ] T027 [P] [US3] `test/groupbuy/ModifyConcurrencyIT.java`: 시나리오 18 — 수정과 취소 동시 실행 시 한쪽만 성공하고 취소됨이면 수정은 409. 수정 N개 동시 실행(개설자 수량 증가 경쟁)에서도 `secured_quantity ≤ total_quantity` 유지, `COMPLETED` 전환은 정확히 한 번. 참여×수정·취소 동시성은 참여 기능에서 검증한다
+- [ ] T026 [P] [US3] `test/groupbuy/NotificationEventIT.java`: 시나리오 20 — 참여자 2명 있는 공구 수정·취소 시 커밋 후 이벤트 1건, 대상이 개설자 제외 참여자. 오픈채팅 링크만 수정하거나 개설자만 참여한 경우 이벤트 없음. 검증 실패로 롤백된 수정은 이벤트 없음. 수정으로 딱 채워 모집 완료가 되면 `GroupBuyCompleted`가 개설자 포함 전원 대상으로 1건 나간다
+- [ ] T027 [P] [US3] `test/groupbuy/ModifyConcurrencyIT.java`: 시나리오 18 — 수정과 취소 동시 실행 시 한쪽만 성공하고 취소됨이면 수정은 404. 수정 N개 동시 실행(개설자 수량 증가 경쟁)에서도 `secured_quantity ≤ total_quantity` 유지, `COMPLETED` 전환은 정확히 한 번. 참여×수정·취소 동시성은 참여 기능에서 검증한다
 
 ### Implementation for User Story 3
 
-- [ ] T028 [P] [US3] `main/groupbuy/GroupBuyEvents.java`: `GroupBuyChanged(groupBuyId, recipientIds, changedFields)`, `GroupBuyCancelled(groupBuyId, recipientIds)` record
+- [ ] T028 [P] [US3] `main/groupbuy/GroupBuyEvents.java`: `GroupBuyChanged(groupBuyId, recipientIds, changedFields)`, `GroupBuyCancelled(groupBuyId, recipientIds)`, `GroupBuyCompleted(groupBuyId, recipientIds)` record (004가 같은 이벤트를 쓴다)
 - [ ] T029 [US3] `main/groupbuy/GroupBuyRepository.java`에 `findByIdForUpdate`(`@Lock(PESSIMISTIC_WRITE)`), `main/groupbuy/ParticipationRepository.java`에 공구별 참여 목록 조회, (공구, 회원)으로 개설자 참여 행 조회
 - [ ] T030 [US3] `main/groupbuy/GroupBuy.java`에 상태 전이 메서드 **(핵심 로직)**: `completeIfFull()`(`securedQuantity == totalQuantity`이면 `COMPLETED`, 이미 `COMPLETED`면 변화 없음), `cancel()`(`OPEN`일 때만 `CANCELLED`). 허용 조건은 `status = OPEN` 이고 `deadline > now`
-- [ ] T031 [US3] `main/groupbuy/GroupBuyService.java`의 `update` **(핵심 로직)**: `findByIdForUpdate`로 락 → data-model.md "수정 시 검증 순서" 그대로(존재 404 → 개설자 403 → `OPEN`·마감 전 아니면 409 `NOT_MODIFIABLE` → 마감 `new ≥ old` & `≤ created_at + 30일` → 수량 `organizerQuantity ≥ 1`, `secured' = secured − old개설자 수량 + new개설자 수량`, `secured' ≤ total'` → 반영 후 `completeIfFull`). 개설자 `Participation`과 `secured_quantity`를 같은 트랜잭션에서 함께 갱신하고 `updatedAt`은 `Instant.now(clock)`으로 설정(30일 상한은 저장된 `createdAt` 기준). 오픈채팅 링크 외 필드(구매처 링크 포함)가 바뀌고 개설자 외 참여자가 있으면 `GroupBuyChanged` 발행
-- [ ] T032 [US3] `main/groupbuy/GroupBuyService.java`의 `cancel` **(핵심 로직)**: 같은 락 → 존재 404 → 개설자 403 → `OPEN`·마감 전 아니면 409 → `cancel()` → 개설자 외 참여자가 있으면 `GroupBuyCancelled` 발행. 행은 지우지 않는다
+- [ ] T031 [US3] `main/groupbuy/GroupBuyService.java`의 `update` **(핵심 로직)**: `findByIdForUpdate`로 락 → data-model.md "수정 시 검증 순서" 그대로(존재하지 않거나 취소됨 404 → 개설자 403 → `OPEN`·마감 전 아니면 409 `NOT_MODIFIABLE` → 마감 `new ≥ old` & `≤ created_at + 30일` → 수량 `organizerQuantity ≥ 1`, `secured' = secured − old개설자 수량 + new개설자 수량`, `secured' ≤ total'` → 반영 후 `completeIfFull`). 개설자 `Participation`과 `secured_quantity`를 같은 트랜잭션에서 함께 갱신하고 `updatedAt`은 `Instant.now(clock)`으로 설정(30일 상한은 저장된 `createdAt` 기준). 오픈채팅 링크 외 필드(구매처 링크 포함)가 바뀌고 개설자 외 참여자가 있으면 `GroupBuyChanged` 발행. `completeIfFull`로 모집 완료가 되면 개설자 포함 모든 참여자 대상 `GroupBuyCompleted`도 발행
+- [ ] T032 [US3] `main/groupbuy/GroupBuyService.java`의 `cancel` **(핵심 로직)**: 같은 락 → 존재하지 않거나 취소됨 404 → 개설자 403 → `OPEN`·마감 전 아니면 409 → `cancel()` → 개설자 외 참여자가 있으면 `GroupBuyCancelled` 발행. 행은 지우지 않는다
 - [ ] T033 [P] [US3] `main/groupbuy/GroupBuyEventLogger.java`: `@TransactionalEventListener(AFTER_COMMIT)`으로 두 이벤트를 로그만 남긴다. 주석: `// ponytail: 커밋 후 유실 가능, 알림 기능에서 전달 수단 연결·신뢰성 필요하면 아웃박스로`
 - [ ] T034 [US3] `main/groupbuy/GroupBuyController.java`에 `PUT /api/groupbuys/{id}`(200, `@Valid` 본문, 응답은 contracts 응답 본문), `POST /api/groupbuys/{id}/cancel`(204)
 

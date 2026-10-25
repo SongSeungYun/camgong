@@ -72,7 +72,7 @@ specs/003-browse-groupbuy/
 src/main/java/com/camgong/groupbuy/
 ├── GroupBuyQueryController.java      # GET 목록, 상세, 내 활동 (001의 최소 상세 GET을 대체)
 ├── GroupBuyQueryService.java         # 조회 흐름, 표시 상태·공개 규칙 적용
-├── GroupBuyListQuery.java            # 요청 파라미터 record (state, category, q, sort, cursor, size)
+├── GroupBuyListQuery.java            # 요청 파라미터 record (status, category, q, sort, cursor, size)
 ├── GroupBuySearchRepository.java     # Criteria API 동적 조건 + 키셋 조회 (카운트 쿼리 없음)
 ├── PageCursor.java                   # 불투명 커서 인코딩/디코딩
 ├── DisplayStatus.java                # OPEN, PENDING_CLOSE, COMPLETED, FAILED 계산
