@@ -1,10 +1,11 @@
 <!--
 Sync Impact Report
-- Version change: (template) → 1.0.0
-- Modified principles: none (initial adoption)
-- Added principles: I. 범위 상한, II. 측정으로 증명, III. 설명 가능한 설계, IV. 핵심 로직 테스트
-- Added sections: 기술 제약, 개발 워크플로
-- Removed sections: 템플릿 5번째 원칙 슬롯 (원칙 4개로 확정)
+- Version change: 1.0.0 → 1.1.0
+- Modified principles: I. 범위 상한 (1단계 시간 상한 4~5시간 → 10시간, 종료 기준을 docs/design-plan.md로 연결)
+- Added principles: none
+- Added sections: none
+- Removed sections: none
+- Bump rationale: 기존 규칙을 완화하고 종료 기준 참조를 더한 것이라 호환되지만 지침이 실질적으로 바뀌어 MINOR
 - Deferred TODOs: none
 -->
 # 캠공 Constitution
@@ -14,7 +15,8 @@ Sync Impact Report
 ### I. 범위 상한 (NON-NEGOTIABLE)
 MVP는 공구 개설, 참여/취소, 목록·상세, 마감 시 성공/실패 확정과 알림, 개설자용 참여자·입금·수령 체크로 한정한다.
 결제 연동은 MVP에 포함하지 않는다. 일정이 막히면 화면, 배포 순서로 먼저 줄이고 핵심 API와 측정은 줄이지 않는다.
-각 단계는 시간 상한을 두며, 1단계(요구사항·설계)는 4~5시간을 넘기지 않는다.
+각 단계는 시간 상한을 두며, 1단계(요구사항·설계)는 10시간을 넘기지 않는다. 1단계는 구현 전에 전체 설계를 닫는 단계이며,
+종료 기준은 `docs/design-plan.md`의 완료 기준을 따른다.
 근거: 사이드 프로젝트라 끝까지 가는 것이 기능 수보다 중요하다.
 
 ### II. 측정으로 증명
@@ -55,4 +57,4 @@ MVP는 공구 개설, 참여/취소, 목록·상세, 마감 시 성공/실패 �
 - 버전 규칙: MAJOR는 원칙 삭제·재정의, MINOR는 원칙/섹션 추가·확장, PATCH는 문구 정리.
 - plan 작성 시 각 원칙(특히 I, II)에 대한 준수 여부를 확인한다. 위반하려면 이유를 plan에 적는다.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-25 | **Last Amended**: 2026-10-25
+**Version**: 1.1.0 | **Ratified**: 2026-10-25 | **Last Amended**: 2026-10-26
