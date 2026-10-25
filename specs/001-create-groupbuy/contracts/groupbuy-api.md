@@ -16,7 +16,8 @@
 | totalQuantity | integer | O | 2~1000 |
 | deadline | datetime | O | 개설: 현재 이후 & 개설 시점 +30일 이내. 수정: 현재 값 이상 & 개설 시점 +30일 이내 |
 | organizerQuantity | integer | O | ≥ 1, 개설: < totalQuantity. 수정: 다른 참여자 수량과 합쳐 totalQuantity 이하 |
-| openChatUrl | string | X | https URL, 최대 500자 |
+| itemUrl | string | O | https URL, 최대 500자 (구매처 링크) |
+| openChatUrl | string | O | https URL, 최대 500자 |
 
 ## POST /api/groupbuys — 개설 (FR-001~010, 016)
 
@@ -44,7 +45,7 @@
 | 404 | 공구 없음 |
 | 409 `NOT_MODIFIABLE` | `OPEN`이 아니거나(COMPLETED, CANCELLED) 마감이 지남 |
 
-부수 효과: 링크 외 필드가 바뀌었고 개설자 외 참여자가 있으면 `GroupBuyChanged` 이벤트 발행(알림 기능이 소비).
+부수 효과: 오픈채팅 링크 외 필드(구매처 링크 포함)가 바뀌었고 개설자 외 참여자가 있으면 `GroupBuyChanged` 이벤트 발행(알림 기능이 소비).
 
 ## POST /api/groupbuys/{id}/cancel — 취소 (FR-011, 014, 015)
 
@@ -97,6 +98,7 @@
   "status": "OPEN",
   "organizerId": 1,
   "organizerQuantity": 9,
+  "itemUrl": "https://example.com/item/123",
   "openChatUrl": null,
   "createdAt": "2026-10-25T07:30:00+09:00"
 }
@@ -128,4 +130,4 @@ RFC 7807 `ProblemDetail`에 `errors` 속성을 더한다.
 | `GroupBuyChanged` | groupBuyId, 알림 대상 회원 id 목록(개설자 제외 참여자), 변경된 필드 이름 목록 |
 | `GroupBuyCancelled` | groupBuyId, 알림 대상 회원 id 목록 |
 
-커밋 후(AFTER_COMMIT)에만 전달된다. 대상이 없거나(참여자가 개설자뿐) 링크만 바뀐 수정은 발행하지 않는다.
+커밋 후(AFTER_COMMIT)에만 전달된다. 대상이 없거나(참여자가 개설자뿐) 오픈채팅 링크만 바뀐 수정은 발행하지 않는다.

@@ -26,7 +26,8 @@
 | total_quantity | INT | 2 ≤ n ≤ 1000 | FR-005 |
 | secured_quantity | INT | 1 ≤ n ≤ total_quantity (CHECK) | 결정 2, FR-013 |
 | deadline | DATETIME(6) UTC | 개설 시 now < d ≤ created_at + 30일. 수정 시 단축 불가, 상한은 created_at + 30일 | FR-004, FR-012 |
-| open_chat_url | VARCHAR(500) NULL | https 주소 | FR-017 |
+| item_url | VARCHAR(500) | 필수, https 주소. 로그인한 모든 회원에게 공개 | FR-018 |
+| open_chat_url | VARCHAR(500) | 필수, https 주소. 모집 완료 후 참여자에게만 공개 | FR-017 |
 | status | VARCHAR(20) | OPEN / COMPLETED / CANCELLED | |
 | version | BIGINT | JPA 버전 | 결정 4 |
 | created_at, updated_at | DATETIME(6) | | |
@@ -93,4 +94,4 @@
 3. 마감: `new ≥ old` 그리고 `new ≤ created_at + 30일`
 4. 수량: `organizerQuantity ≥ 1`, `secured' = secured − old개설자 수량 + new개설자 수량`, `secured' ≤ new total`
 5. 반영 후 `secured' == total'`이면 `COMPLETED`로 전환
-6. 변경된 필드 중 링크 외가 있고 개설자 외 참여자가 있으면 이벤트 발행
+6. 변경된 필드 중 오픈채팅 링크 외(구매처 링크 포함)가 있고 개설자 외 참여자가 있으면 이벤트 발행

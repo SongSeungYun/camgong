@@ -25,11 +25,11 @@
 
   ```sql
   INSERT INTO create_guard (member_id, fingerprint, created_at) VALUES (:m, :f, :now) AS new
-  ON DUPLICATE KEY UPDATE created_at = IF(created_at < :now - INTERVAL 10 SECOND, new.created_at, created_at)
+  ON DUPLICATE KEY UPDATE created_at = IF(create_guard.created_at < :now - INTERVAL 10 SECOND, new.created_at, create_guard.created_at)
   ```
 
   영향 행 1 = 신규, 2 = 10초 지난 가드를 갱신 → 개설 진행. 0 = 10초 안 중복 → 409 `DUPLICATE_REQUEST`.
-  이 판정은 JDBC URL의 `useAffectedRows=true`를 전제한다. 이 옵션이 없으면 Connector/J가 변경 없는 중복도 1로 돌려줘서 신규 삽입과 구분되지 않는다.
+  행 별칭을 쓰면 기존 값을 가리킬 때 테이블 이름을 붙여야 한다(안 붙이면 `created_at`이 모호하다는 오류). 영향 행 수 판정은 JDBC URL의 `useAffectedRows=true`를 전제한다(스파이크로 확인, docs/spikes.md). 이 옵션이 없으면 Connector/J가 변경 없는 중복도 1로 돌려줘서 신규 삽입과 구분되지 않는다.
   `fingerprint`는 정규화한 입력값 전체의 SHA-256(Java `MessageDigest`)이다. 시각은 DB의 `NOW()`가 아니라 애플리케이션 `Clock`에서 파라미터로 넘긴다(테스트에서 시간을 제어하기 위해).
 - **Rationale**: 동시 요청이 PK 충돌 행에서 InnoDB 락으로 직렬화되어 둘 중 하나만 통과한다. 첫 요청이 롤백(검증 실패 등)하면 가드도 같이 롤백되어 두 번째가 통과한다. 슬라이딩 10초라 FR-009를 정확히 지킨다.
 - **Alternatives**: (a) 조회 후 삽입 — 동시에 오면 둘 다 통과한다. (b) 10초 구간 번호 unique — 구간 경계에서 10초 안에 두 개가 생길 수 있어 FR-009를 못 지킨다.
