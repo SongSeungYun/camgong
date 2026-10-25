@@ -69,7 +69,7 @@ specs/003-browse-groupbuy/
 ### Source Code (repository root)
 
 ```text
-src/main/java/com/camgong/groupbuy/
+src/main/java/com/camgong/groupbuy/query/           # 새 하위 패키지 (읽기 전용)
 ├── GroupBuyQueryController.java      # GET 목록, 상세, 내 활동 (001의 최소 상세 GET을 대체)
 ├── GroupBuyQueryService.java         # 조회 흐름, 표시 상태·공개 규칙 적용
 ├── GroupBuyListQuery.java            # 요청 파라미터 record (status, category, q, sort, cursor, size)
@@ -79,15 +79,16 @@ src/main/java/com/camgong/groupbuy/
 ├── GroupBuySummary.java              # 목록 카드
 ├── GroupBuyDetail.java               # 상세 응답
 ├── ParticipantView.java              # 개설자용 명단 행
-├── MyActivityItem.java               # 내 활동 항목(내 수량 포함)
-├── GroupBuy.java                     # (수정) organizer 읽기 전용 연관관계
-├── Participation.java                # (수정) groupBuy, member 읽기 전용 연관관계
-└── ParticipationRepository.java      # (수정) 내 활동·명단·건수 쿼리
+└── MyActivityItem.java               # 내 활동 항목(내 수량 포함)
+src/main/java/com/camgong/groupbuy/                 # (수정) 애그리거트는 그대로 두고 매핑만 추가
+├── GroupBuy.java                     # organizer 읽기 전용 연관관계
+├── Participation.java                # groupBuy, member 읽기 전용 연관관계
+└── ParticipationRepository.java      # 내 활동·명단·건수 쿼리
 src/main/resources/
 └── schema.sql                        # (수정) 인덱스 2개
 src/test/java/com/camgong/
 ├── support/QueryCountInspector.java  # StatementInspector 기반 쿼리 수 카운터
-└── groupbuy/
+└── groupbuy/query/
     ├── ListGroupBuyIT.java           # US1: 노출 대상, 필터, 정렬, 검색, 페이지 넘김
     ├── GroupBuyDetailIT.java         # US2: 필드, 내 금액, 링크·명단 공개 규칙, 401·404
     ├── MyActivityIT.java             # US3

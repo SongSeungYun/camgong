@@ -67,10 +67,10 @@ specs/004-participate-groupbuy/
 
 ### Source Code (repository root)
 
-001이 만든 `groupbuy` 패키지에 더한다. `Participation`, `ParticipationRepository`는 001에서 이미 있다.
+새 하위 패키지 `groupbuy.join`에 더한다. 애그리거트인 `Participation`, `ParticipationRepository`는 001의 `groupbuy` 패키지에 이미 있다.
 
 ```text
-src/main/java/com/camgong/groupbuy/
+src/main/java/com/camgong/groupbuy/join/            # 새 하위 패키지
 ├── ParticipationController.java
 ├── ParticipationService.java            # 흐름 조율: 멱등 확인, 게이트 호출, 참여 행 변경, 이벤트
 ├── ParticipationRequest.java            # quantity, expectedUnitPrice
@@ -82,7 +82,7 @@ src/main/java/com/camgong/groupbuy/
 ├── OptimisticQuantityGate.java
 ├── ConditionalUpdateQuantityGate.java
 └── QuantityGateConfig.java              # camgong.quantity-gate 로 구현체 선택
-src/test/java/com/camgong/groupbuy/
+src/test/java/com/camgong/groupbuy/join/
 ├── JoinParticipationIT.java
 ├── ChangeParticipationIT.java
 ├── LeaveParticipationIT.java

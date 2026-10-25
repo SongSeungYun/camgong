@@ -68,11 +68,12 @@ specs/005-close-groupbuy/
 ### Source Code (repository root)
 
 ```text
-src/main/java/com/camgong/groupbuy/
+src/main/java/com/camgong/groupbuy/close/           # 새 하위 패키지
 ├── CloseExpiredScheduler.java        # @Scheduled(fixedDelay=30s) → 서비스 호출, 설정으로 끌 수 있음
 ├── GroupBuyCloseService.java         # 후보 조회 → 건별 확정 호출 라운드 반복, 통계·로그
 ├── GroupBuyCloser.java               # 공구 1건의 확정 트랜잭션 (별도 빈, SKIP LOCKED로 선점)
-├── CloseStats.java                   # 한 실행의 결과(closed, skipped, failed)
+└── CloseStats.java                   # 한 실행의 결과(closed, skipped, failed)
+src/main/java/com/camgong/groupbuy/                 # (수정) 애그리거트
 ├── GroupBuy.java                     # (수정) fail() 상태 전이 메서드 추가
 ├── GroupBuyStatus.java               # (수정) FAILED 추가
 ├── GroupBuyRepository.java           # (수정) 후보 id 조회, SKIP LOCKED 선점 쿼리
@@ -81,7 +82,7 @@ src/main/java/com/camgong/groupbuy/
 src/main/resources/
 ├── schema.sql                        # (수정) 인덱스 idx_group_buy_status_deadline
 └── application.yml                   # (수정) camgong.scheduler.close.* 설정
-src/test/java/com/camgong/groupbuy/
+src/test/java/com/camgong/groupbuy/close/
 ├── CloseExpiredIT.java               # 대상 선별, 확정 결과, 이벤트 1회
 ├── CloseConcurrencyIT.java           # 여러 인스턴스 모사, 중복 확정·이벤트 0건
 ├── CloseRaceIT.java                  # 004 참여·001 수정/취소와의 마감 경계 경쟁

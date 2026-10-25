@@ -61,14 +61,17 @@ camgong/
 com.camgong
 ├── common/       # 오류 처리, 공통 예외
 ├── member/
-├── groupbuy/     # 공구와 참여 (001, 003, 004, 005). Participation은 공구의 일부
+├── groupbuy/     # 애그리거트(GroupBuy, Participation, 리포지토리, 상태, 이벤트)와 001 쓰기
+│   ├── query/    # 003 조회 (읽기 전용)
+│   ├── join/     # 004 참여·수량 변경·참여 취소 (QuantityGate 4방식)
+│   └── close/    # 005 마감 확정 (스케줄러)
 └── (이후) auth/, notification/
 ```
 
 레이어는 `Controller → Service → Repository`이고, 서비스·리포지토리의 인터페이스는 구현체가 하나뿐이면 만들지 않는다.
 엔티티는 연관관계 매핑 없이 `Long` id 컬럼만 두고, N+1 비교용 매핑은 003에서 정한다.
 
-**결정 (2026-10-26)**: `Participation`은 `groupbuy` 패키지 안에 둔다. 참여는 공구의 일부여서 `secured_quantity = Σ quantity` 불변식과 락이 공구 행 하나에 걸려 있다. 합치면 패키지 순환이 없고 불변식을 한곳에서 지킬 수 있다. 001 plan과 tasks의 경로를 맞췄다.
+**결정 (2026-10-26)**: `Participation`은 `groupbuy` 패키지 안에 둔다. 클래스가 약 40개가 되므로 기능별 하위 패키지 `query`(003), `join`(004), `close`(005)로 나누고, 애그리거트와 001 쓰기는 `groupbuy` 루트에 둔다. 하위 패키지가 애그리거트를 쓰므로 `GroupBuy`·`Participation`의 접근자와 상태 전이 메서드는 `public`이어야 한다. 참여는 공구의 일부여서 `secured_quantity = Σ quantity` 불변식과 락이 공구 행 하나에 걸려 있다. 합치면 패키지 순환이 없고 불변식을 한곳에서 지킬 수 있다. 001 plan과 tasks의 경로를 맞췄다.
 
 ## 6. 공통 규약
 
