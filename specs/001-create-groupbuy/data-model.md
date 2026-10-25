@@ -26,6 +26,7 @@
 | total_quantity | INT | 2 ≤ n ≤ 1000 | FR-005 |
 | secured_quantity | INT | 1 ≤ n ≤ total_quantity (CHECK) | 결정 2, FR-013 |
 | deadline | DATETIME(6) UTC | 개설 시 now < d ≤ created_at + 30일. 수정 시 단축 불가, 상한은 created_at + 30일 | FR-004, FR-012 |
+| category | VARCHAR(20) | 필수, `FOOD`(식품) / `DAILY`(생활용품) / `KITCHEN`(주방) / `HEALTH_BEAUTY`(건강·뷰티) / `STATIONERY`(문구·학용품) / `ETC`(기타) 중 하나 | FR-019 |
 | item_url | VARCHAR(500) | 필수, https 주소. 로그인한 모든 회원에게 공개 | FR-018 |
 | open_chat_url | VARCHAR(500) | 필수, https 주소. 모집 완료 후 참여자에게만 공개 | FR-017 |
 | status | VARCHAR(20) | OPEN / COMPLETED / CANCELLED | |

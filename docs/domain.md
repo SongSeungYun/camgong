@@ -18,6 +18,7 @@
 | 남은 수량 | `remainingQuantity` | 총 수량 − 확보 수량 | |
 | 개당 가격 | `unitPrice` | 상품 하나의 가격(원) | 단가 |
 | 마감 시각 | `deadline` | 이 시각까지 총 수량을 못 채우면 실패 | |
+| 카테고리 | `category` | 상품 종류. 고정 6개: 식품(`FOOD`), 생활용품(`DAILY`), 주방(`KITCHEN`), 건강·뷰티(`HEALTH_BEAUTY`), 문구·학용품(`STATIONERY`), 기타(`ETC`) | 태그, 분류 |
 | 구매처 링크 | `itemUrl` | 상품을 볼 수 있는 외부 링크 | 상품 링크 |
 | 오픈채팅 링크 | `openChatUrl` | 참여자끼리 소통하는 외부 채팅 링크 | 채팅방 |
 | 모집 중 | `OPEN` | 참여를 받는 상태 | |
@@ -48,6 +49,7 @@ erDiagram
         varchar title
         varchar description
         varchar item_name
+        varchar category
         varchar item_url
         int unit_price
         int total_quantity

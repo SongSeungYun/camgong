@@ -16,6 +16,7 @@
 | totalQuantity | integer | O | 2~1000 |
 | deadline | datetime | O | 개설: 현재 이후 & 개설 시점 +30일 이내. 수정: 현재 값 이상 & 개설 시점 +30일 이내 |
 | organizerQuantity | integer | O | ≥ 1, 개설: < totalQuantity. 수정: 다른 참여자 수량과 합쳐 totalQuantity 이하 |
+| category | string | O | `FOOD`, `DAILY`, `KITCHEN`, `HEALTH_BEAUTY`, `STATIONERY`, `ETC` 중 하나 |
 | itemUrl | string | O | https URL, 최대 500자 (구매처 링크) |
 | openChatUrl | string | O | https URL, 최대 500자 |
 
@@ -98,6 +99,7 @@
   "status": "OPEN",
   "organizerId": 1,
   "organizerQuantity": 9,
+  "category": "FOOD",
   "itemUrl": "https://example.com/item/123",
   "openChatUrl": null,
   "createdAt": "2026-10-25T07:30:00+09:00"

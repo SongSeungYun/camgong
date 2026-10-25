@@ -39,15 +39,15 @@ description: "공구 개설 구현 태스크"
 
 - [ ] T005 `res/schema.sql` 작성 (모든 테이블 `CREATE TABLE IF NOT EXISTS`, 앱 재시작에 안전해야 함). data-model.md 제약을 그대로 옮긴다:
   - `member(id BIGINT PK, name)`
-  - `group_buy(id BIGINT AUTO_INCREMENT PRIMARY KEY, organizer_id BIGINT FK→member, title VARCHAR(100) NOT NULL, description VARCHAR(2000) NULL, item_name VARCHAR(100) NOT NULL, unit_price INT NOT NULL CHECK (unit_price BETWEEN 1 AND 1000000), total_quantity INT NOT NULL, secured_quantity INT NOT NULL, deadline DATETIME(6) NOT NULL, item_url VARCHAR(500) NOT NULL, open_chat_url VARCHAR(500) NOT NULL, status VARCHAR(20) NOT NULL, version BIGINT NOT NULL, created_at DATETIME(6), updated_at DATETIME(6), CHECK (secured_quantity BETWEEN 1 AND total_quantity))`
+  - `group_buy(id BIGINT AUTO_INCREMENT PRIMARY KEY, organizer_id BIGINT FK→member, title VARCHAR(100) NOT NULL, description VARCHAR(2000) NULL, item_name VARCHAR(100) NOT NULL, unit_price INT NOT NULL CHECK (unit_price BETWEEN 1 AND 1000000), total_quantity INT NOT NULL, secured_quantity INT NOT NULL, deadline DATETIME(6) NOT NULL, category VARCHAR(20) NOT NULL, item_url VARCHAR(500) NOT NULL, open_chat_url VARCHAR(500) NOT NULL, status VARCHAR(20) NOT NULL, version BIGINT NOT NULL, created_at DATETIME(6), updated_at DATETIME(6), CHECK (secured_quantity BETWEEN 1 AND total_quantity))`
   - `participation(id BIGINT AUTO_INCREMENT PRIMARY KEY, group_buy_id FK→group_buy, member_id FK→member, quantity INT CHECK (quantity > 0), created_at DATETIME(6), UNIQUE (group_buy_id, member_id))`
   - `create_guard(member_id BIGINT, fingerprint CHAR(64), created_at DATETIME(6), PRIMARY KEY (member_id, fingerprint))`
   - 파일 상단에 `-- ponytail: Flyway로 올릴 시점은 운영 데이터가 생기는 5단계 전` 주석
 - [ ] T006 [P] `main/member/Member.java`, `main/member/MemberRepository.java`: 필드 `id`, `name`만
 - [ ] T007 [P] `main/groupbuy/Participation.java`, `main/groupbuy/ParticipationRepository.java`: 필드 `id`, `groupBuyId`, `memberId`, `quantity`, `createdAt`. 연관관계 매핑 없이 `Long` 컬럼만 둔다(N+1 비교용 매핑은 조회 기능에서 결정). `id`는 `@GeneratedValue(strategy = GenerationType.IDENTITY)`, `createdAt`은 서비스가 `Instant.now(clock)`으로 설정
-- [ ] T008 `main/groupbuy/GroupBuyStatus.java`(`OPEN`, `COMPLETED`, `CANCELLED`), `main/groupbuy/GroupBuy.java`: data-model.md의 필드 전부, `organizerId`는 `Long` 컬럼, `@Version version`, `status`는 `EnumType.STRING`, `id`는 `@GeneratedValue(strategy = GenerationType.IDENTITY)`. `createdAt`·`updatedAt`은 DB 기본값이나 `@CreatedDate`를 쓰지 않고 서비스가 `Instant.now(clock)`으로 설정한다('개설 시점 +30일' 판정은 이 `createdAt` 기준). 상태 전이 메서드는 US3에서 추가
+- [ ] T008 `main/groupbuy/GroupBuyStatus.java`(`OPEN`, `COMPLETED`, `CANCELLED`), `main/groupbuy/GroupBuyCategory.java`(`FOOD`, `DAILY`, `KITCHEN`, `HEALTH_BEAUTY`, `STATIONERY`, `ETC`), `main/groupbuy/GroupBuy.java`: data-model.md의 필드 전부, `organizerId`는 `Long` 컬럼, `@Version version`, `status`는 `EnumType.STRING`, `id`는 `@GeneratedValue(strategy = GenerationType.IDENTITY)`. `createdAt`·`updatedAt`은 DB 기본값이나 `@CreatedDate`를 쓰지 않고 서비스가 `Instant.now(clock)`으로 설정한다('개설 시점 +30일' 판정은 이 `createdAt` 기준). 상태 전이 메서드는 US3에서 추가
 - [ ] T009 [P] `main/CamgongApplication.java`에 `Clock` 빈(`Clock.systemUTC()`) 등록
-- [ ] T010 [P] `main/common/ApiException.java`(상태 코드, title, `errors` 목록을 가진 런타임 예외)와 `main/common/ApiExceptionHandler.java`: `ProblemDetail`에 `errors: [{field, message}]` 속성을 담아 응답. `MethodArgumentNotValidException`→400(필드별 메시지), `ApiException`→지정한 상태. contracts의 코드 `DUPLICATE_REQUEST`, `NOT_MODIFIABLE`은 409의 `title`
+- [ ] T010 [P] `main/common/ApiException.java`(상태 코드, title, `errors` 목록을 가진 런타임 예외)와 `main/common/ApiExceptionHandler.java`: `ProblemDetail`에 `errors: [{field, message}]` 속성을 담아 응답. `MethodArgumentNotValidException`→400(필드별 메시지), `ApiException`→지정한 상태, 열거형 값 변환 실패(`HttpMessageNotReadableException`)→400이며 `errors`에 해당 필드명(`category`)을 담는다. contracts의 코드 `DUPLICATE_REQUEST`, `NOT_MODIFIABLE`은 409의 `title`
 
 **Checkpoint**: 앱이 뜨고 `schema.sql`이 `ddl-auto=validate`를 통과한다.
 
@@ -66,10 +66,10 @@ description: "공구 개설 구현 태스크"
 
 ### Implementation for User Story 1
 
-- [ ] T013 [P] [US1] `main/groupbuy/GroupBuyRequest.java`: record로 필드만 정의 — `title`, `description`, `itemName`, `unitPrice`, `totalQuantity`, `deadline`(`OffsetDateTime`), `organizerQuantity`, `itemUrl`, `openChatUrl`. 제약은 US2에서 추가
+- [ ] T013 [P] [US1] `main/groupbuy/GroupBuyRequest.java`: record로 필드만 정의 — `title`, `description`, `itemName`, `unitPrice`, `totalQuantity`, `deadline`(`OffsetDateTime`), `organizerQuantity`, `category`, `itemUrl`, `openChatUrl`. 제약은 US2에서 추가
 - [ ] T014 [P] [US1] `main/groupbuy/GroupBuyResponse.java`: contracts의 응답 필드. `remainingQuantity = totalQuantity − securedQuantity`, `organizerQuantity`, `deadline`은 오프셋 포함 ISO-8601, `openChatUrl`은 호출자가 가시성 판단 후 값 또는 null을 넘긴다
 - [ ] T015 [US1] `main/groupbuy/GroupBuyRepository.java`: `JpaRepository<GroupBuy, Long>` (T008 이후)
-- [ ] T016 [US1] `main/groupbuy/CreateGuard.java` **(핵심 로직)**: `JdbcClient`로 research.md 결정 3의 `INSERT ... ON DUPLICATE KEY UPDATE ... IF(create_guard.created_at < :now - INTERVAL 10 SECOND, new.created_at, create_guard.created_at)`(행 별칭 `AS new`, 기존 값은 테이블 이름을 붙여 참조) 실행, 영향 행 수 0이면 중복. 결과는 `boolean`으로 노출하고, 이 판정은 JDBC `useAffectedRows=true`를 전제한다. `now`는 DB `NOW()`가 아니라 `Clock`에서 파라미터로 전달. 입력값(제목, 설명(null→""), 상품명, 가격, 총 수량, 마감 Instant, 개설자 수량, 구매처 링크, 오픈채팅 링크)을 trim해 이어 붙인 문자열의 SHA-256 hex(`MessageDigest`)를 fingerprint로 만드는 메서드 포함. 주석: `-- ponytail: MySQL 전용 문법, 가드 행 정리 작업 없음`
+- [ ] T016 [US1] `main/groupbuy/CreateGuard.java` **(핵심 로직)**: `JdbcClient`로 research.md 결정 3의 `INSERT ... ON DUPLICATE KEY UPDATE ... IF(create_guard.created_at < :now - INTERVAL 10 SECOND, new.created_at, create_guard.created_at)`(행 별칭 `AS new`, 기존 값은 테이블 이름을 붙여 참조) 실행, 영향 행 수 0이면 중복. 결과는 `boolean`으로 노출하고, 이 판정은 JDBC `useAffectedRows=true`를 전제한다. `now`는 DB `NOW()`가 아니라 `Clock`에서 파라미터로 전달. 입력값(제목, 설명(null→""), 상품명, 가격, 총 수량, 마감 Instant, 개설자 수량, 카테고리, 구매처 링크, 오픈채팅 링크)을 trim해 이어 붙인 문자열의 SHA-256 hex(`MessageDigest`)를 fingerprint로 만드는 메서드 포함. 주석: `-- ponytail: MySQL 전용 문법, 가드 행 정리 작업 없음`
 - [ ] T017 [US1] `main/groupbuy/GroupBuyService.java`의 `create` **(핵심 로직)**: `@Transactional`. 회원 존재 확인(없으면 401) → 가드 호출(중복이면 409 `DUPLICATE_REQUEST`) → `GroupBuy`(`OPEN`, `securedQuantity=organizerQuantity`) 저장 → 개설자 `Participation`(수량=개설자 수량) 저장 → 응답. `createdAt`·`updatedAt`과 시간 판정 모두 주입한 `Clock`으로 설정(DB 기본값 사용 안 함)
 - [ ] T018 [US1] `main/groupbuy/GroupBuyService.java`의 `get`: 존재하지 않거나 `CANCELLED`이면 404. `openChatUrl`은 data-model/contracts 규칙대로 — 개설자는 `OPEN`·`COMPLETED`에서 값, 참여자는 `COMPLETED`에서만 값, 그 외 null. 개설자 수량은 개설자의 `Participation`에서 조회
 - [ ] T019 [US1] `main/groupbuy/GroupBuyController.java`: `POST /api/groupbuys`(201 + `Location`), `GET /api/groupbuys/{id}`. 요청자는 `@RequestHeader(value = "X-Member-Id", required = false) Long memberId`. 주석: `// ponytail: 임시 인증, 4단계에서 로그인으로 교체`
@@ -86,7 +86,7 @@ description: "공구 개설 구현 태스크"
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T020 [P] [US2] `test/groupbuy/CreateGroupBuyValidationIT.java`: 시나리오 3(과거 마감 → `deadline`), 4(총 24·개설자 24 → `organizerQuantity`), 5(제목 공백, 총 수량 0 → 필드별 사유), 6(`openChatUrl=ftp://x` 또는 비움 → `openChatUrl`, `itemUrl` 누락·형식 오류 → `itemUrl`). 경계: 총 수량 1·2·1000·1001, 가격 0·1·1,000,000·1,000,001, 마감 now+30일 정각과 +1초, 제목·상품명 100자와 101자. 실패한 요청이 `create_guard`에 행을 남기지 않는지, 같은 본문 재전송이 409가 아닌 400으로 동일하게 거부되는지
+- [ ] T020 [P] [US2] `test/groupbuy/CreateGroupBuyValidationIT.java`: 시나리오 3(과거 마감 → `deadline`), 4(총 24·개설자 24 → `organizerQuantity`), 5(제목 공백, 총 수량 0 → 필드별 사유), 21(카테고리 누락·목록 밖 값 → `category`), 6(`openChatUrl=ftp://x` 또는 비움 → `openChatUrl`, `itemUrl` 누락·형식 오류 → `itemUrl`). 경계: 총 수량 1·2·1000·1001, 가격 0·1·1,000,000·1,000,001, 마감 now+30일 정각과 +1초, 제목·상품명 100자와 101자. 실패한 요청이 `create_guard`에 행을 남기지 않는지, 같은 본문 재전송이 409가 아닌 400으로 동일하게 거부되는지
 
 ### Implementation for User Story 2
 
@@ -98,6 +98,7 @@ description: "공구 개설 구현 태스크"
   - `totalQuantity`: 필수, 2 이상 1000 이하 (`@NotNull @Min(2) @Max(1000)`)
   - `deadline`: 필수 (`@NotNull`)
   - `organizerQuantity`: 필수, 1 이상 (`@NotNull @Min(1)`)
+  - `category`: 필수, 허용값 6개 중 하나 (`@NotNull`, 열거형 바인딩)
   - `itemUrl`: 필수, 최대 500자, `https://`로 시작 (`@NotBlank @Size(max = 500) @Pattern`)
   - `openChatUrl`: 필수, 최대 500자, `https://`로 시작 (`@NotBlank @Size(max = 500) @Pattern`)
 - [ ] T022 [US2] `main/groupbuy/GroupBuyService.java`에 `validateForCreate` **(핵심 로직)**: `deadline > now` 그리고 `deadline ≤ now + 30일`, `organizerQuantity < totalQuantity`. 위반은 모두 모아 `errors[]`로 400. **`create`에서 가드 호출보다 먼저 실행**한다(실패한 요청이 가드를 소모하면 안 됨)

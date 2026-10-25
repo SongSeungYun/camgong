@@ -84,6 +84,7 @@ src/main/java/com/camgong/
 └── groupbuy/
     ├── GroupBuy.java                   # 엔티티 + 상태 전이 메서드
     ├── GroupBuyStatus.java             # OPEN, COMPLETED, CANCELLED
+    ├── GroupBuyCategory.java           # FOOD, DAILY, KITCHEN, HEALTH_BEAUTY, STATIONERY, ETC
     ├── Participation.java              # 참여 (공구의 일부)
     ├── ParticipationRepository.java
     ├── GroupBuyRepository.java         # 비관적 락 조회 포함
