@@ -52,7 +52,7 @@
 - [x] 상태 변화와 불변식이 `docs/domain.md` 한 곳에 있다
 - [x] 화면-API 대조(`docs/screens.md` 5절)의 빈 칸이 0이거나 의도적 제외로 표시됐다
 - [x] 핵심 3기능 plan이 같은 락·상태·이벤트 규칙을 쓴다 (`docs/cross-check.md`)
-- [x] 설계가 기대는 가정이 스파이크로 검증됐다 (`docs/spikes.md`, Java 21 재검증만 구현 첫날)
+- [x] 설계가 기대는 가정이 스파이크로 검증됐다 (`docs/spikes.md`, Java 21 재검증 완료)
 - [ ] 설명 체크(줄인 범위 8문항)를 통과했다
 
 ## 가정 검증 스파이크
@@ -60,4 +60,4 @@
 `docs/spikes.md`에 결과를 남긴다. 버릴 코드는 저장소에 넣지 않는다.
 
 - [x] DB 수준 가정 5건 검증 (2026-10-26): 영향 행 수, 동시 가드, CHECK, FOR UPDATE, 행 별칭 문법
-- [x] Spring 수준 가정 (2026-10-26 밤샘, Boot 4.1.2/JDK 25로 검증, `docs/spikes.md` 'Spring 수준 검증'). Java 21 재검증은 구현 첫날
+- [x] Spring 수준 가정 (2026-10-26 밤샘, Boot 4.1.2/JDK 25로 검증, `docs/spikes.md` 'Spring 수준 검증'). Java 21 재검증 완료(2026-10-27)

@@ -49,9 +49,11 @@
 | — | 낙관적 `@Version`과 직접 `UPDATE`가 같은 버전 규칙으로 맞물린다 (004) | **확인됨** | 직접 `UPDATE`가 `version=version+1`을 하면 낡은 엔티티 저장이 `ObjectOptimisticLockingFailureException`. **버전을 올리지 않는 직접 `UPDATE`는 충돌을 못 잡고 덮어씀(갱신 손실)**. 영향: 004의 직접 `UPDATE` 쿼리는 항상 `version = version + 1`을 포함해야 함 |
 | — | 같은 컬럼의 읽기 전용 `@ManyToOne(insertable=false, updatable=false)`를 `Long` id와 병행해도 쓰기에 문제 없다 (003) | **확인됨** | `memberId`로 저장 후 트랜잭션 안에서 `member.getName()` 조회 성공, 수정 저장도 정상. 트랜잭션 밖에서 지연 로딩 접근은 `LazyInitializationException`(open-in-view 끔) — 서비스 계층 밖으로 엔티티를 내보내면 안 됨. 프록시의 public 필드는 `null`로 보이므로 접근자로 읽어야 함(스파이크에서 겪음) |
 
+**Java 21 재검증 (2026-10-27)**: 같은 스파이크를 Temurin이 아닌 BellSoft Liberica JDK 21.0.12(`-Djava.version=21`)로 다시 돌렸다. 테스트 15개(5c 추가분 포함) 모두 통과, 결과는 JDK 25와 동일하다(범위 선점은 REPEATABLE READ에서 락 대기 시간 초과, id 지정 선점은 통과 등). 스파이크 판정은 **JDK 21에서도 유효**하다.
+
 ### 이 검증이 가리키는 문서 영향 (문서는 고치지 않음)
 
 1. **005 (가장 중요)**: 위 5' — 스케줄러 트랜잭션의 격리 수준 또는 처리 단위 결정이 필요하다. `specs/005-close-groupbuy` research의 SKIP LOCKED 서술과 `tasks.md`의 동시 워커 테스트 태스크가 영향을 받는다.
 2. **004**: 직접 `UPDATE`에는 `version = version + 1`을 포함하는 규칙을 명시하는 것이 좋다.
 3. **환경**: Boot 4.x는 Hibernate 7을 쓴다. 문서에 적힌 API 이름이 Boot 3.x 기준이면 구현 때 맞춰야 한다(이번에 쓴 것은 모두 동작).
-4. 이번에 **확인 못 한 것**: Java 21에서의 동작, 재기동 시 `schema.sql` 재실행, 실제 규모의 락 경합 빈도, 이스케이프 미적용 시 동작.
+4. 이번에 **확인 못 한 것**: (Java 21은 2026-10-27에 확인함) 재기동 시 `schema.sql` 재실행, 실제 규모의 락 경합 빈도, 이스케이프 미적용 시 동작.
