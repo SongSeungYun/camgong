@@ -39,6 +39,10 @@ public class Participation {
         this.createdAt = createdAt;
     }
 
+    public void changeQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
     public Long getId() {
         return id;
     }

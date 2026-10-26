@@ -1,6 +1,13 @@
 package com.camgong.support;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +20,9 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.mysql.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -54,14 +63,47 @@ public abstract class IntegrationTestBase {
     @Autowired
     protected MutableClock clock;
 
+    @Autowired
+    protected EventCollector events;
+
     @BeforeEach
     void resetState() {
         clock.set(START);
+        events.clear();
         jdbc.update("DELETE FROM participation");
         jdbc.update("DELETE FROM group_buy");
         jdbc.update("DELETE FROM create_guard");
         jdbc.update("DELETE FROM member");
         jdbc.update("INSERT INTO member (id, name) VALUES (1, '개설자'), (2, '참여자'), (3, '외부인')");
+    }
+
+    /** 개설자(1)가 기본 본문으로 공구를 열고 id 를 돌려준다. 같은 본문은 10초 가드에 걸리므로 테스트당 한 번만 쓴다. */
+    protected long openGroupBuy() throws Exception {
+        return openGroupBuy(GroupBuyBodies.valid());
+    }
+
+    protected long openGroupBuy(Map<String, Object> body) throws Exception {
+        String location = mockMvc.perform(post("/api/groupbuys").with(as(ORGANIZER))
+                        .contentType(MediaType.APPLICATION_JSON).content(GroupBuyBodies.json(body)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getHeader("Location");
+        return Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
+    }
+
+    /** 참여 기능이 없으므로 참여 행과 확보 수량을 SQL 로 함께 맞춘다. */
+    protected void seedParticipant(long groupBuyId, long memberId, int quantity) {
+        jdbc.update("INSERT INTO participation (group_buy_id, member_id, quantity, created_at) VALUES (?, ?, ?, ?)",
+                groupBuyId, memberId, quantity, LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC));
+        jdbc.update("UPDATE group_buy SET secured_quantity = secured_quantity + ? WHERE id = ?", quantity, groupBuyId);
+    }
+
+    protected ResultActions updateAs(long memberId, long groupBuyId, Map<String, Object> body) throws Exception {
+        return mockMvc.perform(put("/api/groupbuys/" + groupBuyId).with(as(memberId))
+                .contentType(MediaType.APPLICATION_JSON).content(GroupBuyBodies.json(body)));
+    }
+
+    protected ResultActions cancelAs(long memberId, long groupBuyId) throws Exception {
+        return mockMvc.perform(post("/api/groupbuys/" + groupBuyId + "/cancel").with(as(memberId)));
     }
 
     /**
@@ -82,6 +124,11 @@ public abstract class IntegrationTestBase {
         @Primary
         MutableClock mutableClock() {
             return new MutableClock(START);
+        }
+
+        @Bean
+        EventCollector eventCollector() {
+            return new EventCollector();
         }
     }
 }

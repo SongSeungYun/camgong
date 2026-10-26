@@ -86,6 +86,51 @@ public class GroupBuy {
         this.updatedAt = now;
     }
 
+    /** 수정·취소 허용 조건: OPEN 이고 마감 전(FR-015). */
+    public boolean isModifiable(Instant now) {
+        return status == GroupBuyStatus.OPEN && deadline.isAfter(now);
+    }
+
+    /**
+     * 확보 수량이 총 수량에 닿으면 COMPLETED 로 바꾼다. 모집 완료 판정은 이 메서드 하나만 한다.
+     * 이미 COMPLETED 이거나 아직 덜 찼으면 변화 없음.
+     *
+     * @return 이번 호출로 COMPLETED 가 되었으면 true
+     */
+    public boolean completeIfFull() {
+        if (status == GroupBuyStatus.OPEN && securedQuantity == totalQuantity) {
+            status = GroupBuyStatus.COMPLETED;
+            return true;
+        }
+        return false;
+    }
+
+    /** OPEN 에서만 CANCELLED 로 간다. 행은 지우지 않는다. */
+    public void cancel(Instant now) {
+        if (status != GroupBuyStatus.OPEN) {
+            throw new IllegalStateException("OPEN 이 아닌 공구는 취소할 수 없다: " + status);
+        }
+        status = GroupBuyStatus.CANCELLED;
+        updatedAt = now;
+    }
+
+    /** 개설자·생성 시각·상태는 바꾸지 않는다. 호출자가 락 안에서 검증한 값만 넘긴다. */
+    public void update(String title, String description, String itemName, int unitPrice, int totalQuantity,
+            int securedQuantity, Instant deadline, GroupBuyCategory category, String itemUrl, String openChatUrl,
+            Instant now) {
+        this.title = title;
+        this.description = description;
+        this.itemName = itemName;
+        this.unitPrice = unitPrice;
+        this.totalQuantity = totalQuantity;
+        this.securedQuantity = securedQuantity;
+        this.deadline = deadline;
+        this.category = category;
+        this.itemUrl = itemUrl;
+        this.openChatUrl = openChatUrl;
+        this.updatedAt = now;
+    }
+
     public Long getId() {
         return id;
     }
