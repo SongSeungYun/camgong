@@ -4,7 +4,7 @@
 
 **Input**: Feature specification from `/specs/008-frontend-web/spec.md`
 
-> **상태**: 방식(모바일 우선 웹 + PWA)과 스택(React + Vite + TypeScript)은 2026-10-27 사용자가 확정했다. 나머지 설계 결정은 [research.md](research.md)의 **추천안 기준 가안**이며 사용자 결정 대기다. spec에 빠진 부분(S09·S10의 FR, PWA 문구 충돌, 계약 공백)은 research.md 맨 앞 '스펙·계약 보완 필요'에 모았다.
+> **상태**: 방식(모바일 우선 웹 + PWA)과 스택(React + Vite + TypeScript)은 2026-10-27 사용자가 확정했다. 나머지 설계 결정(3~14)은 2026-10-27 사용자가 [research.md](research.md)의 추천안으로 확정했다(13은 방향만). spec에 빠진 부분(S09·S10의 FR, PWA 문구 충돌, 계약 공백)은 research.md 맨 앞 '스펙·계약 보완 필요'에 모았다.
 
 ## Summary
 
@@ -19,7 +19,7 @@
 
 **Language/Version**: TypeScript 5.x (strict), Node.js LTS (개발·빌드 전용)
 
-**Primary Dependencies**: React 19, Vite, React Router, TanStack Query, React Hook Form, `vite-plugin-pwa`. 테스트: Vitest, Testing Library, MSW, Playwright. 각 선택의 이유(헌법 기술 제약: 새 의존성은 이유 한 줄)는 research.md 결정 3~9에 있다. **전부 사용자 결정 대기.**
+**Primary Dependencies**: React 19, Vite, React Router, TanStack Query, React Hook Form, `vite-plugin-pwa`. 테스트: Vitest, Testing Library, MSW, Playwright. 각 선택의 이유(헌법 기술 제약: 새 의존성은 이유 한 줄)는 research.md 결정 3~9에 있다. 확정(2026-10-27, 추천대로).
 
 **Storage**: 없음. 서버가 진실 원천이다. 브라우저에는 목록 조건(주소 쿼리)과 로그인 쿠키(서버가 설정, 스크립트 접근 불가)만 있다. 비밀번호·토큰을 `localStorage`에 저장하지 않는다(FR-019).
 

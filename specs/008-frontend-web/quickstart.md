@@ -1,6 +1,6 @@
 # Quickstart: 화면 검증
 
-> 추천안 기준(사용자 결정 대기). 요청·응답은 [contracts/ui-api-map.md](contracts/ui-api-map.md), 상태는 [data-model.md](data-model.md).
+> 추천안 기준(2026-10-27 확정). 요청·응답은 [contracts/ui-api-map.md](contracts/ui-api-map.md), 상태는 [data-model.md](data-model.md).
 
 화면이 end-to-end로 동작하는지 확인하는 시나리오다. 먼저 **목(MSW)**으로 돌리고, 백엔드 기능이 구현될 때마다 **같은 시나리오를 실제 백엔드로** 다시 돌려 목이 계약에서 벗어나지 않았는지 확인한다.
 
