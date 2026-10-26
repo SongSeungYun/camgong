@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/api/groupbuys")
 public class GroupBuyController {
@@ -25,7 +27,7 @@ public class GroupBuyController {
     @PostMapping
     ResponseEntity<GroupBuyResponse> create(
             @RequestHeader(value = "X-Member-Id", required = false) Long memberId,
-            @RequestBody GroupBuyRequest request) {
+            @Valid @RequestBody GroupBuyRequest request) {
         GroupBuyResponse created = service.create(memberId, request);
         return ResponseEntity.created(URI.create("/api/groupbuys/" + created.id())).body(created);
     }

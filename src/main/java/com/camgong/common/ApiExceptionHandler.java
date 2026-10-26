@@ -2,6 +2,8 @@ package com.camgong.common;
 
 import java.util.List;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -12,7 +14,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import tools.jackson.core.JacksonException;
 
-/** 모든 오류를 ProblemDetail + errors[{field, message}] 로 돌려준다. */
+/**
+ * 모든 오류를 ProblemDetail + errors[{field, message}] 로 돌려준다.
+ * spring.mvc.problemdetails.enabled 가 등록하는 기본 핸들러보다 먼저 잡아야 errors 가 붙는다.
+ */
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice
 public class ApiExceptionHandler {
 

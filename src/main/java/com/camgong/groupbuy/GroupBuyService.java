@@ -1,7 +1,10 @@
 package com.camgong.groupbuy;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -12,6 +15,8 @@ import com.camgong.member.MemberRepository;
 
 @Service
 public class GroupBuyService {
+
+    private static final long MAX_DEADLINE_DAYS = 30;
 
     private final MemberRepository members;
     private final GroupBuyRepository groupBuys;
@@ -32,6 +37,9 @@ public class GroupBuyService {
     public GroupBuyResponse create(Long memberId, GroupBuyRequest r) {
         requireMember(memberId);
         Instant now = Instant.now(clock);
+
+        // 검증은 가드보다 먼저: 실패한 요청이 가드를 소모하면 같은 본문 재전송이 400 이 아닌 409 가 된다.
+        validateForCreate(r, now);
 
         // 중복이면 409. 이 뒤에서 예외로 롤백되면 가드 행도 같이 롤백된다.
         if (!createGuard.pass(memberId, CreateGuard.fingerprint(r), now)) {
@@ -58,6 +66,23 @@ public class GroupBuyService {
                 .findByGroupBuyIdAndMemberId(id, groupBuy.getOrganizerId())
                 .map(Participation::getQuantity).orElse(0);
         return GroupBuyResponse.from(groupBuy, organizerQuantity, visibleOpenChatUrl(memberId, groupBuy));
+    }
+
+    /** 시계·다른 값에 의존하는 규칙. 위반은 모두 모아 400 으로 돌려준다. */
+    private void validateForCreate(GroupBuyRequest r, Instant now) {
+        List<ApiException.Field> errors = new ArrayList<>();
+        Instant deadline = r.deadline().toInstant();
+        if (!deadline.isAfter(now)) {
+            errors.add(new ApiException.Field("deadline", "마감 시각은 현재보다 미래여야 합니다."));
+        } else if (deadline.isAfter(now.plus(Duration.ofDays(MAX_DEADLINE_DAYS)))) {
+            errors.add(new ApiException.Field("deadline", "마감 시각은 개설 시점으로부터 30일 이내여야 합니다."));
+        }
+        if (r.organizerQuantity() >= r.totalQuantity()) {
+            errors.add(new ApiException.Field("organizerQuantity", "개설자 수량은 총 수량보다 작아야 합니다."));
+        }
+        if (!errors.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.", errors);
+        }
     }
 
     /** 개설자는 OPEN·COMPLETED 에서, 참여자는 COMPLETED 에서만 링크를 본다. 그 외는 null. */
