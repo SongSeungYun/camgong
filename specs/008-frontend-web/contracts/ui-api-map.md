@@ -23,7 +23,7 @@
 ## 2. 요청 공통
 
 - 모든 요청에 쿠키를 포함한다(`credentials: 'include'`). `X-Member-Id`는 보내지 않는다.
-- 상태를 바꾸는 요청(POST/PUT/DELETE)의 CSRF 헤더는 계약 공백 4(research.md)가 정해진 뒤에 래퍼 한 곳에서 붙인다.
+- CSRF: 별도 토큰 헤더 없음(002 계약: `SameSite=Lax` + 서버 `Origin` 검증, 같은 출처 배포). 본문은 `application/json`으로만 보낸다. `Origin` 때문에 거부(403)되면 일반 오류로 취급한다.
 - 시각은 오프셋 포함 ISO-8601로 보낸다(`2026-11-01T18:00:00+09:00`).
 
 ## 3. 오류 → 안내 문구 (FR-005, FR-006, FR-028)
