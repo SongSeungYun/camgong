@@ -1,6 +1,6 @@
 # Data Model: 알림
 
-> 초안: 추천안 기준([research.md](research.md), 사용자 결정 대기).
+> 초안: 추천안 기준([research.md](research.md), 2026-10-26 확정).
 
 ## 새 테이블 `notification`
 

@@ -1,6 +1,6 @@
 # Quickstart: 알림 검증
 
-> 초안: 추천안 기준(사용자 결정 대기). 요청·응답은 [contracts/notification-api.md](contracts/notification-api.md), 규칙은 [data-model.md](data-model.md).
+> 초안: 추천안 기준(2026-10-26 확정). 요청·응답은 [contracts/notification-api.md](contracts/notification-api.md), 규칙은 [data-model.md](data-model.md).
 
 구현 후 알림이 end-to-end로 동작하는지 확인하는 시나리오다. 사건은 001(수정·취소), 004(마지막 수량 참여), 005(마감 확정)로 일으키거나, 이벤트를 직접 발행해서 시험한다. 비동기 처리는 테스트에서 완료를 기다린다(폴링 또는 실행기 동기화). 시간은 `MutableClock`.
 

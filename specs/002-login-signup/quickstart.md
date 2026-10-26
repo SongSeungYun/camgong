@@ -1,6 +1,6 @@
 # Quickstart: 가입·로그인 검증
 
-> 초안: 추천안 기준(사용자 결정 대기). 요청·응답은 [contracts/auth-api.md](contracts/auth-api.md), 규칙은 [data-model.md](data-model.md).
+> 초안: 추천안 기준(2026-10-26 확정). 요청·응답은 [contracts/auth-api.md](contracts/auth-api.md), 규칙은 [data-model.md](data-model.md).
 
 구현 후 가입·로그인이 end-to-end로 동작하는지 확인하는 시나리오다. 테스트에서는 메일 발송 대신 `LoggingMailSender`가 인증 링크의 토큰을 기록하고, 시간은 `MutableClock`으로 움직인다.
 

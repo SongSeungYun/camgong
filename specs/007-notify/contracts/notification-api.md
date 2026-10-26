@@ -1,6 +1,6 @@
 # API Contract: 알림
 
-> 초안: 추천안 기준(사용자 결정 대기, [research.md](../research.md) 결정 5·6·7).
+> 초안: 추천안 기준(2026-10-26 확정, [research.md](../research.md) 결정 5·6·7).
 
 요청·응답은 JSON, 시간은 오프셋 포함 ISO-8601. 모든 요청에 `X-Member-Id` 헤더(임시 인증, 002에서 교체). 오류 본문은 001과 같은 `ProblemDetail` + `errors[]`. 회원은 자기 알림만 볼 수 있다.
 

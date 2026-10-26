@@ -1,6 +1,6 @@
 # Quickstart: 개설자용 입금·수령 체크 검증
 
-> 초안: 추천안 기준(사용자 결정 대기). 요청·응답은 [contracts/check-api.md](contracts/check-api.md), 규칙은 [data-model.md](data-model.md).
+> 초안: 추천안 기준(2026-10-26 확정). 요청·응답은 [contracts/check-api.md](contracts/check-api.md), 규칙은 [data-model.md](data-model.md).
 
 구현 후 이 기능이 end-to-end로 동작하는지 확인하는 시나리오다. 001(개설), 004(참여), 005(마감 확정), 003(상세)이 있으면 API로, 없으면 SQL 시드로 공구와 참여자를 만든다. 시간은 `MutableClock`으로 움직인다.
 

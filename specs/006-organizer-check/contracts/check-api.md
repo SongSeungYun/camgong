@@ -1,6 +1,6 @@
 # API Contract: 개설자용 입금·수령 체크
 
-> 초안: 추천안 기준(사용자 결정 대기, [research.md](../research.md) 결정 1·5·8). 오류 코드 이름은 오류 코드 표 정리(cross-check-2 Y3) 때 확정한다.
+> 초안: 추천안 기준(2026-10-26 확정, [research.md](../research.md) 결정 1·5·8). 오류 코드 이름은 오류 코드 표 정리(cross-check-2 Y3) 때 확정한다.
 
 기본 경로 `/api/groupbuys/{id}`. 요청·응답은 JSON, 시간은 오프셋 포함 ISO-8601. 모든 요청에 `X-Member-Id` 헤더(임시 인증, 002에서 교체). 오류 본문은 001과 같은 `ProblemDetail` + `errors[]`.
 

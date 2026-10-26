@@ -1,6 +1,6 @@
 # API Contract: 가입·로그인·로그아웃
 
-> 초안: 추천안 기준(사용자 결정 대기, [research.md](../research.md) 결정 1·3·7·9). 오류 코드 이름은 오류 코드 표 정리(cross-check-2 Y3) 때 확정한다.
+> 초안: 추천안 기준(2026-10-26 확정, [research.md](../research.md) 결정 1·3·7·9). 오류 코드 이름은 오류 코드 표 정리(cross-check-2 Y3) 때 확정한다.
 
 기본 경로 `/api/auth`. 요청·응답은 JSON. 오류 본문은 001과 같은 `ProblemDetail` + `errors[]`. 인증은 쿠키 `camgong_session`(`HttpOnly`, `SameSite=Lax`, 운영에서 `Secure`)이며 이 기능이 적용되면 `X-Member-Id` 헤더는 어떤 요청도 인증하지 않는다(FR-014).
 

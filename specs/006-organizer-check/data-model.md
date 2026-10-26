@@ -1,6 +1,6 @@
 # Data Model: 개설자용 참여자·입금·수령 체크
 
-> 초안: 추천안 기준([research.md](research.md), 사용자 결정 대기).
+> 초안: 추천안 기준([research.md](research.md), 2026-10-26 확정).
 
 **새 테이블은 없다.** 001의 `participation`에 컬럼 2개를 더한다.
 

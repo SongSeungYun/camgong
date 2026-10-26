@@ -4,7 +4,7 @@
 
 **Input**: Feature specification from `/specs/007-notify/spec.md`
 
-> **초안 (밤샘 작성, 사용자 결정 대기)**: 이 plan의 설계 결정은 모두 [research.md](research.md)의 **추천안 기준**으로 쓴 가안이다. 사용자가 결정하기 전에는 확정이 아니다. 결정 목록은 [docs/overnight/decisions-pending.md](../../docs/overnight/decisions-pending.md).
+> **추천안으로 확정 (2026-10-26)**: 이 plan의 설계 결정은 모두 [research.md](research.md)의 **추천안 기준**으로 쓴 가안이다. 2026-10-26 사용자가 추천대로 확정했다(준비물·오류 코드 이름 등 남은 항목은 decisions-pending.md). 결정 목록은 [docs/overnight/decisions-pending.md](../../docs/overnight/decisions-pending.md).
 
 ## Summary
 
