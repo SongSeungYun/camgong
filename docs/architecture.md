@@ -81,7 +81,28 @@ com.camgong
 - 상태 코드: 400 입력 오류, 401 로그인 필요, 403 권한 없음, 404 없음, 409 상태 충돌. 상태: 기본값
 - 응답의 상태 필드는 `status` 하나이고 값은 `OPEN`, `PENDING_CLOSE`, `COMPLETED`, `FAILED`(표시 상태)다. 취소된 공구는 어떤 API에서도 404다. 상태: 확정(교차 점검)
 - 오류 본문은 RFC 7807 `ProblemDetail`에 `errors: [{field, message}]`를 더한 형식이다. 상태: 확정(001 plan)
-- 목록은 페이지네이션 방식(오프셋/커서)을 003 plan에서 정한다. 상태: 미정
+- 목록은 페이지네이션 방식(오프셋/커서)을 003 plan에서 정한다. 상태: 확정(003 plan, 키셋)
+- **오류 코드 표** (오류 본문 `title`에 코드를 쓴다). 상태 때문에 거부될 때는 본문에 `reason`을 더한다. 상태: 확정(2026-10-27)
+
+| 상태 | 코드 | 기능 | 뜻 / `reason` |
+|------|------|------|---------------|
+| 400 | `INVALID_TOKEN` | 002 | 알 수 없는 인증 토큰 |
+| 401 | `UNAUTHENTICATED` | 002 | 로그인 필요 |
+| 401 | `INVALID_CREDENTIALS` | 002 | 이메일/비밀번호 불일치(계정 존재 여부를 숨김) |
+| 403 | `ORGANIZER_NOT_ALLOWED` | 004 | 개설자는 직접 참여 불가(수정·취소를 쓸 것) |
+| 403 | `ORGANIZER_ONLY` | 006 | 개설자만 가능 |
+| 403 | `EMAIL_NOT_VERIFIED` | 002 | (안내 문구는 002 plan) |
+| 404 | `PARTICIPATION_NOT_FOUND` | 004·006 | 참여 없음. 취소된 공구는 어떤 API에서도 404 |
+| 409 | `NOT_MODIFIABLE` | 001 | 수정·취소 불가. `reason`: `COMPLETED` / `DEADLINE_PASSED` |
+| 409 | `NOT_JOINABLE` | 004 | 참여·변경·취소 불가. `reason`: `DEADLINE_PASSED` / `COMPLETED` / `FAILED` |
+| 409 | `NOT_CHECKABLE` | 006 | 모집 완료가 아니라 체크 불가 |
+| 409 | `DUPLICATE_REQUEST` | 001 | 중복 개설 |
+| 409 | `ALREADY_JOINED` / `PRICE_CHANGED` / `INSUFFICIENT_QUANTITY` / `BUSY` | 004 | 참여 충돌 |
+| 409 | `ALREADY_REGISTERED` / `DISPLAY_NAME_TAKEN` / `TOKEN_USED` | 002 | 가입 충돌 |
+| 410 | `TOKEN_EXPIRED` | 002 | 인증 링크 만료 |
+| 429 | `TOO_MANY_REQUESTS` / `LOGIN_LOCKED` | 002 | 메일 한도 / 로그인 잠금 (`Retry-After`) |
+
+  이미 참여한 사람의 같은 수량 재시도는 공구 상태와 무관하게 성공이며, `FAILED` 공구의 옛 참여 재시도는 409 `NOT_JOINABLE`(`reason: FAILED`)이다. 상태: 확정(2026-10-27)
 
 ### 6.2 시간
 
