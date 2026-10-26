@@ -41,7 +41,7 @@ description: "마감 확정(모집 실패 처리) 구현 태스크"
 - [ ] T007 `main/groupbuy/GroupBuy.java`에 `fail(Instant now)` **(핵심 로직)**: `status == OPEN`일 때만 `FAILED`로 바꾸고 `updatedAt = now`. 그 외 상태, 또는 확보 = 총 수량이면 예외(불변식 I7, I10). `FAILED`는 종료 상태다.
 - [ ] T008 `main/groupbuy/GroupBuyRepository.java`에 쿼리 두 개 추가 **(핵심 로직)**:
   - 후보 id 조회(락 없음): `SELECT id FROM group_buy WHERE status='OPEN' AND deadline <= :cutoff AND secured_quantity < total_quantity ORDER BY deadline LIMIT :batchSize`
-  - 건별 선점(네이티브): `SELECT * FROM group_buy WHERE id = :id AND status = 'OPEN' AND deadline <= :cutoff AND secured_quantity < total_quantity FOR UPDATE SKIP LOCKED` — 영속 엔티티로 돌아와야 한다. `:cutoff`는 `now − margin(1초)`.
+  - 건별 선점(네이티브): `SELECT * FROM group_buy WHERE id = :id AND status = 'OPEN' AND deadline <= :cutoff AND secured_quantity < total_quantity FOR UPDATE SKIP LOCKED` — 영속 엔티티로 돌아와야 한다. `:cutoff`는 `now − margin(1초)`. **선점은 반드시 이렇게 id 하나를 지정한다.** `ORDER BY deadline LIMIT 1 … FOR UPDATE SKIP LOCKED`처럼 범위를 훑어 한 건을 잡는 형태는 기본 격리 수준(REPEATABLE READ)에서 갭 락 때문에 다른 워커의 `status` 갱신이 락 대기 시간 초과로 실패했다(spikes 'Spring 수준 검증' 5'). id 지정 선점은 같은 조건에서 통과했다(5c).
 - [ ] T009 `main/groupbuy/close/GroupBuyCloser.java` **(핵심 로직)**: 별도 빈의 `closeOne(id, cutoff, now)`. `@Transactional`로 선점 쿼리(T008) 실행 → 비어 있으면 `SKIPPED` → 있으면 `fail(now)`, 개설자 포함 모든 참여 행의 회원 id로 `GroupBuyFailed` 발행(같은 트랜잭션, 커밋 후 소비), `CLOSED` 반환. 서비스와 **다른 클래스의 빈**이어야 프록시를 거쳐 건마다 새 트랜잭션이 시작된다.
 
 **Checkpoint**: `closeOne`을 직접 호출해 한 공구가 `FAILED`가 되고 이벤트가 한 번 나간다.

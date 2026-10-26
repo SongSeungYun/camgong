@@ -19,7 +19,7 @@
 
 ## 가장 중요한 발견 (설계에 영향)
 
-1. **005 SKIP LOCKED**: MySQL 기본 격리 수준(REPEATABLE READ)에서는 워커 두 개가 동시에 처리하면 `status` 갱신이 락 대기로 실패한다. READ COMMITTED에서는 통과. 원인은 갭 락으로 **추정**(락 상태를 직접 보지는 않음), 2행짜리 최소 재현. → 결정 대기 #6
+1. **005 SKIP LOCKED** (정정 2026-10-27: `ORDER BY … LIMIT 1` 범위 선점일 때만 해당. 005 tasks의 id 지정 선점은 REPEATABLE READ에서도 통과해 설계 변경 불필요): MySQL 기본 격리 수준(REPEATABLE READ)에서는 범위 선점 워커 두 개가 동시에 처리하면 `status` 갱신이 락 대기로 실패한다. READ COMMITTED에서는 통과. 원인은 갭 락으로 **추정**(락 상태를 직접 보지는 않음), 2행짜리 최소 재현. → 결정 대기 #6
 2. **004 재시도 vs FR-009 모호성**(analyze-004 B1) → 결정 대기
 3. **직접 UPDATE에는 `version = version + 1` 필수**(없으면 갱신 손실 재현됨)
 4. 인덱스는 `CREATE INDEX IF NOT EXISTS`가 아닌 `KEY` 절로(MySQL 미지원으로 알고 있음, 구현 때 확인)

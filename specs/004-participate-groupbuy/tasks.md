@@ -39,7 +39,7 @@ description: "공구 참여·수량 변경·참여 취소 구현 태스크"
 **⚠️ CRITICAL**: 이 단계가 끝나기 전에는 스토리 작업을 시작하지 않는다.
 
 - [ ] T007 `main/groupbuy/join/PessimisticQuantityGate.java` **(핵심 로직)**: `GroupBuyRepository.findByIdForUpdate`로 행을 잡고 아래 순서로 검사한 뒤 갱신한다 — 없거나 `CANCELLED`면 `NOT_FOUND`, `status != OPEN` 또는 `deadline <= now`면 `NOT_JOINABLE`, `expectedUnitPrice`가 있고 현재 가격과 다르면 `PRICE_CHANGED`, `secured + delta > total`이면 `INSUFFICIENT_QUANTITY`. 통과하면 `secured_quantity += delta`, `completeIfFull()`로 `COMPLETED` 전환, `updatedAt = now`. 이 게이트가 측정 전까지 기본 방식이다.
-- [ ] T008 `main/groupbuy/join/ParticipationService.java` 뼈대와 오류 매핑: 회원 존재 확인(없으면 401), 거부 사유를 `ApiException`으로 변환 — `NOT_FOUND` 404, `NOT_JOINABLE` 409 `NOT_JOINABLE`, `PRICE_CHANGED` 409(본문에 `currentUnitPrice`), `INSUFFICIENT_QUANTITY` 409(본문에 `remainingQuantity`), `BUSY` 409 `BUSY`, 개설자 요청 403 `ORGANIZER_NOT_ALLOWED`, 참여 기록 없음 404 `PARTICIPATION_NOT_FOUND`, 이미 참여(수량 다름) 409 `ALREADY_JOINED`. `ApiExceptionHandler`가 추가 본문 속성을 `ProblemDetail`에 실을 수 있게 확장한다.
+- [ ] T008 `main/groupbuy/join/ParticipationService.java` 뼈대와 오류 매핑: 회원 존재 확인(없으면 401), 거부 사유를 `ApiException`으로 변환 — `NOT_FOUND` 404, `NOT_JOINABLE` 409 `NOT_JOINABLE`(본문에 `reason`: `DEADLINE_PASSED` / `COMPLETED` / `FAILED`, `GateResult`가 사유를 함께 전달), `PRICE_CHANGED` 409(본문에 `currentUnitPrice`), `INSUFFICIENT_QUANTITY` 409(본문에 `remainingQuantity`), `BUSY` 409 `BUSY`, 개설자 요청 403 `ORGANIZER_NOT_ALLOWED`, 참여 기록 없음 404 `PARTICIPATION_NOT_FOUND`, 이미 참여(수량 다름) 409 `ALREADY_JOINED`. `ApiExceptionHandler`가 추가 본문 속성을 `ProblemDetail`에 실을 수 있게 확장한다. 재시도 규칙(decisions-pending #1): 이미 참여한 회원의 같은 수량 요청은 `COMPLETED`여도 200, `FAILED`면 409 `NOT_JOINABLE`(`reason: FAILED`), `CANCELLED`면 404. **직접 `UPDATE`(조건부 방식 등)는 항상 `version = version + 1`을 포함한다**(없으면 낡은 엔티티 저장이 충돌 없이 덮어씀, spikes 'Spring 수준 검증').
 - [ ] T009 `main/groupbuy/join/QuantityGateConfig.java`: `camgong.quantity-gate`(`pessimistic` 기본, `conditional`, `optimistic`, `none`)로 구현체를 고르는 빈. `none`은 `benchmark` 프로파일에서만 허용하고 다른 프로파일에서 선택하면 앱이 기동 오류를 낸다. (구현체는 해당 스토리에서 추가하며, 아직 없는 값은 기동 오류로 처리한다.)
 
 **Checkpoint**: 비관적 게이트와 서비스 뼈대가 컴파일되고 앱이 `pessimistic`으로 뜬다.
@@ -54,8 +54,8 @@ description: "공구 참여·수량 변경·참여 취소 구현 태스크"
 
 ### Tests for User Story 1 ⚠️ (먼저 작성하고 실패 확인)
 
-- [ ] T010 [P] [US1] `test/groupbuy/join/JoinParticipationIT.java`: quickstart 시나리오 1(정상: 201, `amount=7200`, `securedQuantity=15`, `remainingQuantity=9`, `OPEN`), 2(딱 채우기: `COMPLETED`, 이후 참여 409 `NOT_JOINABLE`), 3(남은 수량 초과 → 409 `INSUFFICIENT_QUANTITY`, `remainingQuantity`), 6(개설자 403), 7(헤더 없음 401), 8(개당 가격 변경 후 구 가격으로 참여 → 409 `PRICE_CHANGED`, `currentUnitPrice`), 14(`COMPLETED`·마감 경과 후 참여 409), 15(`Clock`을 마감 정각으로 → 409), 20(마지막 수량 참여 시 `GroupBuyCompleted` 정확히 1건, 대상은 개설자 포함 전원; 일반 참여는 이벤트 없음)
-- [ ] T011 [P] [US1] `test/groupbuy/join/IdempotentJoinIT.java`: 시나리오 4(같은 수량으로 다시 참여 → 200, 변화 없음), 5(다른 수량으로 다시 참여 → 409 `ALREADY_JOINED`), 마지막 수량 참여의 응답을 못 받고 같은 요청을 재시도(공구가 이미 `COMPLETED`여도 같은 수량이면 200으로 성공을 돌려준다)
+- [ ] T010 [P] [US1] `test/groupbuy/join/JoinParticipationIT.java`: quickstart 시나리오 1(정상: 201, `amount=7200`, `securedQuantity=15`, `remainingQuantity=9`, `OPEN`), 2(딱 채우기: `COMPLETED`, 이후 **다른 회원의 첫 참여** 409 `NOT_JOINABLE`, `reason: COMPLETED`), 3(남은 수량 초과 → 409 `INSUFFICIENT_QUANTITY`, `remainingQuantity`), 6(개설자 403 `ORGANIZER_NOT_ALLOWED`, 안내 문구 "개설자는 직접 참여할 수 없어요. 수량은 공구 수정에서 바꿔요."), 7(헤더 없음 401), 8(개당 가격 변경 후 구 가격으로 참여 → 409 `PRICE_CHANGED`, `currentUnitPrice`), 14(`COMPLETED`·마감 경과 후 참여 409, `reason`이 각각 `COMPLETED` / `DEADLINE_PASSED`), 15(`Clock`을 마감 정각으로 → 409), 20(마지막 수량 참여 시 `GroupBuyCompleted` 정확히 1건, 대상은 개설자 포함 전원; 일반 참여는 이벤트 없음)
+- [ ] T011 [P] [US1] `test/groupbuy/join/IdempotentJoinIT.java`: 시나리오 4(같은 수량으로 다시 참여 → 200, 변화 없음), 5(다른 수량으로 다시 참여 → 409 `ALREADY_JOINED`), 마지막 수량 참여의 응답을 못 받고 같은 요청을 재시도(공구가 이미 `COMPLETED`여도 같은 수량이면 200으로 성공을 돌려준다), `FAILED` 공구의 옛 참여 재시도(409 `NOT_JOINABLE`, `reason: FAILED`), 취소된 공구의 재시도(404). 결정: decisions-pending #1
 
 ### Implementation for User Story 1
 
@@ -108,7 +108,7 @@ description: "공구 참여·수량 변경·참여 취소 구현 태스크"
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T020 [P] [US3] `test/groupbuy/join/LeaveParticipationIT.java`: 시나리오 12(204, 확보 −6, 공구 `OPEN` 유지, 이후 재참여 가능), 13(개설자 DELETE 403), 14(완료·마감 후 취소 409 `NOT_JOINABLE`), 참여 기록 없음 404 `PARTICIPATION_NOT_FOUND`, 참여 취소 때는 이벤트가 없다.
+- [ ] T020 [P] [US3] `test/groupbuy/join/LeaveParticipationIT.java`: 시나리오 12(204, 확보 −6, 공구 `OPEN` 유지, 이후 재참여 가능), 13(개설자 DELETE 403), 14(완료·마감 후 취소 409 `NOT_JOINABLE`, `reason` 포함), 참여 기록 없음 404 `PARTICIPATION_NOT_FOUND`, 참여 취소 때는 이벤트가 없다.
 
 ### Implementation for User Story 3
 

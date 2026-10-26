@@ -23,7 +23,7 @@
 | 3 | 008 프론트 spec의 범위가 낡음 | cross-check-2 Y2 | **확정(2026-10-27, A)**: 내가 수정안 문서(정확한 문구)를 `docs/spec-change-proposals.md`에 쓰고, 사용자가 읽고 반영 여부 결정(작성 대기) |
 | 4 | 004 거부 문구 불일치 | cross-check-2 Y1 | **확정(2026-10-27, A)**: 403 `ORGANIZER_NOT_ALLOWED`, 안내 "개설자는 직접 참여할 수 없어요. 수량은 공구 수정에서 바꿔요." 004 시나리오 5를 FR-010에 맞춤(반영 대기) |
 | 5 | 용어집 ↔ 003 `참여 인원 수` | cross-check-2 Y7 | **확정(2026-10-27, A)**: 용어집에 `참여 인원 수`=`participantCount`(사람 수, 수량 합 아님)를 정식 용어로 추가, 금지어는 "수량 합을 가리킬 때는 쓰지 않음"으로 한정 |
-| 6 | **005 SKIP LOCKED 워커 동시 처리**: REPEATABLE READ에서 `status` 갱신 UPDATE가 락 대기 시간 초과(스파이크 재현). 후보 A 스케줄러 트랜잭션 READ COMMITTED / B id만 뽑고 건별 짧게 처리 / C 단일 워커 | [spikes.md](../spikes.md) 'Spring 수준 검증' | A (상태: 사용자 결정 대기) |
+| 6 | **(정정 2026-10-27: 불필요 — id 지정 선점은 REPEATABLE READ에서도 통과, 범위 선점만 문제. 005 T008에 "id 지정" 명시)** ~~005 SKIP LOCKED 워커 동시 처리~~ **005 SKIP LOCKED 워커 동시 처리**: REPEATABLE READ에서 `status` 갱신 UPDATE가 락 대기 시간 초과(스파이크 재현). 후보 A 스케줄러 트랜잭션 READ COMMITTED / B id만 뽑고 건별 짧게 처리 / C 단일 워커 | [spikes.md](../spikes.md) 'Spring 수준 검증' | A (상태: 사용자 결정 대기) |
 | 7 | 004 직접 UPDATE는 `version = version + 1` 포함 규칙 명시 | spikes.md | 규칙 추가 |
 
 ## 3. 002 spec 보완 제안 (spec은 수정하지 않았음)

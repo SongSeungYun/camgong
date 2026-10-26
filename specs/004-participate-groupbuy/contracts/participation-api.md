@@ -12,16 +12,16 @@
 
 ## POST /api/groupbuys/{id}/participations — 참여
 
-**성공**: `201 Created`(새 참여), 본문은 아래 응답. 이미 참여했고 요청 수량이 현재 수량과 같으면 변화 없이 `200 OK`(재시도 안전, FR-004).
+**성공**: `201 Created`(새 참여), 본문은 아래 응답. 이미 참여했고 요청 수량이 현재 수량과 같으면 **공구 상태와 무관하게**(이후 `COMPLETED`가 되었더라도) 변화 없이 `200 OK`로 현재 상태를 돌려준다(재시도 안전, FR-004). 단 공구가 `FAILED`이면 옛 참여라도 409 `NOT_JOINABLE`(`reason: FAILED`), 취소된 공구는 404다. 모집 중이 아닌 공구에 **처음** 하는 참여는 거부한다.
 
 | 상태 | title | 조건 |
 |------|-------|------|
 | 400 | | 수량이 1 미만이거나 정수가 아님, 필드 누락 |
 | 401 | | 회원 식별 실패 |
-| 403 | `ORGANIZER_NOT_ALLOWED` | 요청자가 개설자 |
+| 403 | `ORGANIZER_NOT_ALLOWED` | 요청자가 개설자. 안내: "개설자는 직접 참여할 수 없어요. 수량은 공구 수정에서 바꿔요." |
 | 404 | | 공구가 없거나 취소됨 |
 | 409 | `ALREADY_JOINED` | 이미 참여했고 수량이 다름(수량 변경을 쓸 것) |
-| 409 | `NOT_JOINABLE` | 모집 중이 아님(완료, 실패)이거나 마감이 지남 |
+| 409 | `NOT_JOINABLE` | 모집 중이 아님(완료, 실패)이거나 마감이 지남. 본문 `reason`: `DEADLINE_PASSED` / `COMPLETED` / `FAILED` (`docs/architecture.md` 6.1) |
 | 409 | `PRICE_CHANGED` | `expectedUnitPrice`가 현재와 다름. 본문에 `currentUnitPrice` |
 | 409 | `INSUFFICIENT_QUANTITY` | 수량이 남은 수량보다 큼. 본문에 `remainingQuantity` |
 | 409 | `BUSY` | 낙관적 방식에서 재시도 소진(다른 방식에서는 나오지 않음) |
@@ -52,7 +52,7 @@
 | 403 | `ORGANIZER_NOT_ALLOWED` | 요청자가 개설자(공구 취소를 쓸 것) |
 | 404 | `PARTICIPATION_NOT_FOUND` | 내 참여가 없음 |
 | 404 | | 공구가 없거나 취소됨 |
-| 409 | `NOT_JOINABLE` | 모집 완료·실패이거나 마감이 지남 |
+| 409 | `NOT_JOINABLE` | 모집 완료·실패이거나 마감이 지남. 본문 `reason` 포함(위와 같음) |
 | 409 | `BUSY` | 낙관적 방식에서 재시도 소진 |
 
 ## 응답 본문 (참여·수량 변경)
