@@ -127,7 +127,7 @@ description: "모바일 우선 웹 화면(PWA) 구현 태스크"
 - [ ] T040 [US3] `frontend/src/features/groupbuy/form/GroupBuyForm.tsx` + `useCreateGroupBuy.ts`/`useUpdateGroupBuy.ts`/`useCancelGroupBuy.ts`: React Hook Form, 필드 이름은 계약과 같게, 안내용 범위(제목 100자, 개당 가격 1~1,000,000, 총 수량 2~1,000, 내 수량 1 이상 총 수량 미만, 마감 지금부터 30일 이내, 구매처·오픈채팅 https), 서버 `fieldErrors`를 `setError`로 필드에 매핑·나머지는 폼 상단, 마감은 `toIsoWithKstOffset`, 내 부담 금액 미리보기, 카테고리 6개 필수 하나, 성공 시 관련 쿼리 무효화(`ui-api-map.md` 5절). 근거: FR-005, FR-024, FR-025, FR-030
 - [ ] T041 [US3] `frontend/src/pages/CreatePage.tsx`(`/groupbuys/new`)와 목록 헤더의 "공구 열기" 진입. 성공 → 새 상세. 근거: 시나리오 17
 - [ ] T042 [US3] `frontend/src/pages/EditPage.tsx`(`/groupbuys/:id/edit`): 현재 값 채움, 마감 연장만·총 수량 ≥ 확보 안내, 수정 성공 → 상세. 개설자가 아니면 거부 안내. 근거: FR-025, 시나리오 18
-- [ ] T043 [US3] 상세의 개설자 영역: 수정 버튼(→ `/edit`), 취소 버튼 + `ConfirmDialog`(확인 없이 취소 안 됨), 취소 성공 → 목록 + 공구가 사라졌다는 안내, `NOT_MODIFIABLE`+`reason` 문구. `visibleActions`(T035)에 연결. 근거: FR-021, FR-026, 시나리오 19~20
+- [ ] T043 [US3] `frontend/src/features/groupbuy/detail/OrganizerActions.tsx`(상세의 개설자 영역): 수정 버튼(→ `/edit`), 취소 버튼 + `ConfirmDialog`(확인 없이 취소 안 됨), 취소 성공 → 목록 + 공구가 사라졌다는 안내, `NOT_MODIFIABLE`+`reason` 문구. `visibleActions`(T035)에 연결. 근거: FR-021, FR-026, 시나리오 19~20
 - [ ] T044 [US3] `frontend/tests/e2e/create.spec.ts`: 틀린 값 여러 개로 개설 → 필드별 오류 위치 확인 → 올바른 값으로 개설 → 새 상세로 이동. 근거: SC-004, 시나리오 16~17
 
 **Checkpoint**: US1~US3 독립 동작.
@@ -149,7 +149,7 @@ description: "모바일 우선 웹 화면(PWA) 구현 태스크"
 
 - [ ] T047 [P] [US4] `frontend/src/mocks/handlers/participation.ts`: `POST /api/groupbuys/{id}/participations`(201 새 참여 / 200 같은 수량 재시도 — 공구가 이후 `COMPLETED`여도 200, `FAILED` 공구의 옛 참여는 409 `NOT_JOINABLE`+`reason: FAILED` / 409 `ALREADY_JOINED` / 403 `ORGANIZER_NOT_ALLOWED` / 409 `NOT_JOINABLE`+`reason` 3종 / `PRICE_CHANGED`+`currentUnitPrice` / `INSUFFICIENT_QUANTITY`+`remainingQuantity` / 마지막 수량이면 `COMPLETED` 전환), `PUT …/participations/me`(수량 변경), `DELETE …/participations/me`(204, 404 `PARTICIPATION_NOT_FOUND`). 시나리오 토글 지원. 근거: 004 계약
 - [ ] T048 [US4] `frontend/src/features/participation/ParticipationPanel.tsx` + `useJoin.ts`/`useChangeQuantity.ts`/`useLeave.ts`: 수량 입력(1 이상 남은 수량 이하 정수), 내 부담 금액 미리보기, 제출 시 화면에서 확인한 `expectedUnitPrice` 전송, 처리 중 버튼 비활성화, `PRICE_CHANGED`이면 `currentUnitPrice`로 갱신하고 사용자가 다시 확인해야 제출 가능, 거부(`NOT_JOINABLE`/`INSUFFICIENT_QUANTITY`)이면 문구 + 상세 쿼리 무효화, 성공이면 상세·목록·내 활동 무효화(FR-030). 근거: FR-027~030, ui-api-map.md 4·5
-- [ ] T049 [US4] 상세에 `ParticipationPanel` 연결(`visibleActions`): 참여 전 → 참여하기, 참여 후 → 수량 변경·참여 취소(`ConfirmDialog`), 개설자·모집 종료·마감 후에는 참여 관련 버튼 없음. 모집 완료 시 `openChatUrl`이 있으면 입장 링크(새 창). 근거: FR-021, FR-022, 시나리오 25·27
+- [ ] T049 [US4] `frontend/src/features/groupbuy/detail/GroupBuyDetail.tsx`에 `ParticipationPanel` 연결(`visibleActions`): 참여 전 → 참여하기, 참여 후 → 수량 변경·참여 취소(`ConfirmDialog`), 개설자·모집 종료·마감 후에는 참여 관련 버튼 없음. 모집 완료 시 `openChatUrl`이 있으면 입장 링크(새 창). 근거: FR-021, FR-022, 시나리오 25·27
 - [ ] T050 [US4] `frontend/tests/e2e/join.spec.ts`: 로그인 → 상세 → 참여 → 수치 변경 확인 → 연타 시 1건, 가격 변경 시 재확인. 근거: 시나리오 21·22·26
 
 **Checkpoint**: US1~US4 독립 동작. 여기까지가 줄이지 않는 범위다.
@@ -205,9 +205,9 @@ description: "모바일 우선 웹 화면(PWA) 구현 태스크"
 - [ ] T062 [P] 접근성 기본: 모든 입력에 `<label>`, 키보드로 모든 버튼·링크 조작, 포커스 표시, 색 대비(텍스트 4.5:1) 점검, 터치 대상 44px. `frontend/tests/e2e/a11y.spec.ts`에 간단한 확인(레이블 누락 없음). 근거: spec 가정(기본 접근성), SC-003
 - [ ] T063 [P] 가로 스크롤·레이아웃 점검: 모든 화면(S01~S10)을 360px와 1280px에서 열어 `scrollWidth <= innerWidth`, 긴 제목·긴 명단이 줄바꿈되고 깨지지 않음을 `frontend/tests/e2e/layout.spec.ts`로 확인. 근거: FR-001, SC-003, 시나리오 35
 - [ ] T064 [P] 성능 점검: 라우트별 코드 분할 확인, `npm run build` 번들 크기 기록(`frontend/README.md`), 목록 첫 화면 측정은 실제 백엔드 연결 후 4단계에서(SC-006). 수치를 지어내지 않는다. 근거: plan.md Performance Goals
-- [ ] T065 PWA 점검: 빌드 산출물의 매니페스트·서비스 워커 확인, 오프라인 캐시가 없음을 확인(캐시 스토리지 비어 있음), 배포 후 옛 화면이 남지 않는 자동 업데이트 동작 확인. iOS Safari 홈 화면 추가는 실제 기기가 필요해 **확인 못 함**으로 기록. 근거: research.md 결정 14·미검증 가정 2·5, 시나리오 36
+- [ ] T065 `frontend/vite.config.ts`·`frontend/dist/` 기준 PWA 점검: 빌드 산출물의 매니페스트·서비스 워커 확인, 오프라인 캐시가 없음을 확인(캐시 스토리지 비어 있음), 배포 후 옛 화면이 남지 않는 자동 업데이트 동작 확인. iOS Safari 홈 화면 추가는 실제 기기가 필요해 **확인 못 함**으로 기록. 근거: research.md 결정 14·미검증 가정 2·5, 시나리오 36
 - [ ] T066 계약 일치 점검: `mocks/handlers/*`의 응답 모양을 `contracts/ui-api-map.md`와 `specs/001~007/contracts/`에 대조해 어긋난 곳을 표로 적는다(`frontend/README.md` 또는 승인 요약). 백엔드가 구현된 기능부터 quickstart 해당 시나리오를 `VITE_USE_MOCK` 없이 다시 돌려 결과를 기록한다. 근거: research.md 결정 8, quickstart "실제 백엔드 재확인"
-- [ ] T067 quickstart.md 36개 시나리오를 목 모드로 전부 한 번 돌려 통과/실패/확인 못 함을 승인 요약에 기록한다. 근거: quickstart.md
+- [ ] T067 `specs/008-frontend-web/quickstart.md` 36개 시나리오를 목 모드로 전부 한 번 돌려 통과/실패/확인 못 함을 승인 요약에 기록한다. 근거: quickstart.md
 
 ---
 
