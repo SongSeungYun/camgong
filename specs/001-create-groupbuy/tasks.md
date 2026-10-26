@@ -27,7 +27,7 @@ description: "공구 개설 구현 태스크"
 - [ ] T001 `specs/001-create-groupbuy/research.md`의 "설명 체크" 4문항(취소 처리, 확보 수량 컬럼, 중복 가드, 수정 락)에 직접 답해 보기. 헌법 III에 따라 구현 전에 끝낸다.
 - [ ] T002 start.spring.io로 Gradle 프로젝트 생성: Java 21, Spring Boot 최신 안정판, group `com.camgong`, 의존성 Spring Web / Spring Data JPA / Validation / MySQL Driver / Testcontainers. 산출물 `build.gradle`, `main/CamgongApplication.java`
 - [ ] T003 [P] `res/application.yml` 작성: datasource는 환경변수 `DB_URL`, `DB_USER`, `DB_PASSWORD`(로컬 기본값 포함. `DB_URL` 기본값은 `?useAffectedRows=true`로 끝나야 하며 중복 가드 판정에 필요하니 지우지 말 것), `spring.jpa.hibernate.ddl-auto=validate`, `spring.jpa.properties.hibernate.jdbc.time_zone=UTC`, `spring.sql.init.mode=always`, `spring.mvc.problemdetails.enabled=true`
-- [ ] T004 [P] `test/support/IntegrationTestBase.java` 작성: `mysql:8.4` Testcontainers(`@ServiceConnection` 대신 `@DynamicPropertySource`로 `spring.datasource.url = container.getJdbcUrl() + "?useAffectedRows=true"` 지정), 시간을 직접 움직일 수 있는 `MutableClock`(java.time.Clock 상속)을 `@Primary` 빈으로 등록, 각 테스트 전에 `participation`, `group_buy`, `create_guard`, `member`를 비우고 회원 1(개설자)·2(참여자)·3(외부인)을 시드
+- [ ] T004 [P] `test/support/IntegrationTestBase.java` 작성: `mysql:8.4` Testcontainers(`@ServiceConnection` 대신 `@DynamicPropertySource`로 `spring.datasource.url = container.getJdbcUrl() + "?useAffectedRows=true"` 지정), 시간을 직접 움직일 수 있는 `MutableClock`(java.time.Clock 상속)을 `@Primary` 빈으로 등록, 각 테스트 전에 `participation`, `group_buy`, `create_guard`, `member`를 비우고 회원 1(개설자)·2(참여자)·3(외부인)을 시드. **모든 테스트의 인증은 `as(memberId)` 헬퍼 한 곳으로만 한다**(지금은 `X-Member-Id` 헤더를 붙이고, 002에서 세션 쿠키로 바꿀 때 이 헬퍼만 고친다. 테스트 본문에 헤더 이름을 직접 쓰지 않는다). 002 plan 결정 10
 
 ---
 
