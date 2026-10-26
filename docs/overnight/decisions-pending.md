@@ -20,7 +20,7 @@
 |---|------|------|------|
 | 1 | 004 같은 수량 재시도(멱등)와 모집 완료 후 거부(FR-009)의 충돌 | [analyze-004.md](analyze-004.md) B1 | **확정(2026-10-27, A)**: 이미 참여한 사람의 같은 수량 재시도는 공구 상태와 무관하게 성공(현재 상태 반환). 모집 중이 아닌 공구의 첫 참여는 거부. 실패(`FAILED`) 공구의 옛 참여 재시도는 409, 취소는 404. spec/tasks 반영은 대기 |
 | 2 | 오류 코드 체계 통일 | [cross-check-2.md](../cross-check-2.md) Y3 | **확정(2026-10-27, A)**: 코드 이름은 유지, 상태 때문에 거부될 때 응답에 `reason` 필드(예: `NOT_JOINABLE` → `DEADLINE_PASSED`/`COMPLETED`/`FAILED`, `NOT_MODIFIABLE`도 동일). `docs/architecture.md` 6.1에 전체 오류 코드 표를 모음(반영 대기). 002·006 contracts의 코드 이름도 그 표에서 확정 |
-| 3 | 008 프론트 spec의 범위가 낡음 | cross-check-2 Y2 | 사용자가 직접 갱신 (사용자 소유 spec) |
+| 3 | 008 프론트 spec의 범위가 낡음 | cross-check-2 Y2 | **확정(2026-10-27, A)**: 내가 수정안 문서(정확한 문구)를 `docs/spec-change-proposals.md`에 쓰고, 사용자가 읽고 반영 여부 결정(작성 대기) |
 | 4 | 004 거부 문구 불일치 | cross-check-2 Y1 | **확정(2026-10-27, A)**: 403 `ORGANIZER_NOT_ALLOWED`, 안내 "개설자는 직접 참여할 수 없어요. 수량은 공구 수정에서 바꿔요." 004 시나리오 5를 FR-010에 맞춤(반영 대기) |
 | 5 | 용어집 ↔ 003 `참여 인원 수` | cross-check-2 Y7 | |
 | 6 | **005 SKIP LOCKED 워커 동시 처리**: REPEATABLE READ에서 `status` 갱신 UPDATE가 락 대기 시간 초과(스파이크 재현). 후보 A 스케줄러 트랜잭션 READ COMMITTED / B id만 뽑고 건별 짧게 처리 / C 단일 워커 | [spikes.md](../spikes.md) 'Spring 수준 검증' | A (상태: 사용자 결정 대기) |
