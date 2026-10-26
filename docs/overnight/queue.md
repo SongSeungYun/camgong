@@ -94,7 +94,7 @@
 - J1 | 완료 | 003 `91ac503`, 004 `60d0216`, 005 `9fa1e73` | tasks 3개와 analyze-00N 3개. 주요 발견: 003·005 인덱스를 `CREATE INDEX IF NOT EXISTS`가 아니라 `KEY` 절로 넣어야 함(003 A1, 005 C1, MySQL 미지원으로 알고 있음·구현 때 확인), 004 재시도 응답과 모집 완료 후 거부 규칙의 모호성(B1, 사용자 결정 필요), 003 FR-015 자동 테스트 없음(A2)
 - J2 | 완료 | `872f9fe` | graphify 노드 519·엣지 907·군집 28, 하위 에이전트 3개(약 37.6만 토큰). 발견 13건(`docs/cross-check-2.md`): 004 거부 문구 불일치(Y1), 008 범위 낡음(Y2), 오류 코드 체계(Y3), 용어집 ↔ 003 `참여 인원 수`(Y7) 등. 그래프는 추적성 감사에 부정확, 스크립트를 기준으로 삼음
 - J3 | 완료 | 006 `eb7a68b`, 007 `3969a3f`, 002 `1439827` | 기능별 plan·research·data-model·contracts·quickstart. 결정 총 30개(006 8, 007 10, 002 12) 모두 사용자 결정 대기, 모음은 `docs/overnight/decisions-pending.md`. 002 spec 보완 제안 5건(비밀번호 최대 길이 등)
-- J4 | 완료 | (아래 커밋) | Boot 4.1.2/JDK 25, 12개 가정 + 새 발견. 통과 13/13. **중요 발견**: 005 SKIP LOCKED 워커 둘이 REPEATABLE READ에서는 `status` 갱신 UPDATE가 락 대기 시간 초과, READ COMMITTED에서는 통과(결정 대기). 004 직접 UPDATE는 `version=version+1` 필수
+- J4 | 완료 | `28138e5` | Boot 4.1.2/JDK 25, 12개 가정 + 새 발견. 통과 13/13. **중요 발견**: 005 SKIP LOCKED 워커 둘이 REPEATABLE READ에서는 `status` 갱신 UPDATE가 락 대기 시간 초과, READ COMMITTED에서는 통과(결정 대기). 004 직접 UPDATE는 `version=version+1` 필수
 
 ## 종료 절차
 

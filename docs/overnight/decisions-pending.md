@@ -19,6 +19,8 @@
 | 3 | 008 프론트 spec의 범위가 낡음 | cross-check-2 Y2 | 사용자가 직접 갱신 (사용자 소유 spec) |
 | 4 | 004 거부 문구 불일치 | cross-check-2 Y1 | |
 | 5 | 용어집 ↔ 003 `참여 인원 수` | cross-check-2 Y7 | |
+| 6 | **005 SKIP LOCKED 워커 동시 처리**: REPEATABLE READ에서 `status` 갱신 UPDATE가 락 대기 시간 초과(스파이크 재현). 후보 A 스케줄러 트랜잭션 READ COMMITTED / B id만 뽑고 건별 짧게 처리 / C 단일 워커 | [spikes.md](../spikes.md) 'Spring 수준 검증' | A (상태: 사용자 결정 대기) |
+| 7 | 004 직접 UPDATE는 `version = version + 1` 포함 규칙 명시 | spikes.md | 규칙 추가 |
 
 ## 3. 002 spec 보완 제안 (spec은 수정하지 않았음)
 
