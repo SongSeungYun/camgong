@@ -71,3 +71,26 @@ export function makeSeedGroupBuys(now: number): SeedGroupBuy[] {
     }
   })
 }
+
+/** 브라우저 목 모드용 알림: 참여자(2)에게 25건(두 쪽), 개설자(1)에게 2건. 테스트는 mockState.notifications를 직접 채운다. */
+export function makeSeedNotifications(now: number) {
+  const types = ['GROUPBUY_COMPLETED', 'GROUPBUY_FAILED', 'GROUPBUY_CHANGED', 'GROUPBUY_CANCELLED']
+  const mk = (id: number, memberId: number, i: number) => {
+    const type = types[i % 4]!
+    return {
+      id,
+      memberId,
+      type,
+      groupBuyId: (i % 10) + 1,
+      groupBuyTitle: `알림 공구 ${(i % 10) + 1}`,
+      changedFields: type === 'GROUPBUY_CHANGED' ? ['unitPrice', 'deadline'] : null,
+      createdAt: new Date(Math.floor((now - i * 3_600_000) / 60_000) * 60_000).toISOString(),
+      read: i >= 5,
+      linkable: type !== 'GROUPBUY_CANCELLED',
+    }
+  }
+  return [
+    ...Array.from({ length: 25 }, (_, i) => mk(100 + i, 2, i)),
+    ...Array.from({ length: 2 }, (_, i) => mk(200 + i, 1, i)),
+  ]
+}

@@ -176,12 +176,14 @@ describe('체크표 (US6)', () => {
     seedCompleted()
     mockState.sessionMemberId = 1
     const seen: string[] = []
-    server.events.on('request:start', ({ request }) => void seen.push(new URL(request.url).pathname))
+    // 헤더의 읽지 않은 수 조회(GET)는 있어도, 체크가 알림을 만드는 쓰기는 없어야 한다
+    server.events.on('request:start', ({ request }) => void (request.method !== 'GET' && seen.push(new URL(request.url).pathname)))
     renderApp('/groupbuys/1/check')
     await screen.findByRole('listitem', { name: '참여자' })
     await userEvent.click(within(row('참여자')).getByRole('button', { name: '입금 확인' }))
     await within(row('참여자')).findByText(/입금 확인됨/)
     expect(seen.filter((p) => p.includes('/notifications'))).toEqual([])
+    expect(seen.length).toBeGreaterThan(0) // 체크 PUT은 실제로 나갔다
   })
 
   test('참여자 상세에 본인 입금·수령 확인 상태', async () => {

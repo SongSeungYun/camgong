@@ -4,11 +4,6 @@ import { Layout, StateView } from '../shared/ui'
 import { Header } from './Header'
 import { RequireAuth } from './RequireAuth'
 
-const stub = (name: string): RouteObject['lazy'] => async () => {
-  const { Stub } = await import('../pages/Stub')
-  return { element: <Stub name={name} /> }
-}
-
 const page = (load: () => Promise<{ default: ComponentType }>): RouteObject['lazy'] => async () => ({ Component: (await load()).default })
 
 function Root() {
@@ -31,7 +26,7 @@ function RootError() {
   )
 }
 
-// 주소는 contracts/ui-api-map.md 1절. 화면은 Phase 3 이후 stub을 실제 페이지로 바꾼다.
+// 주소는 contracts/ui-api-map.md 1절. 
 export const routes: RouteObject[] = [
   {
     element: <Root />,
@@ -49,7 +44,7 @@ export const routes: RouteObject[] = [
           { path: '/groupbuys/:id/edit', lazy: page(() => import('../pages/EditPage')) },
           { path: '/groupbuys/:id/check', lazy: page(() => import('../pages/CheckPage')) },
           { path: '/me', lazy: page(() => import('../pages/MyPage')) },
-          { path: '/notifications', lazy: stub('알림함') },
+          { path: '/notifications', lazy: page(() => import('../pages/NotificationsPage')) },
         ],
       },
       { path: '*', lazy: page(() => import('../pages/NotFoundPage')) },
