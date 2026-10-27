@@ -8,3 +8,9 @@ camgong:
   scheduler:
     close:
       enabled: false      # 테스트는 서비스를 직접 호출한다. 스케줄러 연결은 CloseSchedulerWiringTest 가 켠다
+  notification:
+    async:
+      enabled: false      # 알림을 요청 스레드에서 바로 만든다. 비동기 동작은 NotificationAsyncIT 가 켠다
+    retry-base-delay: 1ms
+    cleanup:
+      enabled: false

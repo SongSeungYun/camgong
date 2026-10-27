@@ -82,7 +82,7 @@ public record GroupBuyListQuery(DisplayStatus status, GroupBuyCategory category,
     }
 
     /** size 파라미터: 비어 있으면 기본값, 숫자가 아니거나 1~50 밖이면 errors[size] 를 더한다. */
-    static int parseSize(String size, List<ApiException.Field> errors) {
+    public static int parseSize(String size, List<ApiException.Field> errors) {
         int pageSize = DEFAULT_SIZE;
         if (size != null) {
             try {

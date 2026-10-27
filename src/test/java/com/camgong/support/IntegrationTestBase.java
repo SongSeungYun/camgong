@@ -91,6 +91,7 @@ public abstract class IntegrationTestBase {
         jdbc.update("DELETE FROM login_attempt");
         jdbc.update("DELETE FROM participation");
         jdbc.update("DELETE FROM group_buy");
+        jdbc.update("DELETE FROM notification");
         jdbc.update("DELETE FROM create_guard");
         jdbc.update("DELETE FROM member");
         seedMember(1, "개설자");

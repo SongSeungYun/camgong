@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -114,10 +115,10 @@ public class GroupBuyService {
         List<Long> everyone = participations.findLockedByGroupBuyId(id).stream().map(Participation::getMemberId).toList();
         List<Long> others = everyone.stream().filter(m -> !m.equals(g.getOrganizerId())).toList();
         if (!changed.isEmpty() && !others.isEmpty()) {
-            events.publishEvent(new GroupBuyChanged(id, others, changed));
+            events.publishEvent(new GroupBuyChanged(UUID.randomUUID().toString(), id, g.getTitle(), others, changed));
         }
         if (completed) {
-            completion.publish(id, everyone);
+            completion.publish(id, g.getTitle(), everyone);
         }
         return GroupBuyResponse.from(g, newOrganizerQuantity, g.getOpenChatUrl());
     }
@@ -132,7 +133,7 @@ public class GroupBuyService {
         List<Long> others = participations.findLockedByGroupBuyId(id).stream().map(Participation::getMemberId)
                 .filter(m -> !m.equals(g.getOrganizerId())).toList();
         if (!others.isEmpty()) {
-            events.publishEvent(new GroupBuyCancelled(id, others));
+            events.publishEvent(new GroupBuyCancelled(UUID.randomUUID().toString(), id, g.getTitle(), others));
         }
     }
 
