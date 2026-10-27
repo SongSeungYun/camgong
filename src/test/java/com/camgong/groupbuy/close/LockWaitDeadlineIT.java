@@ -29,6 +29,11 @@ class LockWaitDeadlineIT extends CloseTestBase {
 
     private final ExecutorService pool = Executors.newFixedThreadPool(2);
 
+    @org.junit.jupiter.api.AfterEach
+    void shutDown() {
+        pool.shutdownNow();
+    }
+
     /** 공구 행 락을 쥐고 있다가, 요청이 락에서 막힌 뒤 시계를 마감 뒤로 보내고 락을 놓는다. 요청의 응답 상태를 돌려준다. */
     private int requestThatWaitsPastTheDeadline(long id, java.util.concurrent.Callable<Integer> request) throws Exception {
         CountDownLatch holding = new CountDownLatch(1);
