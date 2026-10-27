@@ -17,11 +17,15 @@ export default function SignupPage() {
   const { register, handleSubmit, setError, formState: { errors } } = useForm<Form>()
   const [topErrors, setTopErrors] = useState<string[]>([])
   const [accepted, setAccepted] = useState<Accepted | null>(null)
+  const [already, setAlready] = useState(false)
 
   const m = useMutation({
     mutationFn: (f: Form) => signup(f.email.trim()),
     onSuccess: setAccepted,
-    onError: (e) => setTopErrors(e instanceof ApiError ? applyServerErrors(e, setError, ['email']) : [errorMessage(new ApiError(0))]),
+    onError: (e) => {
+      setAlready(e instanceof ApiError && e.code === 'ALREADY_REGISTERED')
+      setTopErrors(e instanceof ApiError ? applyServerErrors(e, setError, ['email']) : [errorMessage(new ApiError(0))])
+    },
   })
 
   if (accepted) return <Sent accepted={accepted} onAccepted={setAccepted} />
@@ -34,6 +38,7 @@ export default function SignupPage() {
         <p>학교 이메일만 가입할 수 있어요.</p>
         <p>이름과 비밀번호는 메일의 링크를 열었을 때 정해요.</p>
         {topErrors.map((t) => <p key={t} role="alert">{t}</p>)}
+        {already && <p><Link to="/login">로그인하러 가기</Link></p>}
         <Button type="submit" pending={m.isPending}>가입하기</Button>
       </form>
       <p>이미 계정이 있나요? <Link to="/login">로그인</Link></p>

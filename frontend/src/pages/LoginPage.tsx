@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, Navigate } from 'react-router'
 import { login } from '../features/auth/api'
@@ -14,9 +15,11 @@ interface Form {
 }
 
 export default function LoginPage() {
-  const { status, expired, setMember } = useSession()
+  const { status, expired: expiredNow, ackExpired, setMember } = useSession()
+  const [expired] = useState(expiredNow) // 이 방문에서만 보여주고 바로 해제한다
+  useEffect(() => { if (expiredNow) ackExpired() }, [expiredNow, ackExpired])
   const { register, handleSubmit, watch } = useForm<Form>()
-  const m = useMutation({ mutationFn: (f: Form) => login(f.email.trim(), f.password), onSuccess: (r) => setMember(r.member) })
+  const m = useMutation({ mutationFn: (f: Form) => login(f.email.trim(), f.password), onSuccess: (r) => setMember(r.member), gcTime: 0 }) // 비밀번호(variables)가 캐시에 남지 않게
 
   if (status === 'authenticated') return <Navigate to="/" replace />
   const failText = m.error instanceof ApiError ? errorMessage(m.error) : m.error ? errorMessage(new ApiError(0)) : null

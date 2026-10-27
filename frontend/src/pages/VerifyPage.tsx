@@ -30,14 +30,17 @@ export default function VerifyPage() {
   const { status, setMember } = useSession()
   const { register, handleSubmit, setError, formState: { errors } } = useForm<Form>({ defaultValues: { consent: false } })
   const [topErrors, setTopErrors] = useState<string[]>([])
+  const [already, setAlready] = useState(false)
   const [tokenError, setTokenError] = useState<ApiError | null>(token ? null : new ApiError(400, 'INVALID_TOKEN'))
 
   const m = useMutation({
     mutationFn: (f: Form) => verify({ token, displayName: f.displayName.trim(), password: f.password, consent: f.consent, consentVersion: CONSENT_VERSION }),
+    gcTime: 0, // 비밀번호(variables)가 캐시에 남지 않게
     onSuccess: (r) => setMember(r.member),
     onError: (e) => {
       if (!(e instanceof ApiError)) return setTopErrors([errorMessage(new ApiError(0))])
       if (e.code && TOKEN_CODES.includes(e.code)) return setTokenError(e)
+      setAlready(e.code === 'ALREADY_REGISTERED')
       if (e.code === 'DISPLAY_NAME_TAKEN') return setError('displayName', { type: 'server', message: errorMessage(e) })
       setTopErrors(applyServerErrors(e, setError, FIELDS))
     },
@@ -74,6 +77,7 @@ export default function VerifyPage() {
         </details>
         {errors.consent?.message && <p role="alert">{errors.consent.message}</p>}
         {topErrors.map((t) => <p key={t} role="alert">{t}</p>)}
+        {already && <p><Link to="/login">로그인하러 가기</Link></p>}
         <Button type="submit" pending={m.isPending}>인증 완료하기</Button>
       </form>
     </Layout>

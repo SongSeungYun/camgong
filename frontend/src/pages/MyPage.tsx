@@ -1,3 +1,4 @@
+import { uniqueById } from '../shared/lib/uniqueById'
 import { useSearchParams } from 'react-router'
 import type { MyRole } from '../features/groupbuy/api'
 import { GroupBuyCard } from '../features/groupbuy/list/GroupBuyCard'
@@ -14,7 +15,7 @@ export default function MyPage() {
   const [sp, setSp] = useSearchParams()
   const tab = TABS.find((t) => t.param === sp.get('tab')) ?? TABS[0]!
   const q = useMyGroupBuys(tab.role)
-  const items = q.data?.pages.flatMap((p) => p.items) ?? []
+  const items = uniqueById(q.data?.pages.flatMap((p) => p.items) ?? [])
   const state = q.isPending ? 'loading' : q.isError && items.length === 0 ? 'error' : items.length === 0 ? 'empty' : 'ready'
 
   return (

@@ -50,7 +50,7 @@ describe('로그인·보호 라우트', () => {
     await fillLogin(EMAIL, 'password1234')
     expect((await screen.findByRole('alert')).textContent).toBe('이메일 또는 비밀번호가 맞지 않아요.')
     // 로그인 화면의 재발송 진입: 방금 보냈으니 한도 안내가 나온다
-    await userEvent.type(screen.getByLabelText('인증 메일 받을 이메일'), EMAIL)
+    expect((screen.getByLabelText('인증 메일 받을 이메일') as HTMLInputElement).value).toBe(EMAIL) // 로그인 화면에 입력한 이메일이 따라온다
     await userEvent.click(screen.getByRole('button', { name: '인증 메일 다시 받기' }))
     await screen.findByText(/잠시 뒤에 다시 시도해 주세요/)
   })

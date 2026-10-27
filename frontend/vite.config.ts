@@ -28,7 +28,9 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       // 같은 출처를 만들어 SameSite=Lax 세션 쿠키가 동작하게 한다(research 결정 10).
-      proxy: { '/api': env.VITE_API_TARGET || 'http://localhost:8080' },
+      // changeOrigin을 끈다: 브라우저의 Origin(localhost:5173)과 서버가 보는 Host가 같아야 백엔드 Origin 검사를 통과한다.
+      // 켜면 Host가 백엔드 주소로 바뀌어 모든 쓰기 요청이 403 FORBIDDEN_ORIGIN이 된다. 다른 출처로 직접 호출하지도 않는다.
+      proxy: { '/api': { target: env.VITE_API_TARGET || 'http://localhost:8080', changeOrigin: false } },
     },
   }
 })

@@ -15,6 +15,7 @@ export function visibleActions(d: GroupBuyDetail) {
     openChat: d.openChatUrl !== null,
     participants: d.participants !== null,
     checkSheet: d.isOrganizer && completed,
-    myConfirm: d.myParticipation !== null && completed,
+    // 개설자의 myParticipation에는 확인 필드가 없다(006): 참여자에게만
+    myConfirm: !d.isOrganizer && d.myParticipation !== null && completed,
   }
 }

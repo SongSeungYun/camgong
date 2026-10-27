@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useSession } from '../features/auth/session'
 import s from '../features/notification/Notification.module.css'
@@ -18,15 +19,30 @@ function NotificationBell() {
 export function Header() {
   const { status, logout } = useSession()
   const navigate = useNavigate()
+  const [logoutFailed, setLogoutFailed] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const onLogout = async () => {
+    setLoggingOut(true)
+    setLogoutFailed(false)
+    try {
+      await logout()
+      navigate('/login')
+    } catch {
+      setLogoutFailed(true) // 서버가 확인하지 못했으니 로그인 상태를 유지하고 다시 시도하게 한다
+    } finally {
+      setLoggingOut(false)
+    }
+  }
   return (
-    <header style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', padding: 'var(--space-2) var(--space-4)', borderBottom: '1px solid var(--color-border)' }}>
+    <header style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap', padding: 'var(--space-2) var(--space-4)', borderBottom: '1px solid var(--color-border)' }}>
       <Link to="/" style={{ fontWeight: 700, marginRight: 'auto' }}>캠공</Link>
       {status === 'authenticated' ? (
         <>
           <Link to="/groupbuys/new">공구 열기</Link>
           <Link to="/me">내 활동</Link>
           <NotificationBell />
-          <Button variant="secondary" onClick={() => logout().then(() => navigate('/login'))}>로그아웃</Button>
+          <Button variant="secondary" pending={loggingOut} onClick={() => void onLogout()}>로그아웃</Button>
+          {logoutFailed && <p role="alert" style={{ flexBasis: '100%', margin: 0 }}>로그아웃을 서버에 알리지 못했어요. 다시 시도해 주세요.</p>}
         </>
       ) : status === 'anonymous' ? (
         <>
