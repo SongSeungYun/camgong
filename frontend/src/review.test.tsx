@@ -350,4 +350,21 @@ describe('재검수 보완', () => {
     await router.navigate('/login')
     expect(screen.queryByText('로그인이 필요해요. 입력하던 내용은 저장되지 않아요.')).toBeNull()
   })
+
+  test('인증: ALREADY_REGISTERED 뒤 같은 폼을 다시 제출했는데 네트워크 오류면 이전 로그인 링크가 남지 않는다', async () => {
+    await post('/api/auth/signup', { email: 'new@school.ac.kr' })
+    server.use(
+      http.post('/api/auth/verify', () => HttpResponse.json({ title: 'ALREADY_REGISTERED', status: 409 }, { status: 409 }), { once: true }),
+      http.post('/api/auth/verify', () => HttpResponse.error(), { once: true }),
+    )
+    renderApp(`/verify?token=${mockState.pending[0]!.token}`)
+    await userEvent.type(await screen.findByLabelText('표시 이름'), '새내기')
+    await userEvent.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await userEvent.click(screen.getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: '인증 완료하기' }))
+    await screen.findByRole('link', { name: '로그인하러 가기' })
+    await userEvent.click(screen.getByRole('button', { name: '인증 완료하기' }))
+    await screen.findByText('잠시 문제가 생겼어요. 다시 시도해 주세요.')
+    expect(screen.queryByRole('link', { name: '로그인하러 가기' })).toBeNull()
+  })
 })

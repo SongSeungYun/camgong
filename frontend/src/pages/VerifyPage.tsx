@@ -63,7 +63,7 @@ export default function VerifyPage() {
     <Layout>
       <h1>이메일 인증</h1>
       <p>사용할 이름과 비밀번호를 정해 가입을 마쳐요.</p>
-      <form noValidate onSubmit={handleSubmit((f) => { setTopErrors([]); m.mutate(f) })}>
+      <form noValidate onSubmit={handleSubmit((f) => { setTopErrors([]); setAlready(false); m.mutate(f) })}>
         <TextField label="표시 이름" autoComplete="nickname" error={errors.displayName?.message} {...register('displayName')} />
         <p>2~20자. 다른 사람에게 보이는 이름이에요.</p>
         <TextField label="비밀번호" type="password" autoComplete="new-password" error={errors.password?.message} {...register('password')} />
