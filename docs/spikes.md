@@ -48,6 +48,7 @@
 | — | Criteria `LIKE … ESCAPE`가 `%`·`_`를 이스케이프한다 (003) | **확인됨** | `cb.like(path, pattern, '\\')` → `like ? escape '\\'`. 키워드 `%`는 "100% fun"만, `_`는 "a_b"만 일치(앞 문자를 `\`로 이스케이프해 넘긴 경우). **직접 이스케이프하지 않으면 보호되지 않음**은 별도 확인 안 함 |
 | — | 낙관적 `@Version`과 직접 `UPDATE`가 같은 버전 규칙으로 맞물린다 (004) | **확인됨** | 직접 `UPDATE`가 `version=version+1`을 하면 낡은 엔티티 저장이 `ObjectOptimisticLockingFailureException`. **버전을 올리지 않는 직접 `UPDATE`는 충돌을 못 잡고 덮어씀(갱신 손실)**. 영향: 004의 직접 `UPDATE` 쿼리는 항상 `version = version + 1`을 포함해야 함 |
 | — | 같은 컬럼의 읽기 전용 `@ManyToOne(insertable=false, updatable=false)`를 `Long` id와 병행해도 쓰기에 문제 없다 (003) | **확인됨** | `memberId`로 저장 후 트랜잭션 안에서 `member.getName()` 조회 성공, 수정 저장도 정상. 트랜잭션 밖에서 지연 로딩 접근은 `LazyInitializationException`(open-in-view 끔) — 서비스 계층 밖으로 엔티티를 내보내면 안 됨. 프록시의 public 필드는 `null`로 보이므로 접근자로 읽어야 함(스파이크에서 겪음) |
+| — | 행 락을 기다린 뒤 읽는 일반 SELECT가 최신 값을 본다 (001, 004) | **아니오 — 잠금 읽기 필요** (001 구현 중 발견) | `findByIdForUpdate`로 공구 행 락을 기다린 뒤 `participation`을 일반 SELECT로 읽으면, REPEATABLE READ 스냅샷이 락 대기 전 시점이라 다른 요청이 커밋한 변경을 못 본다. `PESSIMISTIC_WRITE` 잠금 읽기로 읽으면 최신 값을 본다. 001 `ModifyConcurrencyIT`가 잡았고 `ParticipationRepository.findLocked*`로 해결. 004·005도 같은 규칙을 적용한다(스파이크가 아니라 구현에서 확인) |
 
 **Java 21 재검증 (2026-10-27)**: 같은 스파이크를 Temurin이 아닌 BellSoft Liberica JDK 21.0.12(`-Djava.version=21`)로 다시 돌렸다. 테스트 15개(5c 추가분 포함) 모두 통과, 결과는 JDK 25와 동일하다(범위 선점은 REPEATABLE READ에서 락 대기 시간 초과, id 지정 선점은 통과 등). 스파이크 판정은 **JDK 21에서도 유효**하다.
 

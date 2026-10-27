@@ -20,7 +20,7 @@
 
 **Language/Version**: Java 21
 
-**Primary Dependencies**: Spring Boot (프로젝트 생성 시점 최신 안정판), spring-boot-starter-web, -data-jpa, -validation, MySQL Connector/J
+**Primary Dependencies**: Spring Boot 4.1.2 (Hibernate 7), spring-boot-starter-webmvc(Boot 4의 웹 스타터 이름), -data-jpa, -validation, MySQL Connector/J
 
 **Storage**: MySQL 8.x. 스키마는 `src/main/resources/schema.sql`로 관리하고 `ddl-auto=validate`로 엔티티와 대조한다.
 
@@ -86,8 +86,8 @@ src/main/java/com/camgong/
     ├── GroupBuyStatus.java             # OPEN, COMPLETED, CANCELLED
     ├── GroupBuyCategory.java           # FOOD, DAILY, KITCHEN, HEALTH_BEAUTY, STATIONERY, ETC
     ├── Participation.java              # 참여 (공구의 일부)
-    ├── ParticipationRepository.java
-    ├── GroupBuyRepository.java         # 비관적 락 조회 포함
+    ├── ParticipationRepository.java    # 락 뒤 읽기용 findLocked* 포함
+    ├── GroupBuyRepository.java         # 비관적 락 조회 포함 (findByIdForUpdate)
     ├── CreateGuard.java                # JdbcClient로 가드 INSERT
     ├── GroupBuyService.java            # 개설, 수정, 취소, 조회
     ├── GroupBuyController.java
@@ -100,7 +100,11 @@ src/main/resources/
 └── schema.sql
 src/test/java/com/camgong/
 ├── support/
-│   └── IntegrationTestBase.java        # MySQL Testcontainer, MutableClock, 시드
+│   ├── IntegrationTestBase.java        # MySQL Testcontainer, MutableClock 주입, 시드, as(memberId)
+│   ├── MutableClock.java
+│   ├── EventCollector.java             # AFTER_COMMIT 이벤트 수집
+│   └── GroupBuyBodies.java             # 요청 본문 빌더
+├── support/SchemaIT.java               # schema.sql ddl-auto=validate, 재실행 안전
 └── groupbuy/
     ├── CreateGroupBuyIT.java
     ├── CreateGuardIT.java              # 중복 가드
