@@ -23,6 +23,10 @@ export const mockState = {
   sessionExpired: false,
   /** 시나리오: true면 로그인이 잠금(429) */
   loginLocked: false,
+  /** 시나리오: 다음 참여 요청 직전에 개당 가격이 이 값으로 바뀐 것처럼 동작(PRICE_CHANGED) */
+  priceChangeTo: null as number | null,
+  /** 시나리오: 다음 참여 요청을 이 응답으로 거부 */
+  forceNext: null as { status: number; body: Record<string, unknown> } | null,
   reset() {
     this.members = SEED_MEMBERS.map((m) => ({ ...m }))
     this.groupBuys = makeSeedGroupBuys(Date.now())
@@ -34,6 +38,8 @@ export const mockState = {
     this.nextToken = 1
     this.sessionExpired = false
     this.loginLocked = false
+    this.priceChangeTo = null
+    this.forceNext = null
   },
 }
 mockState.reset()
