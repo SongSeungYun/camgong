@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -15,7 +14,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.camgong.common.ApiException;
-import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCompleted;
+import com.camgong.groupbuy.GroupBuyCompletion;
 import com.camgong.groupbuy.GroupBuyStatus;
 import com.camgong.groupbuy.Participation;
 import com.camgong.groupbuy.ParticipationRepository;
@@ -36,16 +35,16 @@ public class ParticipationService {
     private final JoinQueryRepository query;
     private final ParticipationRepository participations;
     private final QuantityGate gate;
-    private final ApplicationEventPublisher events;
+    private final GroupBuyCompletion completion;
     private final Clock clock;
     private final TransactionTemplate tx;
 
     public ParticipationService(JoinQueryRepository query, ParticipationRepository participations, QuantityGate gate,
-            ApplicationEventPublisher events, Clock clock, PlatformTransactionManager transactionManager) {
+            GroupBuyCompletion completion, Clock clock, PlatformTransactionManager transactionManager) {
         this.query = query;
         this.participations = participations;
         this.gate = gate;
-        this.events = events;
+        this.completion = completion;
         this.clock = clock;
         this.tx = new TransactionTemplate(transactionManager);
     }
@@ -167,9 +166,7 @@ public class ParticipationService {
 
     private void publishIfCompleted(Long groupBuyId, GateResult res) {
         if (res.completed()) {
-            List<Long> everyone = participations.findLockedByGroupBuyId(groupBuyId).stream()
-                    .map(Participation::getMemberId).toList();
-            events.publishEvent(new GroupBuyCompleted(groupBuyId, everyone));
+            completion.publish(groupBuyId);
             BenchCounters.COMPLETED_EVENTS.increment();
         }
     }

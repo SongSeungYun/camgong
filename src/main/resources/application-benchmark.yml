@@ -8,3 +8,7 @@ logging:
   level:
     root: WARN
     com.camgong: WARN
+
+camgong:
+  mail:
+    sender: logging       # 측정에는 메일이 필요 없다(기본 smtp 는 SMTP 설정 없이 기동하지 못한다)

@@ -11,7 +11,7 @@ OUT=$(mktemp -d)
 case $SCENARIO in
   last-seat) TOTAL=24; ORG=23 ;;
   s2) TOTAL=24; ORG=14 ;;
-  mixed) TOTAL=24; ORG=9 ;;
+  mixed) TOTAL=200; ORG=9 ;;     # 계속 열려 있도록 크게 잡는다(24 면 금방 모집 완료되어 빠른 409 만 남는다)
 esac
 
 mysql_exec() { docker exec -i $DB mysql -uroot -ppw camgong "$@" 2>/dev/null; }
