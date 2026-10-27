@@ -31,4 +31,16 @@ class DatabaseSettingsCheckTest extends IntegrationTestBase {
         assertThatThrownBy(() -> new DatabaseSettingsCheck(without).afterPropertiesSet())
                 .hasMessageContaining("useAffectedRows");
     }
+
+    @Test
+    void refusesToStartOnTheSchemaFromBeforeChangeB2() {
+        jdbc.execute("ALTER TABLE pending_signup ADD COLUMN display_name VARCHAR(20) NULL");
+        try {
+            assertThatThrownBy(() -> new DatabaseSettingsCheck(dataSource).afterPropertiesSet())
+                    .hasMessageContaining("새로 만들어야");
+        } finally {
+            jdbc.execute("ALTER TABLE pending_signup DROP COLUMN display_name");
+        }
+        assertThatCode(() -> new DatabaseSettingsCheck(dataSource).afterPropertiesSet()).doesNotThrowAnyException();
+    }
 }

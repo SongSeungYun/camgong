@@ -41,5 +41,5 @@ camgong:
     allowed-origins: ${ALLOWED_ORIGINS:}
     verify-link-base-url: ${VERIFY_LINK_BASE_URL:http://localhost:5173/verify?token=}
   mail:
-    # logging | smtp. SMTP 접속 정보는 SPRING_MAIL_* 환경변수로만 받는다.
-    sender: ${MAIL_SENDER:logging}
+    # smtp(기본) | logging(local/test/benchmark 프로파일에서만). SMTP 접속 정보는 SPRING_MAIL_* 환경변수로만 받는다.
+    sender: ${MAIL_SENDER:smtp}

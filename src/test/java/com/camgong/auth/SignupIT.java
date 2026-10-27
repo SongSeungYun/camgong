@@ -54,7 +54,7 @@ class SignupIT extends IntegrationTestBase {
 
         Map<String, Object> row = jdbc.queryForMap("SELECT * FROM pending_signup");
         assertThat(row.get("email_key")).isEqualTo("mixed.case@school.ac.kr");
-        assertThat(row.get("email")).isEqualTo("Mixed.Case@School.AC.KR");
+        assertThat(row.get("email")).as("저장 주소는 정규화한 값").isEqualTo("mixed.case@school.ac.kr");
         String token = mail.sent().get(0).verifyLink().split("token=")[1];
         assertThat(row.get("token_hash")).isEqualTo(Tokens.sha256Hex(token)).isNotEqualTo(token);
         assertThat(row.get("sent_count")).isEqualTo(1);
@@ -128,5 +128,28 @@ class SignupIT extends IntegrationTestBase {
 
         assertThat(pendingRows()).isEqualTo(1);
         assertThat(mail.sent()).hasSize(2);
+    }
+
+    @Test
+    void nonAsciiAddressesAreRejectedSoNobodyCanPinTheStoredAddress() throws Exception {
+        // 켈빈 기호 K(U+212A)는 소문자로 바꾸면 ASCII 'k' 가 되어 진짜 kim@ 와 같은 키가 된다
+        for (String email : new String[] { "\u212Aim@school.ac.kr", "kim\u00e9@school.ac.kr", "ｋｉｍ@school.ac.kr",
+                "kim@school.ac.kr\u200b", "ki m@school.ac.kr" }) {
+            submit(signup(email)).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[*].field").value(hasItem("email")));
+        }
+        assertThat(pendingRows()).isZero();
+        assertThat(mail.sent()).isEmpty();
+    }
+
+    @Test
+    void everyMailGoesToTheNormalizedAddressWhoeverAppliedFirst() throws Exception {
+        submit(signup("Kim@School.AC.KR")).andExpect(status().isAccepted());
+        clock.advance(java.time.Duration.ofMinutes(2));
+        submit(signup("kIM@school.ac.kr")).andExpect(status().isAccepted());
+
+        assertThat(mail.sent()).extracting(LoggingMailSender.Sent::toEmail)
+                .containsExactly("kim@school.ac.kr", "kim@school.ac.kr");
+        assertThat(jdbc.queryForObject("SELECT email FROM pending_signup", String.class)).isEqualTo("kim@school.ac.kr");
     }
 }

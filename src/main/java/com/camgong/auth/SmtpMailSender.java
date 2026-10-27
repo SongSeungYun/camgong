@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 // ponytail: 발송 실패는 로그만 남기고 사용자가 재발송으로 복구(호출하는 리스너가 잡는다)
 @Component
-@ConditionalOnProperty(name = "camgong.mail.sender", havingValue = "smtp")
+@ConditionalOnProperty(name = "camgong.mail.sender", havingValue = "smtp", matchIfMissing = true)
 public class SmtpMailSender implements MailSender {
 
     private final JavaMailSender mailSender;

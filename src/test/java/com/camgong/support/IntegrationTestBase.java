@@ -22,6 +22,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.mysql.MySQLContainer;
@@ -32,6 +33,7 @@ import org.testcontainers.utility.DockerImageName;
 /** 모든 통합 테스트의 기반. 실제 MySQL 8.4 컨테이너(헌법 IV)와 조작 가능한 시계를 쓴다. */
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 @Import(IntegrationTestBase.TestClockConfig.class)
 public abstract class IntegrationTestBase {
 
@@ -55,6 +57,7 @@ public abstract class IntegrationTestBase {
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("camgong.auth.bcrypt-cost", () -> 4); // 테스트 속도
+        registry.add("camgong.mail.sender", () -> "logging"); // 실제 메일 대신 기록
         registry.add("camgong.auth.cleanup.enabled", () -> false); // 정리는 SessionCleanupIT 가 직접 호출
     }
 

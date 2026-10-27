@@ -55,7 +55,7 @@ public class SignupService {
     @Transactional
     public SignupResponse signup(SignupRequest r) {
         String emailKey = Keys.normalize(r.email());
-        if (emailKey.length() > MAX_EMAIL_KEY || !allowedDomain(emailKey)) {
+        if (emailKey.length() > MAX_EMAIL_KEY || !asciiOnly(r.email()) || !allowedDomain(emailKey)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.",
                     List.of(new ApiException.Field("email", "허용되지 않은 이메일 도메인입니다.")));
         }
@@ -74,7 +74,7 @@ public class SignupService {
                 ON DUPLICATE KEY UPDATE id = id
                 """)
                 .param("key", emailKey)
-                .param("email", r.email())
+                .param("email", emailKey)             // 저장·발송 주소는 정규화한 값 하나로 통일한다(아래 asciiOnly 주석)
                 .param("now", at)
                 .param("tokenHash", Tokens.sha256Hex(token))
                 .param("expires", utcTime(now.plus(props.verifyTokenTtl())))
@@ -99,6 +99,7 @@ public class SignupService {
      */
     // ponytail: 인증 링크는 화면이 POST로 확인(메일 스캐너의 GET 미리 열기 방지)
     // ponytail: 가입 입력(이름·비밀번호·동의)은 인증 링크를 누른 사람만 정한다(계정 선점 방지, 변경 B2)
+    // ponytail: BCrypt 동안 트랜잭션·커넥션을 쥔다. 필요하면 TransactionTemplate 으로 ③~⑤만 묶는다
     @Transactional
     public Authenticated verify(VerifyRequest r) {
         Instant now = Instant.now(clock);
@@ -184,6 +185,10 @@ public class SignupService {
     @Transactional
     public SignupResponse resend(ResendRequest r) {
         String emailKey = Keys.normalize(r.email());
+        if (emailKey.length() > MAX_EMAIL_KEY || !asciiOnly(r.email())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.",
+                    List.of(new ApiException.Field("email", "이메일 형식이 올바르지 않습니다.")));
+        }
         Instant now = Instant.now(clock);
         String token = Tokens.newToken();
         if (refreshMailQuota(emailKey, token, now) == 0) {
@@ -254,6 +259,14 @@ public class SignupService {
     }
 
     // ponytail: 허용 도메인은 설정값(ALLOWED_EMAIL_DOMAINS). 학교가 여럿으로 늘고 관리가 필요해지면 DB 테이블로
+    /**
+     * 이메일은 ASCII(공백·제어문자 제외)만 받는다. 정규화한 키가 아니라 입력 원문을 검사한다 — 켈빈 기호는 소문자 변환 뒤에 ASCII 가 된다. 소문자 변환이 같은 키를 만드는 다른 글자(켈빈 기호 K 등)를 허용하면,
+     * 공격자가 그 문자열로 먼저 신청해 저장된 주소를 굳히고 진짜 주소의 사용자에게 메일이 가지 못하게 막을 수 있다.
+     */
+    private static boolean asciiOnly(String value) {
+        return value.chars().allMatch(c -> c > 0x20 && c < 0x7f);
+    }
+
     /** 마지막 @ 뒤가 허용 목록과 정확히 같아야 한다. endsWith·contains 는 evil.school.ac.kr 같은 우회를 못 막는다. */
     private boolean allowedDomain(String emailKey) {
         int at = emailKey.lastIndexOf('@');

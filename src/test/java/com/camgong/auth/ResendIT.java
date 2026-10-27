@@ -183,6 +183,14 @@ class ResendIT extends IntegrationTestBase {
     }
 
     @Test
+    void nonAsciiAddressForResendIsRejected() throws Exception {
+        submit(signup(EMAIL)).andExpect(status().isAccepted());
+        clock.advance(Duration.ofMinutes(2));
+        resend("\u212Aim@school.ac.kr").andExpect(status().isBadRequest());
+        resend("new@school.ac.kr\u200b").andExpect(status().isBadRequest());
+    }
+
+    @Test
     void invalidEmailFormatIsRejected() throws Exception {
         resend("not-an-email").andExpect(status().isBadRequest());
     }

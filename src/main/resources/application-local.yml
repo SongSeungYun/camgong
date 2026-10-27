@@ -2,3 +2,5 @@
 camgong:
   auth:
     cookie-secure: false
+  mail:
+    sender: logging

@@ -27,6 +27,7 @@ class DatabaseSettingsCheck implements InitializingBean {
     public void afterPropertiesSet() throws SQLException {
         try (Connection c = dataSource.getConnection(); Statement st = c.createStatement()) {
             st.execute("CREATE TEMPORARY TABLE IF NOT EXISTS camgong_affected_rows_check (id INT PRIMARY KEY, v INT)");
+            checkNoLegacySchema(st);
             try {
                 st.executeUpdate("INSERT INTO camgong_affected_rows_check VALUES (1, 1)");
                 int rows = st.executeUpdate(
@@ -37,6 +38,20 @@ class DatabaseSettingsCheck implements InitializingBean {
                 }
             } finally {
                 st.execute("DROP TEMPORARY TABLE IF EXISTS camgong_affected_rows_check");
+            }
+        }
+    }
+
+    /**
+     * 변경 B2 이전 스키마(pending_signup 에 display_name·password_hash 가 NOT NULL 로 남은 DB)는 schema.sql 이
+     * CREATE TABLE IF NOT EXISTS 라서 바뀌지 않고, 그대로 두면 신청마다 500 이 난다. 알려 주고 기동을 막는다.
+     */
+    static void checkNoLegacySchema(Statement st) throws SQLException {
+        try (var rs = st.executeQuery("SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() "
+                + "AND table_name = 'pending_signup' AND column_name IN ('display_name', 'password_hash')")) {
+            if (rs.next()) {
+                throw new IllegalStateException("pending_signup 이 변경 B2 이전 스키마(" + rs.getString(1)
+                        + " 컬럼)다. 로컬 DB 를 새로 만들어야 한다(예: docker rm -f 후 새 MySQL 컨테이너).");
             }
         }
     }
