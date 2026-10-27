@@ -20,3 +20,23 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+
+camgong:
+  auth:
+    # 운영 도메인은 환경변수로만 준다. 저장소에 넣지 않는다.
+    allowed-email-domains: ${ALLOWED_EMAIL_DOMAINS:school.ac.kr}
+    session-ttl: 14d
+    session-touch-interval: 10m
+    verify-token-ttl: 24h
+    mail:
+      resend-interval: 1m
+      daily-limit: 5
+    login:
+      max-failures: 5
+      lock-duration: 15m
+    cookie-secure: ${COOKIE_SECURE:false}
+    bcrypt-cost: 10
+    verify-link-base-url: ${VERIFY_LINK_BASE_URL:http://localhost:5173/verify?token=}
+  mail:
+    # logging | smtp. SMTP 접속 정보는 SPRING_MAIL_* 환경변수로만 받는다.
+    sender: ${MAIL_SENDER:logging}
