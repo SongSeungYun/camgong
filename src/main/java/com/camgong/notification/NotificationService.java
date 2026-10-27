@@ -76,7 +76,7 @@ public class NotificationService {
         jdbc.sql("UPDATE notification SET read_at = COALESCE(read_at, :now) WHERE id = :id AND recipient_id = :me")
                 .param("now", LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC)).param("id", id).param("me", me).update();
         // 접근 규칙: 내 알림이 아니면(없음 포함) 같은 404. 이 SELECT 가 트랜잭션의 첫 일관 읽기라(앞의 UPDATE 는 스냅샷을 만들지 않는다)
-        // 동시 요청이 먼저 읽음 처리했어도 최신 값을 읽는다. 잠금 읽기로 하면 없는 id 에서 갭 락만 잡는다.
+        // 동시 요청이 먼저 읽음 처리했어도 최신 값을 읽는다. 잠금 읽기는 필요 없다.
         return jdbc.sql("SELECT " + COLUMNS + " FROM notification WHERE id = :id AND recipient_id = :me")
                 .param("id", id).param("me", me)
                 .query((rs, i) -> view(rs.getLong("id"), rs.getString("type"), rs.getLong("group_buy_id"),
