@@ -60,7 +60,7 @@ public class NotificationCleanup {
             this.cleanup = cleanup;
         }
 
-        @Scheduled(fixedDelayString = "${camgong.notification.cleanup.interval:1d}", initialDelayString = "${camgong.notification.cleanup.interval:1d}")
+        @Scheduled(fixedDelayString = "${camgong.notification.cleanup.interval:1d}", initialDelayString = "PT1M")
         void scheduled() {
             try {
                 cleanup.run();

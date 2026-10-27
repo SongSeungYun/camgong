@@ -84,4 +84,15 @@ class NotificationEventListenerTest {
 
         failing.on(new GroupBuyCompleted("e1", 1L, "t", List.of(1L)));
     }
+
+    @Test
+    void anEventWithNullRecipientsOrFieldsNeverThrowsIntoTheCommittedRequest() {
+        listener.on(new GroupBuyCompleted("e1", 1L, "t", null));
+        listener.on(new GroupBuyFailed("e2", 1L, "t", null));
+        listener.on(new GroupBuyCancelled("e3", 1L, "t", null));
+        listener.on(new GroupBuyChanged("e4", 1L, "t", null, List.of("title")));
+        listener.on(new GroupBuyChanged("e5", 1L, "t", List.of(2L), null));
+
+        assertThat(written).isEmpty();
+    }
 }

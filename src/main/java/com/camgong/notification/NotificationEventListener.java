@@ -39,25 +39,25 @@ class NotificationEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void on(GroupBuyCompleted e) {
-        dispatch(e.eventId(), rows(e.eventId(), e.recipientIds(), NotificationType.GROUPBUY_COMPLETED, e.groupBuyId(),
+        dispatch(e.eventId(), () -> rows(e.eventId(), e.recipientIds(), NotificationType.GROUPBUY_COMPLETED, e.groupBuyId(),
                 e.groupBuyTitle(), null));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void on(GroupBuyFailed e) {
-        dispatch(e.eventId(), rows(e.eventId(), e.recipientIds(), NotificationType.GROUPBUY_FAILED, e.groupBuyId(),
+        dispatch(e.eventId(), () -> rows(e.eventId(), e.recipientIds(), NotificationType.GROUPBUY_FAILED, e.groupBuyId(),
                 e.groupBuyTitle(), null));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void on(GroupBuyChanged e) {
-        dispatch(e.eventId(), rows(e.eventId(), e.recipientIds(), NotificationType.GROUPBUY_CHANGED, e.groupBuyId(),
+        dispatch(e.eventId(), () -> rows(e.eventId(), e.recipientIds(), NotificationType.GROUPBUY_CHANGED, e.groupBuyId(),
                 e.groupBuyTitle(), String.join(",", e.changedFields())));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void on(GroupBuyCancelled e) {
-        dispatch(e.eventId(), rows(e.eventId(), e.recipientIds(), NotificationType.GROUPBUY_CANCELLED, e.groupBuyId(),
+        dispatch(e.eventId(), () -> rows(e.eventId(), e.recipientIds(), NotificationType.GROUPBUY_CANCELLED, e.groupBuyId(),
                 e.groupBuyTitle(), null));
     }
 
@@ -68,7 +68,18 @@ class NotificationEventListener {
                 .map(r -> new NotificationRow(eventId, r, type, groupBuyId, title, changedFields, now)).toList();
     }
 
-    private void dispatch(String eventId, List<NotificationRow> rows) {
+    /**
+     * 이미 커밋된 원 요청을 절대 실패시키지 않는다: 행 만들기(recipientIds 가 null 인 이벤트 등)부터 실행기 제출까지 모든 예외를 삼키고
+     * WARN 만 남긴다(유실로 취급, 허용된 한계).
+     */
+    private void dispatch(String eventId, java.util.function.Supplier<List<NotificationRow>> rowsSupplier) {
+        List<NotificationRow> rows;
+        try {
+            rows = rowsSupplier.get();
+        } catch (RuntimeException e) {
+            log.warn("notification-dropped eventId={} reason=invalid-event {}", eventId, e.getClass().getSimpleName());
+            return;
+        }
         if (rows.isEmpty()) {
             return;
         }

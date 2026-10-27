@@ -56,8 +56,10 @@ class CheckAccessIT extends CheckTestBase {
                 .andExpect(jsonPath("$.title").value("INVALID_TARGET")).andExpect(jsonPath("$.errors[*].field").value(hasItem("memberId")));
         receive(ORGANIZER, id, ORGANIZER, TRUE).andExpect(status().isBadRequest());
         seedMembers(4, 4);
-        pay(ORGANIZER, id, 4, TRUE).andExpect(status().isNotFound());                  // 이 공구에 참여하지 않은 회원
-        pay(ORGANIZER, id, 99999, TRUE).andExpect(status().isNotFound());
+        pay(ORGANIZER, id, 4, TRUE).andExpect(status().isNotFound())                   // 이 공구에 참여하지 않은 회원
+                .andExpect(jsonPath("$.title").value("PARTICIPATION_NOT_FOUND"));
+        pay(ORGANIZER, id, 99999, TRUE).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("PARTICIPATION_NOT_FOUND"));
         org.assertj.core.api.Assertions.assertThat(paidAt(id, ORGANIZER)).isNull();
     }
 
@@ -77,5 +79,26 @@ class CheckAccessIT extends CheckTestBase {
         mockMvc.perform(put("/api/groupbuys/" + id + "/participations/" + PARTICIPANT + "/payment")
                 .contentType(MediaType.APPLICATION_JSON).content(TRUE)).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/groupbuys/" + id + "/check-sheet").header("X-Member-Id", "1")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void aMemberWhoParticipatesInAnotherGroupBuyIsNotATargetHere() throws Exception {
+        long id = completedGroupBuy();
+        long other = completedGroupBuy();
+        seedMembers(4, 4);
+        participate(other, 4, 1);                                                      // 4 는 다른 공구에만 참여한다
+
+        pay(ORGANIZER, id, 4, TRUE).andExpect(status().isNotFound()).andExpect(jsonPath("$.title").value("PARTICIPATION_NOT_FOUND"));
+        receive(ORGANIZER, id, 4, TRUE).andExpect(status().isNotFound()).andExpect(jsonPath("$.title").value("PARTICIPATION_NOT_FOUND"));
+        org.assertj.core.api.Assertions.assertThat(paidAt(other, 4)).isNull();         // 다른 공구의 행은 건드리지 않았다
+    }
+
+    @Test
+    void anInvalidBodyIs400BeforeAnyAccessCheck() throws Exception {
+        long id = completedGroupBuy();
+        long open = groupBuy().status("OPEN").insert(jdbc);
+        pay(OUTSIDER, id, PARTICIPANT, "{}").andExpect(status().isBadRequest());       // 개설자가 아니어도 403 이 아니라 400
+        pay(ORGANIZER, open, PARTICIPANT, "{}").andExpect(status().isBadRequest());    // 모집 완료가 아니어도 409 가 아니라 400
+        pay(ORGANIZER, 99999, PARTICIPANT, "{}").andExpect(status().isBadRequest());   // 없는 공구여도 404 가 아니라 400
     }
 }

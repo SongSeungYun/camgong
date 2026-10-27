@@ -118,7 +118,7 @@ public class ParticipationCheckService {
                     List.of(new ApiException.Field("memberId", "개설자 본인은 체크 대상이 아닙니다.")));
         }
         if (rows.findOne(groupBuyId, memberId).isEmpty()) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Not Found", "이 공구의 참여자가 아닙니다.");
+            throw new ApiException(HttpStatus.NOT_FOUND, "PARTICIPATION_NOT_FOUND", "이 공구의 참여자가 아닙니다.");
         }
         jdbc.sql(updateSql).param("now", LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC))
                 .param("groupBuyId", groupBuyId).param("memberId", memberId).update();

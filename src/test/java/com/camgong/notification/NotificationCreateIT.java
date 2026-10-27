@@ -130,4 +130,12 @@ class NotificationCreateIT extends NotificationTestBase {
                 .containsExactlyInAnyOrder("id", "event_id", "recipient_id", "type", "group_buy_id", "group_buy_title",
                         "changed_fields", "created_at", "read_at");
     }
+
+    @Test
+    void anEditWithAnUnchangedBodyCreatesNoNotification() throws Exception {
+        long id = openWithParticipants();
+        updateAs(ORGANIZER, id, GroupBuyBodies.valid()).andExpect(status().isOk());      // 개설 때와 같은 내용
+
+        assertThat(notificationCount()).isZero();
+    }
 }
