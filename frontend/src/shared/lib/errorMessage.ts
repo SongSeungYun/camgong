@@ -25,8 +25,6 @@ export function errorMessage(err: ApiError, { fromForm = false, nowMs = Date.now
       return fromForm ? '로그인이 필요해요. 입력하던 내용은 저장되지 않아요.' : '로그인이 필요해요.'
     case 'INVALID_CREDENTIALS':
       return '이메일 또는 비밀번호가 맞지 않아요.'
-    case 'EMAIL_NOT_VERIFIED':
-      return '이메일 인증이 필요해요.'
     case 'ORGANIZER_NOT_ALLOWED':
       return '개설자는 직접 참여할 수 없어요. 수량은 공구 수정에서 바꿔요.'
     case 'ORGANIZER_ONLY':
