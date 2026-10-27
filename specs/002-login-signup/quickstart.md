@@ -9,6 +9,7 @@
 - 001 quickstart의 준비(JDK 21, Docker, `useAffectedRows=true`).
 - 허용 도메인: `school.ac.kr`(테스트용). 운영 값은 사용자 제공.
 - 자동 테스트: `./gradlew test`.
+- 로컬 `bootRun`은 `--spring.profiles.active=local`로 실행한다(세션 쿠키 `Secure` 기본값이 true라, 프로필 없이 http로 실행하면 Safari가 쿠키를 버려 로그인 직후 `/me`가 401이 된다). 이전 스키마로 만든 로컬 DB는 `pending_signup` 컬럼이 달라 새 MySQL 컨테이너로 다시 만들어야 한다.
 
 ## 시나리오
 

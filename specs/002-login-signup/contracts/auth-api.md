@@ -52,7 +52,7 @@
 | `consent` | 필수, `true`여야 한다 |
 | `consentVersion` | 필수, 안내문 버전 |
 
-처리 순서: ① 토큰 조회(400 `INVALID_TOKEN` / 409 `TOKEN_USED` / 410 `TOKEN_EXPIRED`) → ② 본문 검증 오류면 `400` + `errors[]`이고 **토큰은 소진되지 않는다**(고쳐서 다시 제출) → ③ `used_at` 조건부 `UPDATE`로 선점 → ④ `member` INSERT(비밀번호는 BCrypt 해시, 동의 시각·안내문 버전도 `member`에 기록). ⑤ 이름 충돌 `409 DISPLAY_NAME_TAKEN`, 이메일 충돌 `409 ALREADY_REGISTERED`이면 같은 트랜잭션 롤백으로 토큰이 유효한 채로 남는다. 비밀번호는 응답·로그·오류 본문 어디에도 나오지 않는다.
+처리 순서(단, JSON 형식·타입이 틀린 본문 — 예: `consent`가 문자열, `password`가 객체 — 은 토큰을 보기 전에 역직렬화 단계에서 `400`이 된다. 필드 누락·값 규칙 위반만 아래 순서를 따른다): ① 토큰 조회(400 `INVALID_TOKEN` / 409 `TOKEN_USED` / 410 `TOKEN_EXPIRED`) → ② 본문 검증 오류면 `400` + `errors[]`이고 **토큰은 소진되지 않는다**(고쳐서 다시 제출) → ③ `used_at` 조건부 `UPDATE`로 선점 → ④ `member` INSERT(비밀번호는 BCrypt 해시, 동의 시각·안내문 버전도 `member`에 기록). ⑤ 이름 충돌 `409 DISPLAY_NAME_TAKEN`, 이메일 충돌 `409 ALREADY_REGISTERED`이면 같은 트랜잭션 롤백으로 토큰이 유효한 채로 남는다. 비밀번호는 응답·로그·오류 본문 어디에도 나오지 않는다.
 
 **성공** `200 OK` + `Set-Cookie` — 가입이 완료되고 로그인된 상태다.
 
