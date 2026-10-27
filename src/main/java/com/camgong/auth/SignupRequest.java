@@ -1,21 +1,17 @@
 package com.camgong.auth;
 
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-public record SignupRequest(
-        @NotBlank @Email @Size(max = 254) String email,
-        @NotBlank @Size(min = 2, max = 20) String displayName,
-        @NotNull @Size(min = 8) String password,
-        @AssertTrue(message = "개인정보 수집·이용에 동의해야 합니다.") boolean consent,
-        @NotBlank @Size(max = 20) String consentVersion) {
+/**
+ * 신청은 이메일 하나다. 이름·비밀번호·동의는 인증 링크를 누른 사람이 verify 에서 정한다(계정 선점 방지, 변경 B2):
+ * 신청에 비밀번호를 받으면 남이 먼저 내 이메일로 신청해 비밀번호를 정해 둘 수 있다.
+ */
+public record SignupRequest(@NotBlank @Email @Size(max = 254) String email) {
 
-    /** 이메일과 이름은 앞뒤 공백을 지운 값으로 검증·저장한다(공백뿐인 이름은 NotBlank 에 걸린다). */
+    /** 앞뒤 공백을 지운 값으로 검증·저장한다. */
     public SignupRequest {
         email = email == null ? null : email.trim();
-        displayName = displayName == null ? null : displayName.trim();
     }
 }

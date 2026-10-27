@@ -133,39 +133,24 @@ class ResendIT extends IntegrationTestBase {
     }
 
     @Test
-    void resubmittingBeforeVerificationOnlyRefreshesTokenAndKeepsTheFirstNameAndPassword() throws Exception {
-        submit(signup(EMAIL, "처음이름", "password1")).andExpect(status().isAccepted());
+    void applyingAgainBeforeVerificationRefreshesTheTokenOnlyAndKeepsCounting() throws Exception {
+        submit(signup(EMAIL)).andExpect(status().isAccepted());
         String oldToken = lastToken();
-        String hash = jdbc.queryForObject("SELECT password_hash FROM pending_signup", String.class);
 
         clock.advance(Duration.ofMinutes(2));
-        submit(signup(EMAIL, "바뀐이름", "password2")).andExpect(status().isAccepted());
+        submit(signup(EMAIL)).andExpect(status().isAccepted());
 
         assertThat(pendingRows()).isEqualTo(1);
         assertThat(sentCount()).isEqualTo(2);
-        assertThat(jdbc.queryForObject("SELECT display_name FROM pending_signup", String.class)).isEqualTo("처음이름");
-        assertThat(jdbc.queryForObject("SELECT password_hash FROM pending_signup", String.class)).isEqualTo(hash);
         assertThat(mail.sent()).hasSize(2);
-        verifyToken(oldToken).andExpect(status().isBadRequest());
+        verifyToken(oldToken).andExpect(status().isBadRequest()).andExpect(jsonPath("$.title").value("INVALID_TOKEN"));
 
-        verifyToken(lastToken()).andExpect(status().isOk()).andExpect(jsonPath("$.member.displayName").value("처음이름"));
+        // 링크를 누른 사람이 정한 이름·비밀번호로 가입된다
+        mockMvc.perform(post("/api/auth/verify").contentType(MediaType.APPLICATION_JSON)
+                .content(json(com.camgong.support.AuthBodies.verify(lastToken(), "처음이름", "chosen-pw-1"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.member.displayName").value("처음이름"));
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content(json(com.camgong.support.AuthBodies.login(EMAIL, "password1")))).andExpect(status().isOk());
-        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content(json(com.camgong.support.AuthBodies.login(EMAIL, "password2"))))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void resendKeepsTheStoredNameAndPassword() throws Exception {
-        submit(signup(EMAIL, "처음이름", "password1")).andExpect(status().isAccepted());
-        String hash = jdbc.queryForObject("SELECT password_hash FROM pending_signup", String.class);
-
-        clock.advance(Duration.ofMinutes(2));
-        resend(EMAIL).andExpect(status().isAccepted());
-
-        assertThat(jdbc.queryForObject("SELECT display_name FROM pending_signup", String.class)).isEqualTo("처음이름");
-        assertThat(jdbc.queryForObject("SELECT password_hash FROM pending_signup", String.class)).isEqualTo(hash);
+                .content(json(com.camgong.support.AuthBodies.login(EMAIL, "chosen-pw-1")))).andExpect(status().isOk());
     }
 
     @Test
@@ -173,8 +158,12 @@ class ResendIT extends IntegrationTestBase {
         submit(signup(EMAIL)).andExpect(status().isAccepted());
         clock.advance(Duration.ofMinutes(2));
 
-        resend("  NEW@School.ac.kr ").andExpect(status().isAccepted());
+        resend("  NEW@School.ac.kr ").andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.email").value(EMAIL));        // 응답도 저장된 주소
         assertThat(pendingRows()).isEqualTo(1);
+        // 메일은 요청에 적힌 대문자 섞인 문자열이 아니라 신청 때 저장된 주소로 나간다
+        assertThat(mail.sent()).hasSize(2);
+        assertThat(mail.sent().get(1).toEmail()).isEqualTo(EMAIL);
     }
 
     @Test

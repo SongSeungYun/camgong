@@ -26,6 +26,7 @@ import com.camgong.member.MemberRepository;
 public class SignupService {
 
     private static final int BCRYPT_MAX_BYTES = 72;
+    private static final int MAX_EMAIL_KEY = 254;   // member.email_key / pending_signup.email_key 컬럼 길이
     private static final Duration WINDOW = Duration.ofHours(24);
 
     private final JdbcClient jdbc;
@@ -48,24 +49,16 @@ public class SignupService {
     }
 
     /**
-     * 가입 신청(research 결정 4·6·8). 인증 전에는 회원을 만들지 않고 pending_signup 에만 둔다.
-     * 표시 이름은 이 시점에 점유·검사하지 않는다(FR-003, FR-006): 인증 시점에 판정한다.
+     * 가입 신청(research 결정 4·6·8, 변경 B2). 인증 전에는 회원을 만들지 않고 pending_signup 에 이메일과 토큰만 둔다.
+     * 이름·비밀번호·동의는 받지 않는다 — 인증 링크를 누른 사람이 verify 에서 정한다(계정 선점 방지).
      */
     @Transactional
     public SignupResponse signup(SignupRequest r) {
-        // 비싼 BCrypt 전에 입력 검증을 모아서 한 번에 돌려준다.
-        List<ApiException.Field> invalid = new ArrayList<>();
-        if (!allowedDomain(Keys.normalize(r.email()))) {
-            invalid.add(new ApiException.Field("email", "허용되지 않은 이메일 도메인입니다."));
-        }
-        // BCrypt 는 72바이트 뒤를 잘라 버리므로 글자 수가 아니라 바이트로 막는다.
-        if (r.password().getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_BYTES) {
-            invalid.add(new ApiException.Field("password", "비밀번호는 72바이트(영문 72자, 한글 24자) 이하여야 합니다."));
-        }
-        if (!invalid.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.", invalid);
-        }
         String emailKey = Keys.normalize(r.email());
+        if (emailKey.length() > MAX_EMAIL_KEY || !allowedDomain(emailKey)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.",
+                    List.of(new ApiException.Field("email", "허용되지 않은 이메일 도메인입니다.")));
+        }
         if (members.existsByEmailKey(emailKey)) {
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_REGISTERED", "이미 가입된 이메일입니다.");
         }
@@ -73,49 +66,46 @@ public class SignupService {
         Instant now = Instant.now(clock);
         LocalDateTime at = utcTime(now);
         String token = Tokens.newToken();
-        String hash = encoder.encode(r.password());
         // 중복 키를 예외로 받으면 공유 잠금이 남아 동시 요청끼리 UPDATE 에서 교착한다. 중복이면 행 잠금을 잡고 0행을 돌려받는다.
         int inserted = jdbc.sql("""
-                INSERT INTO pending_signup (email_key, email, display_name, password_hash, consent_at,
-                    consent_version, token_hash, token_expires_at, last_sent_at, window_started_at,
-                    sent_count, used_at, created_at)
-                VALUES (:key, :email, :name, :hash, :now, :consentVersion, :tokenHash, :expires, :now, :now,
-                    1, NULL, :now)
+                INSERT INTO pending_signup (email_key, email, token_hash, token_expires_at, last_sent_at,
+                    window_started_at, sent_count, used_at, created_at)
+                VALUES (:key, :email, :tokenHash, :expires, :now, :now, 1, NULL, :now)
                 ON DUPLICATE KEY UPDATE id = id
                 """)
                 .param("key", emailKey)
                 .param("email", r.email())
-                .param("name", r.displayName())
-                .param("hash", hash)
                 .param("now", at)
-                .param("consentVersion", r.consentVersion())
                 .param("tokenHash", Tokens.sha256Hex(token))
                 .param("expires", utcTime(now.plus(props.verifyTokenTtl())))
                 .update();
         if (inserted == 0) {
             // 이미 신청이 있다: 한도 안이면 토큰만 새로 건다(이전 토큰은 token_hash 교체로 무효).
-            // 이름·비밀번호·동의는 처음 값을 유지한다: 인증 전 재제출로 남의 신청을 덮어쓰지 못하게 한다.
-            int updated = refreshMailQuota(emailKey, token, now);
-            if (updated == 0) {
+            if (refreshMailQuota(emailKey, token, now) == 0) {
                 throw limited(emailKey, now, false);
             }
         }
 
-        events.publishEvent(new VerificationMailRequested(r.email(), token));
-        return SignupResponse.of(r.email(), now.plus(props.mail().resendInterval()));
+        // 메일은 요청에 적힌 문자열이 아니라 DB 에 저장된 주소로 보낸다(키가 같아도 대소문자가 다른 문자열이 수신자가 되지 않게).
+        String storedEmail = storedEmail(emailKey);
+        events.publishEvent(new VerificationMailRequested(storedEmail, token));
+        return SignupResponse.of(storedEmail, now.plus(props.mail().resendInterval()));
     }
 
     /**
-     * 인증 링크 확인(research 결정 3·4). 토큰을 한 번만 쓰게 하는 것이 핵심이라 used_at 조건부 UPDATE 를
-     * 회원 INSERT 보다 먼저 실행한다. 이어지는 INSERT 가 실패하면 예외로 같은 트랜잭션이 롤백되어
-     * used_at 도 되돌아가므로 토큰은 유효한 채로 남는다(이름 충돌 뒤 새 이름으로 다시 시도할 수 있다).
+     * 인증 링크 확인(research 결정 3·4·13, 변경 B2). 순서: ① 토큰 조회 → ② 본문 검증(오류면 400, 토큰은 소진되지 않는다)
+     * → ③ used_at 조건부 UPDATE 선점 → ④ BCrypt 해시로 회원 INSERT → ⑤ 이름·이메일 충돌이면 예외로 롤백(used_at 도 되돌아가
+     * 토큰이 유효한 채로 남는다 — 새 이름으로 다시 보낼 수 있다). 토큰을 한 번만 쓰게 하는 것이 핵심이라 ③ 을 ④ 보다 먼저 한다.
      */
     // ponytail: 인증 링크는 화면이 POST로 확인(메일 스캐너의 GET 미리 열기 방지)
+    // ponytail: 가입 입력(이름·비밀번호·동의)은 인증 링크를 누른 사람만 정한다(계정 선점 방지, 변경 B2)
     @Transactional
     public Authenticated verify(VerifyRequest r) {
         Instant now = Instant.now(clock);
-        PendingSignup p = findByToken(Tokens.sha256Hex(r.token()))
-                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TOKEN", "알 수 없는 인증 링크입니다."));
+        if (r.token() == null || r.token().isBlank()) {
+            throw invalidToken();
+        }
+        PendingSignup p = findByToken(Tokens.sha256Hex(r.token())).orElseThrow(SignupService::invalidToken);
         if (p.usedAt() != null) {
             throw tokenUsed();
         }
@@ -123,9 +113,13 @@ public class SignupService {
             throw new ApiException(HttpStatus.GONE, "TOKEN_EXPIRED", "인증 링크가 만료되었습니다. 인증 메일을 다시 받아 주세요.");
         }
 
+        String displayName = r.displayName() == null ? null : r.displayName().trim();
+        validateSignupInput(r, displayName);
+        String passwordHash = encoder.encode(r.password());
+
         // 동시에 같은 토큰이 와도 영향 행이 1인 쪽만 통과한다(useAffectedRows=true 전제).
         int claimed = jdbc.sql("UPDATE pending_signup SET used_at = :now WHERE id = :id AND used_at IS NULL "
-                + "AND token_hash = :hash")   // 읽은 뒤 재발송·재제출로 토큰이 바뀌었으면 소진하지 않는다
+                + "AND token_hash = :hash")   // 읽은 뒤 재발송으로 토큰이 바뀌었으면 옛 토큰으로 소진하지 못한다
                 .param("now", LocalDateTime.ofInstant(now, ZoneOffset.UTC))
                 .param("id", p.id())
                 .param("hash", p.tokenHash())
@@ -134,11 +128,9 @@ public class SignupService {
             throw tokenUsed();
         }
 
-        String displayName = r.displayName() != null ? r.displayName() : p.displayName();
         Member member;
         try {
-            member = members.saveAndFlush(new Member(displayName, p.email(), p.passwordHash(),
-                    p.consentAt(), p.consentVersion(), now));
+            member = members.saveAndFlush(new Member(displayName, p.email(), passwordHash, now, r.consentVersion(), now));
         } catch (DataIntegrityViolationException e) {
             // 어느 UNIQUE 가 걸렸는지는 MySQL 오류 메시지의 키 이름으로 가른다. 던지면 used_at 도 롤백된다.
             // 메시지 앞쪽의 'Duplicate entry <값>' 에는 사용자 입력이 섞이므로 "for key" 뒤쪽만 본다.
@@ -157,6 +149,37 @@ public class SignupService {
         return new Authenticated(new AuthResponse(new MemberView(member.getId(), member.getName())), sessionToken);
     }
 
+    /** 본문 검증 오류를 모아 400 으로 돌려준다. 토큰은 아직 소진되지 않았다. */
+    private static void validateSignupInput(VerifyRequest r, String displayName) {
+        List<ApiException.Field> errors = new ArrayList<>();
+        if (displayName == null || displayName.isEmpty()) {
+            errors.add(new ApiException.Field("displayName", "표시 이름을 입력해 주세요."));
+        } else if (displayName.length() < 2 || displayName.length() > 20) {
+            errors.add(new ApiException.Field("displayName", "표시 이름은 2~20자여야 합니다."));
+        } else if (Keys.normalize(displayName).length() > 20) {
+            // 소문자 변환이 길이를 늘리는 글자(예: 'İ')는 이름 키 컬럼(20자)을 넘어 저장 오류가 되므로 미리 막는다.
+            errors.add(new ApiException.Field("displayName", "사용할 수 없는 글자가 포함된 이름입니다."));
+        }
+        String password = r.password();
+        if (password == null || password.isBlank()) {
+            errors.add(new ApiException.Field("password", "비밀번호를 입력해 주세요."));
+        } else if (password.length() < 8) {
+            errors.add(new ApiException.Field("password", "비밀번호는 8자 이상이어야 합니다."));
+        } else if (password.getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_BYTES) {
+            // BCrypt 는 72바이트 뒤를 잘라 버리므로 글자 수가 아니라 바이트로 막는다.
+            errors.add(new ApiException.Field("password", "비밀번호는 72바이트(영문 72자, 한글 24자) 이하여야 합니다."));
+        }
+        if (!Boolean.TRUE.equals(r.consent())) {
+            errors.add(new ApiException.Field("consent", "개인정보 수집·이용에 동의해야 합니다."));
+        }
+        if (r.consentVersion() == null || r.consentVersion().isBlank() || r.consentVersion().length() > 20) {
+            errors.add(new ApiException.Field("consentVersion", "동의 안내문 버전이 필요합니다."));
+        }
+        if (!errors.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.", errors);
+        }
+    }
+
     /** 인증 메일 재발송. 표시 이름·비밀번호는 그대로 두고 새 토큰만 건다. */
     @Transactional
     public SignupResponse resend(ResendRequest r) {
@@ -166,8 +189,15 @@ public class SignupService {
         if (refreshMailQuota(emailKey, token, now) == 0) {
             throw limited(emailKey, now, true);
         }
-        events.publishEvent(new VerificationMailRequested(r.email(), token));
-        return SignupResponse.of(r.email(), now.plus(props.mail().resendInterval()));
+        String storedEmail = storedEmail(emailKey);
+        events.publishEvent(new VerificationMailRequested(storedEmail, token));
+        return SignupResponse.of(storedEmail, now.plus(props.mail().resendInterval()));
+    }
+
+    /** 저장된 신청 주소(원문). 한도 UPDATE 가 방금 이 행을 잡았으므로 잠금 읽기로 최신 값을 본다. */
+    private String storedEmail(String emailKey) {
+        return jdbc.sql("SELECT email FROM pending_signup WHERE email_key = :key FOR UPDATE")
+                .param("key", emailKey).query(String.class).single();
     }
 
     /**
@@ -242,8 +272,6 @@ public class SignupService {
         return jdbc.sql("SELECT * FROM pending_signup WHERE token_hash = :hash")
                 .param("hash", tokenHash)
                 .query((rs, i) -> new PendingSignup(rs.getLong("id"), rs.getString("email_key"), rs.getString("email"),
-                        rs.getString("display_name"), rs.getString("password_hash"),
-                        utc(rs.getObject("consent_at", LocalDateTime.class)), rs.getString("consent_version"),
                         rs.getString("token_hash"), utc(rs.getObject("token_expires_at", LocalDateTime.class)),
                         utc(rs.getObject("last_sent_at", LocalDateTime.class)),
                         utc(rs.getObject("window_started_at", LocalDateTime.class)), rs.getInt("sent_count"),
@@ -254,6 +282,10 @@ public class SignupService {
 
     private static Instant utc(LocalDateTime t) {
         return t == null ? null : t.toInstant(ZoneOffset.UTC);
+    }
+
+    private static ApiException invalidToken() {
+        return new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TOKEN", "알 수 없는 인증 링크입니다.");
     }
 
     private static ApiException tokenUsed() {

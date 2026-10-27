@@ -40,13 +40,18 @@ class AuthController {
     }
 
     @PostMapping("/verify")
-    ResponseEntity<AuthResponse> verify(@Valid @RequestBody VerifyRequest request) {
+    ResponseEntity<AuthResponse> verify(@RequestBody VerifyRequest request) {
         return withSession(signupService.verify(request));
     }
 
     @PostMapping("/login")
-    ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return withSession(loginService.login(request));
+    ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+            @CookieValue(name = SessionService.COOKIE_NAME, required = false) String previousToken) {
+        Authenticated authenticated = loginService.login(request);
+        // 같은 브라우저에서 계정을 바꿔 로그인하면 이전 쿠키의 세션 행만 폐기한다(다른 기기의 세션은 유지, FR-012).
+        // 로그인이 실패하면 여기까지 오지 않으므로 이전 세션은 그대로 남는다.
+        sessions.revoke(previousToken);
+        return withSession(authenticated);
     }
 
     @PostMapping("/logout")

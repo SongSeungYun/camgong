@@ -26,7 +26,7 @@ class AuthConfigIT extends IntegrationTestBase {
         assertThat(props.mail().dailyLimit()).isEqualTo(5);
         assertThat(props.login().maxFailures()).isEqualTo(5);
         assertThat(props.login().lockDuration()).isEqualTo(Duration.ofMinutes(15));
-        assertThat(props.cookieSecure()).isFalse();
+        assertThat(props.cookieSecure()).as("기본은 Secure (로컬 개발만 local 프로파일에서 끈다)").isTrue();
         assertThat(props.verifyLinkBaseUrl()).isEqualTo("http://localhost:5173/verify?token=");
     }
 

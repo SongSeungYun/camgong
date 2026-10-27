@@ -34,7 +34,8 @@ camgong:
     login:
       max-failures: 5
       lock-duration: 15m
-    cookie-secure: ${COOKIE_SECURE:false}
+    # 기본은 Secure. 로컬 개발은 local 프로파일(application-local.yml)에서만 끈다 — 운영에서 환경변수를 빠뜨려도 조용히 풀리지 않게.
+    cookie-secure: ${COOKIE_SECURE:true}
     bcrypt-cost: 10
     # 프록시 뒤에서 호스트가 달라지면 여기에 프론트 출처를 쉼표로 적는다(Origin 검사 허용 목록).
     allowed-origins: ${ALLOWED_ORIGINS:}

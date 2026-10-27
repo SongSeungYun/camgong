@@ -53,16 +53,18 @@ class PrivacyIT extends IntegrationTestBase {
         String password = "very-secret-pw1";
 
         // 가입 신청 응답은 신청자 본인이 보낸 이메일을 돌려주는 계약이라 따로 두고, 나머지 응답만 검사한다.
-        mockMvc.perform(postJson("/api/auth/signup", signup(email, "프라이버시", password)));
+        mockMvc.perform(postJson("/api/auth/signup", signup(email)));
         String link = mail.sent().get(0).verifyLink();
         String token = link.substring(link.indexOf("token=") + "token=".length());
 
-        call(postJson("/api/auth/signup", signup(email, "다른이름", "other-secret-pw2")));    // 429
+        call(postJson("/api/auth/signup", signup(email)));                                  // 429
         call(postJson("/api/auth/signup", signup("m1@school.ac.kr")));                       // 409
-        call(postJson("/api/auth/signup", signup("bad@gmail.com", "프라이버시", password)));  // 400
-        call(postJson("/api/auth/verify", verify("wrong-token")));                           // 400
-        MvcResult verified = call(postJson("/api/auth/verify", verify(token)));              // 200
-        call(postJson("/api/auth/verify", verify(token)));                                   // 409
+        call(postJson("/api/auth/signup", signup("bad@gmail.com")));                          // 400
+        call(postJson("/api/auth/verify", verify("wrong-token", "프라이버시", "wrong-token-pw1")));    // 400 INVALID_TOKEN
+        call(postJson("/api/auth/verify", verify(token, "가", "short-pw")));                    // 400 본문 오류(토큰 유지)
+        call(postJson("/api/auth/verify", verify(token, "개설자", password)));                    // 409 DISPLAY_NAME_TAKEN
+        MvcResult verified = call(postJson("/api/auth/verify", verify(token, "프라이버시", password)));  // 200
+        call(postJson("/api/auth/verify", verify(token, "프라이버시", password)));                  // 409 TOKEN_USED
         call(postJson("/api/auth/login", login(email, "wrong-password")));                   // 401
         MvcResult loggedIn = call(postJson("/api/auth/login", login(email, password)));      // 200
         Cookie session = new Cookie("camgong_session", Cookies.sessionOf(loggedIn));
@@ -87,19 +89,17 @@ class PrivacyIT extends IntegrationTestBase {
             assertThat(FORBIDDEN_KEY.matcher(body).find()).as(body).isFalse();
             assertThat(body).doesNotContain("@school.ac.kr").doesNotContain("$2a$").doesNotContain(password)
                     .doesNotContain(token).doesNotContain("bad@gmail.com").doesNotContain("wrong-password")
-                    .doesNotContain("privacy.user").doesNotContain("other-secret-pw2");
+                    .doesNotContain("privacy.user").doesNotContain("wrong-token-pw1").doesNotContain("short-pw");
         });
         assertThat(verified.getResponse().getContentAsString()).contains("\"displayName\"");
 
         String logs = String.join("\n", output.getAll().lines().filter(l -> !l.contains("LoggingMailSender")).toList());
         assertThat(output.getAll()).contains("verification mail");   // 로그를 실제로 모으고 있다
-        assertThat(logs).doesNotContain(token).doesNotContain(password).doesNotContain("other-secret-pw2")
+        assertThat(logs).doesNotContain(token).doesNotContain(password).doesNotContain("wrong-token-pw1").doesNotContain("short-pw")
                 .doesNotContain(Cookies.sessionOf(loggedIn));
 
         String bcrypt = "^\\$2[aby]\\$\\d\\d\\$.{53}$";
         assertThat(jdbc.queryForObject("SELECT password_hash FROM member WHERE email_key = ?", String.class, email))
                 .matches(bcrypt);
-        assertThat(jdbc.queryForObject("SELECT password_hash FROM pending_signup WHERE email_key = ?", String.class,
-                email)).matches(bcrypt);
     }
 }

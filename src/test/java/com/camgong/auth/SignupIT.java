@@ -2,13 +2,14 @@ package com.camgong.auth;
 
 import static com.camgong.support.AuthBodies.signup;
 import static com.camgong.support.GroupBuyBodies.json;
-import static com.camgong.support.GroupBuyBodies.with;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.camgong.support.IntegrationTestBase;
 
-/** quickstart 시나리오 1, 4, 5 */
+/** quickstart 시나리오 1, 4, 5(신청 쪽) — 변경 B2: 신청은 이메일 하나다 */
 class SignupIT extends IntegrationTestBase {
 
     private ResultActions submit(Map<String, Object> body) throws Exception {
@@ -34,7 +35,7 @@ class SignupIT extends IntegrationTestBase {
 
     @Test
     void signupSendsOneMailAndCreatesNoMemberYet() throws Exception {
-        submit(signup("new@school.ac.kr", "홍길동", "password1"))
+        submit(signup("new@school.ac.kr"))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.email").value("new@school.ac.kr"))
                 .andExpect(jsonPath("$.resendAvailableAt").value("2026-10-27T09:01:00+09:00"));
@@ -48,19 +49,34 @@ class SignupIT extends IntegrationTestBase {
     }
 
     @Test
-    void storesOnlyHashesAndNormalizedKey() throws Exception {
-        submit(signup("  Mixed.Case@School.AC.KR ", " 홍길동 ", "password1")).andExpect(status().isAccepted());
+    void storesOnlyEmailTokenHashAndLimitColumns() throws Exception {
+        submit(signup("  Mixed.Case@School.AC.KR ")).andExpect(status().isAccepted());
 
         Map<String, Object> row = jdbc.queryForMap("SELECT * FROM pending_signup");
         assertThat(row.get("email_key")).isEqualTo("mixed.case@school.ac.kr");
         assertThat(row.get("email")).isEqualTo("Mixed.Case@School.AC.KR");
-        assertThat(row.get("display_name")).isEqualTo("홍길동");
-        assertThat((String) row.get("password_hash")).startsWith("$2").doesNotContain("password1");
         String token = mail.sent().get(0).verifyLink().split("token=")[1];
         assertThat(row.get("token_hash")).isEqualTo(Tokens.sha256Hex(token)).isNotEqualTo(token);
-        assertThat(row.get("consent_version")).isEqualTo("v1");
         assertThat(row.get("sent_count")).isEqualTo(1);
         assertThat(row.get("used_at")).isNull();
+        // 이름·비밀번호·동의는 신청이 아니라 인증 단계에서 받는다: 저장할 컬럼 자체가 없다
+        List<String> columns = jdbc.queryForList("SELECT column_name FROM information_schema.columns "
+                + "WHERE table_schema = DATABASE() AND table_name = 'pending_signup'", String.class);
+        assertThat(columns).doesNotContain("display_name", "password_hash", "consent_at", "consent_version");
+    }
+
+    @Test
+    void extraFieldsInTheApplicationAreIgnoredAndNotStored() throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>(signup("extra@school.ac.kr"));
+        body.put("password", "attackers-password1");
+        body.put("displayName", "공격자");
+        body.put("consent", true);
+
+        submit(body).andExpect(status().isAccepted());
+
+        assertThat(jdbc.queryForMap("SELECT * FROM pending_signup").values().toString()).doesNotContain("attackers-password1")
+                .doesNotContain("공격자");
+        assertThat(pendingRows()).isEqualTo(1);
     }
 
     @Test
@@ -73,66 +89,44 @@ class SignupIT extends IntegrationTestBase {
     }
 
     @Test
-    void invalidInputGivesFieldErrorsAndLeavesNothingBehind() throws Exception {
-        Map<String, Object> ok = signup("v@school.ac.kr");
-        submit(with(ok, "password", "short7!")).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("password")));
-        submit(with(ok, "email", "not-an-email")).andExpect(status().isBadRequest())
+    void invalidEmailGivesFieldErrorAndLeavesNothingBehind() throws Exception {
+        submit(signup("not-an-email")).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[*].field").value(hasItem("email")));
-        submit(with(ok, "displayName", "   ")).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("displayName")));
-        submit(with(ok, "consent", false)).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("consent")));
-        submit(with(ok, "consentVersion", null)).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("consentVersion")));
+        submit(signup("   ")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("email")));
+        submit(new LinkedHashMap<>()).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field").value(hasItem("email")));
+        submit(signup("a".repeat(250) + "@school.ac.kr")).andExpect(status().isBadRequest());
 
         assertThat(pendingRows()).isZero();
         assertThat(mail.sent()).isEmpty();
     }
 
     @Test
-    void passwordLengthBoundaries() throws Exception {
-        submit(with(signup("a@school.ac.kr"), "password", "1234567")).andExpect(status().isBadRequest());   // 7자
-        submit(with(signup("b@school.ac.kr"), "password", "12345678")).andExpect(status().isAccepted());    // 8자
-        submit(with(signup("c@school.ac.kr"), "password", "가".repeat(24))).andExpect(status().isAccepted()); // 72바이트
-        submit(with(signup("d@school.ac.kr"), "password", "가".repeat(24) + "a")).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[*].field").value(hasItem("password")));                      // 73바이트
-        submit(with(signup("e@school.ac.kr"), "password", "a".repeat(72))).andExpect(status().isAccepted());
-        submit(with(signup("f@school.ac.kr"), "password", "a".repeat(73))).andExpect(status().isBadRequest());
-
-        assertThat(pendingRows()).isEqualTo(3);
+    void emailWhoseLowercaseFormIsLongerThanTheKeyColumnIsRejectedNotAServerError() throws Exception {
+        // 'İ'(U+0130)는 소문자로 두 글자가 되어 키가 254자를 넘는다
+        submit(signup("İ".repeat(130) + "@school.ac.kr")).andExpect(status().is4xxClientError());
+        assertThat(pendingRows()).isZero();
     }
 
     @Test
-    void displayNameLengthBoundaries() throws Exception {
-        submit(with(signup("a@school.ac.kr"), "displayName", "가")).andExpect(status().isBadRequest());
-        submit(with(signup("b@school.ac.kr"), "displayName", "가나")).andExpect(status().isAccepted());
-        submit(with(signup("c@school.ac.kr"), "displayName", "가".repeat(20))).andExpect(status().isAccepted());
-        submit(with(signup("d@school.ac.kr"), "displayName", "가".repeat(21))).andExpect(status().isBadRequest());
-        submit(with(signup("e@school.ac.kr"), "displayName", " 가 ")).andExpect(status().isBadRequest()); // 공백 제거 후 1자
-    }
+    void secondRequestForAnEmailWithAPendingSignupIsLimitedWithoutAnotherMail() throws Exception {
+        submit(signup("dup@school.ac.kr")).andExpect(status().isAccepted());
 
-    @Test
-    void sameNameCanBeRequestedByDifferentEmailsBeforeVerification() throws Exception {
-        submit(signup("x@school.ac.kr", "같은이름", "password1")).andExpect(status().isAccepted());
-        submit(signup("y@school.ac.kr", "같은이름", "password1")).andExpect(status().isAccepted());
-        assertThat(pendingRows()).isEqualTo(2);
-    }
-
-    @Test
-    void secondRequestForAnEmailWithAPendingSignupIsRejectedWithoutAnotherMail() throws Exception {
-        submit(signup("dup@school.ac.kr", "처음이름", "password1")).andExpect(status().isAccepted());
-
-        submit(signup("dup@school.ac.kr", "다른이름", "password2")).andExpect(status().isTooManyRequests())
+        submit(signup("dup@school.ac.kr")).andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.title").value("TOO_MANY_REQUESTS"));
 
         assertThat(pendingRows()).isEqualTo(1);
         assertThat(mail.sent()).hasSize(1);
-        assertThat(jdbc.queryForObject("SELECT display_name FROM pending_signup", String.class)).isEqualTo("처음이름");
     }
 
     @Test
-    void passwordOfOnlySpacesIsAcceptedWhenLongEnough() throws Exception {
-        submit(with(signup("sp@school.ac.kr"), "password", " ".repeat(8))).andExpect(status().isAccepted());
+    void thereIsNothingToPreemptApplyingTwiceForTheSameEmailKeepsOneRow() throws Exception {
+        submit(signup("victim@school.ac.kr")).andExpect(status().isAccepted());
+        clock.advance(java.time.Duration.ofMinutes(2));
+        submit(signup("VICTIM@school.ac.kr")).andExpect(status().isAccepted());
+
+        assertThat(pendingRows()).isEqualTo(1);
+        assertThat(mail.sent()).hasSize(2);
     }
 }

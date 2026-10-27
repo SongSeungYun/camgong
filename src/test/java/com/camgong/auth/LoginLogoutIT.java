@@ -86,7 +86,7 @@ class LoginLogoutIT extends IntegrationTestBase {
     @Test
     void wrongPasswordUnknownEmailAndUnverifiedEmailLookExactlyAlike() throws Exception {
         mockMvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
-                .content(json(signup("pending@school.ac.kr", "신청만", "password1")))).andExpect(status().isAccepted());
+                .content(json(signup("pending@school.ac.kr")))).andExpect(status().isAccepted());
 
         String wrongPassword = loginFail("login.user@school.ac.kr", "wrong-password").getResponse().getContentAsString();
         String unknownEmail = loginFail("nobody@school.ac.kr", "password1").getResponse().getContentAsString();
@@ -110,5 +110,42 @@ class LoginLogoutIT extends IntegrationTestBase {
         String body = loginFail("login.user@school.ac.kr", tooLong).getResponse().getContentAsString();
         assertThat(body).contains("INVALID_CREDENTIALS");
         assertThat(loginFail("nobody@school.ac.kr", tooLong).getResponse().getContentAsString()).isEqualTo(body);
+    }
+
+    @Test
+    void loggingInAgainWithAnOldCookieRevokesOnlyThatSession() throws Exception {
+        seedLoginMember(11, "other@school.ac.kr", "다른사람", "password2");
+        MvcResult first = loginOk("login.user@school.ac.kr", "password1");
+        MvcResult otherDevice = loginOk("login.user@school.ac.kr", "password1");
+        String firstToken = Cookies.sessionOf(first);
+        assertThat(sessions()).isEqualTo(2);
+
+        // 같은 브라우저(첫 쿠키)에서 다른 계정으로 로그인 → 첫 세션 행만 사라진다
+        MvcResult switched = mockMvc.perform(post("/api/auth/login").cookie(cookie(firstToken))
+                .contentType(MediaType.APPLICATION_JSON).content(json(login("other@school.ac.kr", "password2"))))
+                .andExpect(status().isOk()).andReturn();
+
+        assertThat(sessions()).isEqualTo(2);                                   // 첫 세션 -1, 새 세션 +1
+        mockMvc.perform(get("/api/auth/me").cookie(cookie(firstToken))).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/auth/me").cookie(cookie(Cookies.sessionOf(otherDevice)))).andExpect(status().isOk());
+        mockMvc.perform(get("/api/auth/me").cookie(cookie(Cookies.sessionOf(switched)))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.member.displayName").value("다른사람"));
+    }
+
+    @Test
+    void aFailedLoginKeepsTheSessionThatCameWithTheRequest() throws Exception {
+        MvcResult first = loginOk("login.user@school.ac.kr", "password1");
+
+        mockMvc.perform(post("/api/auth/login").cookie(cookie(Cookies.sessionOf(first)))
+                .contentType(MediaType.APPLICATION_JSON).content(json(login("login.user@school.ac.kr", "wrong"))))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/auth/me").cookie(cookie(Cookies.sessionOf(first)))).andExpect(status().isOk());
+    }
+
+    @Test
+    void emailWhoseLowercaseFormExceedsTheKeyColumnIsJustWrongCredentials() throws Exception {
+        loginFail("İ".repeat(130) + "@school.ac.kr", "password1");           // 소문자로 두 글자가 되어 키가 254자를 넘는다
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM login_attempt", Integer.class)).isZero();
     }
 }

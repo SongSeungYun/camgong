@@ -37,10 +37,9 @@ class SessionCleanupIT extends IntegrationTestBase {
     }
 
     private void pending(String key, Duration expiredAgo, Duration usedAgo) {
-        jdbc.update("INSERT INTO pending_signup (email_key, email, display_name, password_hash, consent_at, "
-                + "consent_version, token_hash, token_expires_at, last_sent_at, window_started_at, sent_count, used_at, "
-                + "created_at) VALUES (?, ?, 'n', 'h', ?, 'v1', ?, ?, ?, ?, 1, ?, ?)",
-                key, key, ago(Duration.ZERO), "0".repeat(60) + key.substring(0, 4), ago(expiredAgo), ago(Duration.ofDays(30)),
+        jdbc.update("INSERT INTO pending_signup (email_key, email, token_hash, token_expires_at, last_sent_at, "
+                + "window_started_at, sent_count, used_at, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
+                key, key, "0".repeat(60) + key.substring(0, 4), ago(expiredAgo), ago(Duration.ofDays(30)),
                 ago(Duration.ofDays(30)), usedAgo == null ? null : ago(usedAgo), ago(Duration.ofDays(30)));
     }
 

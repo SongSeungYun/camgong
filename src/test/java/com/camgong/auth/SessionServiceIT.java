@@ -109,7 +109,7 @@ class SessionServiceIT extends IntegrationTestBase {
         assertThat(c.isHttpOnly()).isTrue();
         assertThat(c.getSameSite()).isEqualTo("Lax");
         assertThat(c.getPath()).isEqualTo("/");
-        assertThat(c.isSecure()).isFalse();                        // cookie-secure 기본값 false
+        assertThat(c.isSecure()).isTrue();                         // cookie-secure 기본값 true
         assertThat(c.getMaxAge()).isEqualTo(Duration.ofDays(14));
 
         ResponseCookie gone = sessions.clearCookie();

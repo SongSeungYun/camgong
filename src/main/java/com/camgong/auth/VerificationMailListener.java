@@ -27,7 +27,13 @@ class VerificationMailListener {
             mailSender.sendVerification(event.email(), props.verifyLinkBaseUrl() + event.token());
         } catch (RuntimeException e) {
             // 토큰·링크는 남기지 않는다. 사용자는 재발송으로 복구한다.
-            log.warn("verification mail failed to={} cause={}", event.email(), e.getClass().getSimpleName());
+            log.warn("verification mail failed to={} cause={}", mask(event.email()), e.getClass().getSimpleName());
         }
+    }
+
+    /** 로그에는 주소 전체 대신 "a***@도메인" 만 남긴다. */
+    static String mask(String email) {
+        int at = email.indexOf('@');
+        return at <= 0 ? "***" : email.charAt(0) + "***" + email.substring(at);
     }
 }

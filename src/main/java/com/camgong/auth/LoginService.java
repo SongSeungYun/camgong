@@ -20,6 +20,7 @@ import com.camgong.member.MemberRepository;
 public class LoginService {
 
     private static final int BCRYPT_MAX_BYTES = 72;
+    private static final int MAX_EMAIL_KEY = 254;
 
     private final MemberRepository members;
     private final PasswordEncoder encoder;
@@ -45,6 +46,11 @@ public class LoginService {
     public Authenticated login(LoginRequest r) {
         String emailKey = Keys.normalize(r.email());
         Instant now = Instant.now(clock);
+        if (emailKey.length() > MAX_EMAIL_KEY) {
+            // 소문자 변환이 길이를 늘려 컬럼(254자)을 넘는 이메일은 존재할 수 없다. 저장하지 않고 다른 실패와 똑같이 답한다.
+            encoder.matches(r.password().getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_BYTES ? "" : r.password(), dummyHash);
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다.");
+        }
         // 시도를 비밀번호 비교 전에 센다(한 문장으로 원자적): 동시에 같은 이메일로 틀린 요청이 몰려도 잠금 기준(5회)까지만
         // 비교로 들어가고, 이미 잠긴 뒤에 도착한 요청은 BCrypt 없이 바로 거부된다(없는 계정도 같은 규칙이라 응답이 같다).
         if (!countAttempt(emailKey, now)) {
