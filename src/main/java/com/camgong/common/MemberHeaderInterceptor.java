@@ -26,7 +26,7 @@ public class MemberHeaderInterceptor implements HandlerInterceptor, WebMvcConfig
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(this).addPathPatterns("/api/**");
+        registry.addInterceptor(this).addPathPatterns("/api/**").excludePathPatterns("/api/auth/**");
     }
 
     @Override

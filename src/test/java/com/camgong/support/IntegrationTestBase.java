@@ -147,6 +147,12 @@ public abstract class IntegrationTestBase {
             return new MutableClock(START);
         }
 
+        /** 메일 리스너(@Async)를 요청 스레드에서 돌려 테스트가 발송 시점을 기다리지 않게 한다. */
+        @Bean
+        org.springframework.core.task.SyncTaskExecutor taskExecutor() {
+            return new org.springframework.core.task.SyncTaskExecutor();
+        }
+
         @Bean
         EventCollector eventCollector() {
             return new EventCollector();
