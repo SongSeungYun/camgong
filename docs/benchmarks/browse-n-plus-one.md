@@ -10,7 +10,7 @@
 | ① 순진한 구현 | `e38d78f` | 4 | 23 | 53 | 공구+개설자(join fetch) 1, 내 참여 1, 인원 수 1, 명단 1, 이후 참여자마다 `participation.getMember()` 지연 로딩. N=1은 개설자가 이미 영속성 컨텍스트에 있어 추가 쿼리가 없다. 즉 `N + 3` |
 | ② fetch join | `2a35d39` | 4 | 4 | 4 | 명단을 `join fetch p.member`로 한 번에 읽는다. 참여자 수와 무관하게 4쿼리 |
 | ③ batch size | `5ad73aa` | 4 | 5 | 5 | 쿼리를 순진한 구현으로 되돌리고 `hibernate.default_batch_fetch_size=100`만 켰다. 지연 로딩 N번이 `IN (…)` 한 번으로 묶인다. N=1은 개설자가 컨텍스트에 있어 추가 쿼리가 없다. 한 번에 최대 100개까지라 N>100이면 `ceil(N/100)`번 |
-| ④ DTO 프로젝션 | | | | | |
+| ④ DTO 프로젝션 | `74ab096` | 4 | 4 | 4 | 명단을 `select new ParticipantView(…) … join p.member`로 필요한 컬럼(참여자 id, 이름, 수량)만 읽는다. 엔티티를 만들지 않으므로 지연 로딩 자체가 없다. fetch join과 쿼리 수는 같고 읽는 컬럼이 적다 |
 | 최종 상한 | | 4 이하 | 4 이하 | 4 이하 | T030 |
 
 ## 시나리오 A: 내가 참여한 공구 한 페이지
@@ -20,5 +20,5 @@
 | ① 순진한 구현 | `23e6e5f` | 2 | 21 | 51 | 참여 행 한 페이지 1, 이후 항목마다 `participation.getGroupBuy()` 지연 로딩. 즉 `1 + N` |
 | ② fetch join | `2a35d39` | 1 | 1 | 1 | `join fetch p.groupBuy`로 참여 행과 공구를 한 쿼리로 읽는다. 항목 수와 무관하게 1쿼리. to-one 조인이라 행 중복이 없고 `LIMIT`을 그대로 쓸 수 있다 |
 | ③ batch size | `5ad73aa` | 2 | 2 | 2 | 같은 방식. 참여 행 1 + 공구 `IN` 1. fetch join보다 1쿼리 많지만 쿼리 코드를 바꾸지 않는다 |
-| ④ DTO 프로젝션 | | | | | |
+| ④ DTO 프로젝션 | `74ab096` | 1 | 1 | 1 | `select new MyActivityRow(…) from Participation p join p.groupBuy g`로 카드 컬럼과 내 수량만 읽는다. 1쿼리, 엔티티·지연 로딩 없음 |
 | 최종 상한 | | 2 이하 | 2 이하 | 2 이하 | T030 |
