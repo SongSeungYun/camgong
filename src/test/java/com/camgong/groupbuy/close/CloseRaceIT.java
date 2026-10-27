@@ -87,6 +87,7 @@ class CloseRaceIT extends CloseTestBase {
                     + "WHERE group_buy_id = ?) FROM group_buy WHERE id = ?", Integer.class, id, id)).isZero();   // I1
         }
         System.out.println("[CloseRaceIT last seat] rounds=" + REPEAT + " completed=" + completed + " failed=" + failed);
+        assertBothOrdersSeen("마지막 자리", completed, failed);
     }
 
     @Test
@@ -119,6 +120,7 @@ class CloseRaceIT extends CloseTestBase {
             assertThat(wronglyFailed(T.plusSeconds(2))).as("round %d", round).isEmpty();
         }
         System.out.println("[CloseRaceIT extension] rounds=" + REPEAT + " extended=" + extended + " closedFirst=" + closedFirst);
+        assertBothOrdersSeen("마감 연장", extended, closedFirst);
     }
 
     @Test
@@ -152,5 +154,78 @@ class CloseRaceIT extends CloseTestBase {
             }
         }
         System.out.println("[CloseRaceIT cancel] rounds=" + REPEAT + " cancelled=" + cancelled + " failed=" + failed);
+        assertBothOrdersSeen("개설자 취소", cancelled, failed);
+    }
+
+    /**
+     * 반복이 충분히 많을 때(수동 -Drace.repeat=…)는 두 순서가 모두 나왔는지 단언한다 — 한쪽만 나오면 이 테스트가 경쟁이 아니라 한 순서만
+     * 확인하는 퇴화 상태라는 뜻이다. 소수 쪽이 10% 안팎이라 200회 이상에서는 한쪽이 0일 확률이 사실상 없다. 순서를 결정적으로 고정한
+     * 확인은 CloseOrderedRaceIT 가 한다.
+     */
+    private static void assertBothOrdersSeen(String name, int first, int second) {
+        if (REPEAT >= 200) {
+            assertThat(first).as(name + ": 요청이 먼저 이긴 횟수").isPositive();
+            assertThat(second).as(name + ": 확정이 먼저 이긴 횟수").isPositive();
+        }
+    }
+
+    @Test
+    void participantLeavingRacingTheCloseNeverLeavesAnInconsistentGroupBuy() throws Exception {
+        for (int round = 0; round < REPEAT; round++) {
+            events.clear();
+            long id = seed("이탈 경쟁 " + round, "OPEN", T, 24, 9);
+            addParticipant(id, 4, 3);
+            clock.set(T.minusSeconds(1));
+
+            List<Object> results = Concurrent.all(List.<Callable<Object>>of(
+                    () -> mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                            .delete("/api/groupbuys/" + id + "/participations/me").with(as(4))).andReturn().getResponse().getStatus(),
+                    () -> closeAfterDeadline(id)));
+
+            int leaveStatus = (Integer) results.get(0);
+            if (results.get(1) == GroupBuyCloser.Outcome.SKIPPED) {
+                // 이탈이 공구 행 락을 쥐고 있을 때 확정이 도착해 건너뛰었다(SKIP LOCKED). 이탈은 성공했고 공구는 다음 실행이 확정한다.
+                assertThat(leaveStatus).isEqualTo(204);
+                assertThat(statusOf(id)).isEqualTo("OPEN");
+                assertThat(events.failed()).isEmpty();
+                Instant later = T.plusSeconds(2);
+                assertThat(closer.closeOne(id, later.minusSeconds(1), later)).isEqualTo(GroupBuyCloser.Outcome.CLOSED);
+            }
+            assertThat(statusOf(id)).as("round %d", round).isEqualTo("FAILED");         // 미충족 공구는 결국 FAILED
+            assertThat(leaveStatus).isIn(204, 409);
+            assertThat(events.failed()).hasSize(1);
+            if (leaveStatus == 204) {                                                   // 이탈이 먼저: 수신자에서 빠진다
+                assertThat(events.failed().get(0).recipientIds()).containsExactly(ORGANIZER);
+                assertThat(participationRows(id)).isEqualTo(1);
+            } else {                                                                    // 확정이 먼저: 이탈은 거부되고 참여가 남는다
+                assertThat(events.failed().get(0).recipientIds()).containsExactlyInAnyOrder(ORGANIZER, 4L);
+                assertThat(participationRows(id)).isEqualTo(2);
+            }
+            assertThat(jdbc.queryForObject("SELECT secured_quantity - (SELECT COALESCE(SUM(quantity), 0) FROM participation "
+                    + "WHERE group_buy_id = ?) FROM group_buy WHERE id = ?", Integer.class, id, id)).isZero();
+        }
+    }
+
+    @Test
+    void quantityChangeThatFillsRacingTheCloseEndsInExactlyOneTerminalState() throws Exception {
+        for (int round = 0; round < REPEAT; round++) {
+            events.clear();
+            long id = seed("변경 경쟁 " + round, "OPEN", T, 24, 9);
+            addParticipant(id, 4, 5);                                                   // 확보 14, 남은 10
+            clock.set(T.minusSeconds(1));
+
+            List<Object> results = Concurrent.all(List.<Callable<Object>>of(
+                    () -> mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                            .put("/api/groupbuys/" + id + "/participations/me").with(as(4)).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"quantity\":15,\"expectedUnitPrice\":1200}")).andReturn().getResponse().getStatus(),
+                    () -> closeAfterDeadline(id)));
+
+            int change = (Integer) results.get(0);
+            String status = statusOf(id);
+            assertThat(status).as("round %d", round).isIn("COMPLETED", "FAILED");
+            assertThat(change).isEqualTo(status.equals("COMPLETED") ? 200 : 409);
+            assertThat(events.completed().size() + events.failed().size()).isEqualTo(1);
+            assertThat(wronglyFailed(T.plusSeconds(2))).isEmpty();
+        }
     }
 }

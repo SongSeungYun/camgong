@@ -1,7 +1,9 @@
 package com.camgong.groupbuy.close;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -11,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.camgong.groupbuy.GroupBuy;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyFailed;
 import com.camgong.groupbuy.GroupBuyRepository;
-import com.camgong.groupbuy.Participation;
 import com.camgong.groupbuy.ParticipationRepository;
 
 /**
@@ -48,8 +49,11 @@ public class GroupBuyCloser {
         }
         g.fail(now);
         // 선점 뒤에 읽으므로 잠금 읽기로 읽는다: 일반 SELECT 는 REPEATABLE READ 에서 선점 대기 전 스냅샷을 볼 수 있다.
-        List<Long> recipients = participations.findLockedByGroupBuyId(id).stream().map(Participation::getMemberId)
-                .distinct().toList();
+        // 개설자는 반드시 포함한다(계약): 개설자 참여 행이 없는 데이터가 있어도 알림 대상에서 빠지지 않게 명시적으로 합친다.
+        Set<Long> recipientSet = new LinkedHashSet<>();
+        recipientSet.add(g.getOrganizerId());
+        participations.findLockedByGroupBuyId(id).forEach(p -> recipientSet.add(p.getMemberId()));
+        List<Long> recipients = List.copyOf(recipientSet);
         events.publishEvent(new GroupBuyFailed(UUID.randomUUID().toString(), id, g.getTitle(), recipients));
         return Outcome.CLOSED;
     }

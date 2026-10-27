@@ -12,6 +12,7 @@ import org.springframework.test.context.TestPropertySource;
 class CloseSchedulerWiringTest {
 
     @Nested
+    @org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
     @TestPropertySource(properties = { "camgong.scheduler.close.enabled=true", "camgong.scheduler.close.interval=200ms" })
     class Enabled extends CloseTestBase {
 

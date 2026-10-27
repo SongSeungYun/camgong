@@ -72,6 +72,8 @@ class CloseResilienceIT extends CloseTestBase {
         assertThat(statusOf(broken)).isEqualTo("OPEN");                              // 롤백되어 그대로
         assertThat(ids.stream().filter(id -> id != broken).map(this::statusOf)).containsOnly("FAILED");
         assertThat(output.getAll()).contains("close-failed groupBuyId=" + broken);
+        assertThat(output.getAll()).as("WARN 에 스택 트레이스가 함께 남는다").contains("테스트가 일으킨 실패 groupBuyId=" + broken)
+                .contains("\tat com.camgong");
         assertThat(output.getAll()).contains("close-run closed=9 skipped=0 failed=1");
         assertThat(events.failed()).hasSize(9);                                       // 롤백된 건의 이벤트는 나가지 않는다
 

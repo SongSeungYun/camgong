@@ -64,7 +64,7 @@ public class GroupBuyCloseService {
                     }
                 } catch (RuntimeException e) {
                     failed++;
-                    log.warn("close-failed groupBuyId={} reason={}", id, e.toString());
+                    log.warn("close-failed groupBuyId={} reason={}", id, e.toString(), e);   // 마지막 인자로 스택 트레이스를 함께 남긴다
                 }
             }
         }

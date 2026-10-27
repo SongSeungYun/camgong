@@ -167,4 +167,17 @@ class CloseExpiredIT extends CloseTestBase {
         assertThat(open.getStatus()).isEqualTo(com.camgong.groupbuy.GroupBuyStatus.FAILED);
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> open.fail(T)).isInstanceOf(IllegalStateException.class);   // 종료 상태
     }
+
+    @Test
+    void theOrganizerIsAlwaysARecipientEvenWithoutAParticipationRow() {
+        long id = com.camgong.support.GroupBuySeed.groupBuy().title("개설자 행 없음").deadline(T).quantities(24, 9).insert(jdbc);
+        seedMembers(4, 4);
+        jdbc.update("INSERT INTO participation (group_buy_id, member_id, quantity, created_at) VALUES (?, 4, 9, ?)", id,
+                java.time.LocalDateTime.ofInstant(START, java.time.ZoneOffset.UTC));
+        clock.set(T.plusSeconds(2));
+
+        closeService.closeExpired();
+
+        assertThat(onlyFailedEvent().recipientIds()).containsExactlyInAnyOrder(ORGANIZER, 4L).doesNotHaveDuplicates();
+    }
 }
