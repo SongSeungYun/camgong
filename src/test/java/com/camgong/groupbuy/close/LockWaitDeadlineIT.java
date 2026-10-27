@@ -35,7 +35,8 @@ class LockWaitDeadlineIT extends CloseTestBase {
     }
 
     /** 공구 행 락을 쥐고 있다가, 요청이 락에서 막힌 뒤 시계를 마감 뒤로 보내고 락을 놓는다. 요청의 응답 상태를 돌려준다. */
-    private int requestThatWaitsPastTheDeadline(long id, java.util.concurrent.Callable<Integer> request) throws Exception {
+    private org.springframework.mock.web.MockHttpServletResponse requestThatWaitsPastTheDeadline(long id,
+            java.util.concurrent.Callable<org.springframework.mock.web.MockHttpServletResponse> request) throws Exception {
         CountDownLatch holding = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         Future<?> holder = pool.submit(() -> new TransactionTemplate(txManager).executeWithoutResult(s -> {
@@ -51,8 +52,8 @@ class LockWaitDeadlineIT extends CloseTestBase {
 
         try {
             clock.set(T.minusMillis(100));                          // 마감 0.1초 전에 도착
-            Future<Integer> req = pool.submit(request);
-            Thread.sleep(500);                                      // 요청이 락에서 막힐 시간
+            Future<org.springframework.mock.web.MockHttpServletResponse> req = pool.submit(request);
+            awaitLockWait(10_000);                                  // 요청이 락에서 실제로 막힌 것을 DB 로 확인한 뒤에 시계를 넘긴다
             assertThat(req.isDone()).as("요청은 다른 트랜잭션이 쥔 락 때문에 아직 끝나지 않았다").isFalse();
             clock.set(T.plusSeconds(1));                            // 기다리는 사이 마감이 지났다
             release.countDown();
@@ -68,9 +69,10 @@ class LockWaitDeadlineIT extends CloseTestBase {
         long id = openUnderfilled("락 대기 연장");
         var body = GroupBuyBodies.with(GroupBuyBodies.valid(T.plus(Duration.ofDays(3))), "title", "락 대기 연장");
 
-        int status = requestThatWaitsPastTheDeadline(id, () -> updateAs(ORGANIZER, id, body).andReturn().getResponse().getStatus());
+        var res = requestThatWaitsPastTheDeadline(id, () -> updateAs(ORGANIZER, id, body).andReturn().getResponse());
 
-        assertThat(status).isEqualTo(409);
+        assertThat(res.getStatus()).isEqualTo(409);
+        assertThat(res.getContentAsString()).contains("DEADLINE_PASSED");
         assertThat(jdbc.queryForObject("SELECT deadline FROM group_buy WHERE id = ?", java.time.LocalDateTime.class, id))
                 .isEqualTo(java.time.LocalDateTime.ofInstant(T, java.time.ZoneOffset.UTC));      // 마감은 연장되지 않았다
     }
@@ -79,9 +81,10 @@ class LockWaitDeadlineIT extends CloseTestBase {
     void aCancelThatWaitedForTheLockPastTheDeadlineIsRefused() throws Exception {
         long id = openUnderfilled("락 대기 취소");
 
-        int status = requestThatWaitsPastTheDeadline(id, () -> cancelAs(ORGANIZER, id).andReturn().getResponse().getStatus());
+        var res = requestThatWaitsPastTheDeadline(id, () -> cancelAs(ORGANIZER, id).andReturn().getResponse());
 
-        assertThat(status).isEqualTo(409);
+        assertThat(res.getStatus()).isEqualTo(409);
+        assertThat(res.getContentAsString()).contains("DEADLINE_PASSED");
         assertThat(statusOf(id)).isEqualTo("OPEN");
     }
 
@@ -90,11 +93,13 @@ class LockWaitDeadlineIT extends CloseTestBase {
         seedMembers(4, 4);
         long id = openUnderfilled("락 대기 참여");
 
-        int status = requestThatWaitsPastTheDeadline(id, () -> mockMvc.perform(post("/api/groupbuys/" + id + "/participations")
+        var res = requestThatWaitsPastTheDeadline(id, () -> mockMvc.perform(post("/api/groupbuys/" + id + "/participations")
                 .with(as(4)).contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":1,\"expectedUnitPrice\":1200}"))
-                .andReturn().getResponse().getStatus());
+                .andReturn().getResponse());
 
-        assertThat(status).isEqualTo(409);
+        assertThat(res.getStatus()).isEqualTo(409);
+        // 락 타임아웃(BUSY)이나 다른 거부가 아니라 "마감이 지났다"로 거부되어야 한다
+        assertThat(res.getContentAsString()).contains("NOT_JOINABLE").contains("DEADLINE_PASSED").doesNotContain("BUSY");
         assertThat(participationRows(id)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT secured_quantity FROM group_buy WHERE id = ?", Integer.class, id)).isEqualTo(9);
     }

@@ -81,7 +81,7 @@ class CloseOrderedRaceIT extends CloseTestBase {
         Future<GroupBuyCloser.Outcome> close = pool.submit(() -> closeAfterDeadline(id));
         pause.awaitReached();
         Future<Integer> req = pool.submit(request);
-        Thread.sleep(400);                                         // 요청이 공구 행 락에서 막힐 시간
+        awaitLockWait(10_000);                                     // 요청이 확정이 쥔 공구 행 락에서 실제로 막혔다
         assertThat(req.isDone()).as("요청은 확정이 쥔 락 때문에 아직 끝나지 않았다").isFalse();
         pause.release();
         assertThat(close.get()).isEqualTo(GroupBuyCloser.Outcome.CLOSED);

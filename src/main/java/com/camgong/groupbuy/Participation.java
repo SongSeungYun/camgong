@@ -42,6 +42,13 @@ public class Participation {
     @Column(name = "created_at")
     private Instant createdAt;
 
+    // ponytail: 확인 시각은 조건부 UPDATE 로만 쓴다(006 research 결정 2). 엔티티는 읽기만 해서 Hibernate 가 덮어쓰지 않는다.
+    @Column(name = "paid_at", insertable = false, updatable = false)
+    private Instant paidAt;
+
+    @Column(name = "received_at", insertable = false, updatable = false)
+    private Instant receivedAt;
+
     protected Participation() {
     }
 
@@ -62,6 +69,14 @@ public class Participation {
 
     public Long getGroupBuyId() {
         return groupBuyId;
+    }
+
+    public Instant getPaidAt() {
+        return paidAt;
+    }
+
+    public Instant getReceivedAt() {
+        return receivedAt;
     }
 
     public Long getMemberId() {
