@@ -3,11 +3,8 @@ package com.camgong.groupbuy;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 import jakarta.persistence.LockModeType;
 
@@ -31,16 +28,4 @@ public interface ParticipationRepository extends JpaRepository<Participation, Lo
     // --- 조회(003) ---
 
     long countByGroupBuyId(Long groupBuyId);
-
-    /** 개설자용 명단. 순진한 구현: 이름은 호출 쪽이 participation.getMember() 지연 로딩으로 읽는다(N+1 기준선). */
-    List<Participation> findByGroupBuyIdOrderByIdAsc(Long groupBuyId);
-
-    /**
-     * 내가 참여한 공구(내가 연 공구 포함), 공구 id 역순 키셋. 순진한 구현: 참여 행만 읽고
-     * 호출 쪽이 participation.getGroupBuy() 를 지연 로딩한다(1 + N 쿼리, N+1 기준선).
-     */
-    @Query("select p from Participation p where p.memberId = :me "
-            + "and p.groupBuy.status <> com.camgong.groupbuy.GroupBuyStatus.CANCELLED "
-            + "and (:cursor is null or p.groupBuyId < :cursor) order by p.groupBuyId desc")
-    List<Participation> findMine(@Param("me") Long me, @Param("cursor") Long cursor, Limit limit);
 }

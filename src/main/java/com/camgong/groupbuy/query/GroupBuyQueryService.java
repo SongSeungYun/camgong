@@ -33,13 +33,15 @@ public class GroupBuyQueryService {
     private final GroupBuySearchRepository search;
     private final GroupBuyRepository groupBuys;
     private final ParticipationRepository participations;
+    private final BrowseQueryRepository browse;
     private final Clock clock;
 
     public GroupBuyQueryService(GroupBuySearchRepository search, GroupBuyRepository groupBuys,
-            ParticipationRepository participations, Clock clock) {
+            ParticipationRepository participations, BrowseQueryRepository browse, Clock clock) {
         this.search = search;
         this.groupBuys = groupBuys;
         this.participations = participations;
+        this.browse = browse;
         this.clock = clock;
     }
 
@@ -60,26 +62,20 @@ public class GroupBuyQueryService {
                 : PageCursor.decode(cursor, GroupBuyListQuery.Sort.LATEST).id();
         Instant now = Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
 
-        List<MyActivityItem> items = new ArrayList<>();
-        if ("organizer".equals(role)) {
-            for (GroupBuy g : groupBuys.findMine(memberId, cursorId, Limit.of(pageSize + 1))) {
-                items.add(activityItem(g, now, null));
-            }
-        } else {
-            for (Participation p : participations.findMine(memberId, cursorId, Limit.of(pageSize + 1))) {
-                items.add(activityItem(p.getGroupBuy(), now, p.getQuantity()));
-            }
-        }
+        List<MyActivityRow> rows = "organizer".equals(role)
+                ? browse.findOrganized(memberId, cursorId, Limit.of(pageSize + 1))
+                : browse.findParticipated(memberId, cursorId, Limit.of(pageSize + 1));
+        List<MyActivityItem> items = rows.stream().map(r -> activityItem(r, now)).toList();
         boolean hasNext = items.size() > pageSize;
         List<MyActivityItem> page = hasNext ? items.subList(0, pageSize) : items;
         String nextCursor = hasNext ? PageCursor.latest(page.get(page.size() - 1).id()).encode() : null;
         return new Page<>(page, nextCursor);
     }
 
-    private static MyActivityItem activityItem(GroupBuy g, Instant now, Integer myQuantity) {
-        return new MyActivityItem(g.getId(), g.getTitle(), g.getItemName(), g.getCategory(), g.getUnitPrice(),
-                g.getSecuredQuantity(), g.getTotalQuantity(), toOffset(g.getDeadline()),
-                DisplayStatus.derive(g.getStatus(), g.getDeadline(), now), myQuantity);
+    private static MyActivityItem activityItem(MyActivityRow r, Instant now) {
+        return new MyActivityItem(r.id(), r.title(), r.itemName(), r.category(), r.unitPrice(), r.securedQuantity(),
+                r.totalQuantity(), toOffset(r.deadline()), DisplayStatus.derive(r.status(), r.deadline(), now),
+                r.myQuantity());
     }
 
     /**
@@ -105,8 +101,7 @@ public class GroupBuyQueryService {
 
         List<ParticipantView> roster = null;
         if (isOrganizer) {
-            roster = participations.findByGroupBuyIdOrderByIdAsc(id).stream()
-                    .map(p -> new ParticipantView(p.getMemberId(), p.getMember().getName(), p.getQuantity())).toList();
+            roster = browse.findRoster(id);
         }
         return GroupBuyDetail.of(g, status, g.getOrganizer().getName(), isOrganizer, participantCount,
                 myParticipation, visibleOpenChatUrl(g, status, isOrganizer, mine != null), roster);
