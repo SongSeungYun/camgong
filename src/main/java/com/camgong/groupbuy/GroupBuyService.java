@@ -16,24 +16,21 @@ import com.camgong.common.ApiException;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCancelled;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyChanged;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCompleted;
-import com.camgong.member.MemberRepository;
 
 @Service
 public class GroupBuyService {
 
     private static final long MAX_DEADLINE_DAYS = 30;
 
-    private final MemberRepository members;
     private final GroupBuyRepository groupBuys;
     private final ParticipationRepository participations;
     private final CreateGuard createGuard;
     private final Clock clock;
     private final ApplicationEventPublisher events;
 
-    public GroupBuyService(MemberRepository members, GroupBuyRepository groupBuys,
+    public GroupBuyService(GroupBuyRepository groupBuys,
             ParticipationRepository participations, CreateGuard createGuard, Clock clock,
             ApplicationEventPublisher events) {
-        this.members = members;
         this.groupBuys = groupBuys;
         this.participations = participations;
         this.createGuard = createGuard;
@@ -43,7 +40,6 @@ public class GroupBuyService {
 
     @Transactional
     public GroupBuyResponse create(Long memberId, GroupBuyRequest r) {
-        requireMember(memberId);
         Instant now = Instant.now(clock);
 
         // 검증은 가드보다 먼저: 실패한 요청이 가드를 소모하면 같은 본문 재전송이 400 이 아닌 409 가 된다.
@@ -65,7 +61,6 @@ public class GroupBuyService {
 
     @Transactional(readOnly = true)
     public GroupBuyResponse get(Long memberId, Long id) {
-        requireMember(memberId);
         GroupBuy groupBuy = groupBuys.findById(id)
                 .filter(g -> g.getStatus() != GroupBuyStatus.CANCELLED)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Not Found", "공구를 찾을 수 없습니다."));
@@ -82,7 +77,6 @@ public class GroupBuyService {
      */
     @Transactional
     public GroupBuyResponse update(Long memberId, Long id, GroupBuyRequest r) {
-        requireMember(memberId);
         Instant now = Instant.now(clock);
         GroupBuy g = lockModifiable(memberId, id, now);
 
@@ -141,7 +135,6 @@ public class GroupBuyService {
 
     @Transactional
     public void cancel(Long memberId, Long id) {
-        requireMember(memberId);
         Instant now = Instant.now(clock);
         GroupBuy g = lockModifiable(memberId, id, now);
 
@@ -200,11 +193,5 @@ public class GroupBuyService {
         }
         boolean participant = participations.findByGroupBuyIdAndMemberId(g.getId(), memberId).isPresent();
         return participant && g.getStatus() == GroupBuyStatus.COMPLETED ? g.getOpenChatUrl() : null;
-    }
-
-    private void requireMember(Long memberId) {
-        if (memberId == null || !members.existsById(memberId)) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Unauthorized", "로그인이 필요합니다.");
-        }
     }
 }

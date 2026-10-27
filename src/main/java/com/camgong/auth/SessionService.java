@@ -45,8 +45,15 @@ public class SessionService {
         return raw;
     }
 
+    /** 확인된 세션: 회원 id 와, 이번 요청이 last_used_at 을 실제로 갱신했는지(쿠키도 다시 내려줘야 하는지). */
+    public record Resolved(long memberId, boolean refreshed) {}
+
     /** 유효한 세션이면 회원 id. 만료됐으면 행을 지우고 empty. */
     public Optional<Long> resolve(String rawToken) {
+        return resolveSession(rawToken).map(Resolved::memberId);
+    }
+
+    public Optional<Resolved> resolveSession(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
             return Optional.empty();
         }
@@ -69,12 +76,12 @@ public class SessionService {
             return Optional.empty();
         }
         // 조건부 UPDATE: 동시 요청이 와도 간격 안에서는 쓰기가 없고, 겹쳐도 같은 값으로 끝난다.
-        jdbc.sql("UPDATE login_session SET last_used_at = :now WHERE id = :id AND last_used_at < :threshold")
+        int touched = jdbc.sql("UPDATE login_session SET last_used_at = :now WHERE id = :id AND last_used_at < :threshold")
                 .param("now", utc(now))
                 .param("id", row.id())
                 .param("threshold", utc(now.minus(props.sessionTouchInterval())))
                 .update();
-        return Optional.of(row.memberId());
+        return Optional.of(new Resolved(row.memberId(), touched > 0));
     }
 
     /** 해당 세션만 삭제한다. 없어도 오류가 아니다(멱등). */

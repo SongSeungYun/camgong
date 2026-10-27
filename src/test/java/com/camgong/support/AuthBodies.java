@@ -34,4 +34,11 @@ public final class AuthBodies {
         m.put("displayName", displayName);
         return m;
     }
+
+    public static Map<String, Object> login(String email, String password) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("email", email);
+        m.put("password", password);
+        return m;
+    }
 }

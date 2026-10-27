@@ -91,9 +91,6 @@ public class SignupService {
         return SignupResponse.of(r.email(), now.plus(props.mail().resendInterval()));
     }
 
-    /** 인증 성공 결과: 응답 본문과 쿠키에 담을 세션 원문 토큰. */
-    public record Verified(AuthResponse response, String sessionToken) {}
-
     /**
      * 인증 링크 확인(research 결정 3·4). 토큰을 한 번만 쓰게 하는 것이 핵심이라 used_at 조건부 UPDATE 를
      * 회원 INSERT 보다 먼저 실행한다. 이어지는 INSERT 가 실패하면 예외로 같은 트랜잭션이 롤백되어
@@ -101,7 +98,7 @@ public class SignupService {
      */
     // ponytail: 인증 링크는 화면이 POST로 확인(메일 스캐너의 GET 미리 열기 방지)
     @Transactional
-    public Verified verify(VerifyRequest r) {
+    public Authenticated verify(VerifyRequest r) {
         Instant now = Instant.now(clock);
         PendingSignup p = findByToken(Tokens.sha256Hex(r.token()))
                 .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TOKEN", "알 수 없는 인증 링크입니다."));
@@ -141,7 +138,7 @@ public class SignupService {
             throw e;
         }
         String sessionToken = sessions.issue(member.getId());
-        return new Verified(new AuthResponse(new MemberView(member.getId(), member.getName())), sessionToken);
+        return new Authenticated(new AuthResponse(new MemberView(member.getId(), member.getName())), sessionToken);
     }
 
     private Optional<PendingSignup> findByToken(String tokenHash) {

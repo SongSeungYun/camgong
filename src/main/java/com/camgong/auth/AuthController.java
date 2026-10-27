@@ -3,6 +3,8 @@ package com.camgong.auth;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,10 +18,12 @@ import jakarta.validation.Valid;
 class AuthController {
 
     private final SignupService signupService;
+    private final LoginService loginService;
     private final SessionService sessions;
 
-    AuthController(SignupService signupService, SessionService sessions) {
+    AuthController(SignupService signupService, LoginService loginService, SessionService sessions) {
         this.signupService = signupService;
+        this.loginService = loginService;
         this.sessions = sessions;
     }
 
@@ -31,9 +35,30 @@ class AuthController {
 
     @PostMapping("/verify")
     ResponseEntity<AuthResponse> verify(@Valid @RequestBody VerifyRequest request) {
-        SignupService.Verified verified = signupService.verify(request);
+        return withSession(signupService.verify(request));
+    }
+
+    @PostMapping("/login")
+    ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        return withSession(loginService.login(request));
+    }
+
+    @PostMapping("/logout")
+    ResponseEntity<Void> logout(@CookieValue(name = SessionService.COOKIE_NAME, required = false) String rawToken) {
+        sessions.revoke(rawToken);
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, sessions.clearCookie().toString())
+                .build();
+    }
+
+    @GetMapping("/me")
+    AuthResponse me(CurrentMember me) {
+        return new AuthResponse(new MemberView(me.id(), me.displayName()));
+    }
+
+    private ResponseEntity<AuthResponse> withSession(Authenticated authenticated) {
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, sessions.cookie(verified.sessionToken()).toString())
-                .body(verified.response());
+                .header(HttpHeaders.SET_COOKIE, sessions.cookie(authenticated.sessionToken()).toString())
+                .body(authenticated.response());
     }
 }

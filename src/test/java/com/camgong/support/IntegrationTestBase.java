@@ -72,8 +72,13 @@ public abstract class IntegrationTestBase {
     @Autowired
     protected LoggingMailSender mail;
 
+    @Autowired
+    protected org.springframework.security.crypto.password.PasswordEncoder encoder;
+
     @BeforeEach
     void resetState() {
+        currentJdbc = jdbc;
+        currentClock = clock;
         clock.set(START);
         events.clear();
         mail.clear();
@@ -96,6 +101,14 @@ public abstract class IntegrationTestBase {
                 id, name, name.toLowerCase(), "m" + id + "@school.ac.kr", "m" + id + "@school.ac.kr",
                 "$2a$04$dummydummydummydummydummydummydummydummydummydummydummy", LocalDateTime.ofInstant(START, ZoneOffset.UTC),
                 "v1", LocalDateTime.ofInstant(START, ZoneOffset.UTC));
+    }
+
+    /** 실제 비밀번호로 로그인할 수 있는 회원. 이메일 키는 소문자 정규화 값이다. */
+    protected void seedLoginMember(long id, String email, String name, String password) {
+        jdbc.update("INSERT INTO member (id, name, display_name_key, email, email_key, password_hash, "
+                + "consent_at, consent_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, name, name.toLowerCase(), email, email.trim().toLowerCase(), encoder.encode(password),
+                LocalDateTime.ofInstant(START, ZoneOffset.UTC), "v1", LocalDateTime.ofInstant(START, ZoneOffset.UTC));
     }
 
     /** 개설자(1)가 기본 본문으로 공구를 열고 id 를 돌려준다. 같은 본문은 10초 가드에 걸리므로 테스트당 한 번만 쓴다. */
@@ -127,15 +140,38 @@ public abstract class IntegrationTestBase {
         return mockMvc.perform(post("/api/groupbuys/" + groupBuyId + "/cancel").with(as(memberId)));
     }
 
+    // as() 는 정적이라 현재 테스트의 jdbc·시계를 정적 필드로 들고 있다. 모든 테스트가 같은 DB 컨테이너를 쓴다.
+    private static volatile JdbcTemplate currentJdbc;
+    private static volatile MutableClock currentClock;
+
     /**
-     * 요청자 인증은 이 헬퍼 한 곳으로만 한다. 지금은 X-Member-Id 헤더이고,
-     * 002에서 세션 쿠키로 바꿀 때 이 메서드만 고친다. 테스트 본문에 헤더 이름을 쓰지 않는다.
+     * 요청자 인증은 이 헬퍼 한 곳으로만 한다. 회원의 login_session 행을 요청 시점에 만들거나 사용 시각을 갱신하고
+     * 세션 쿠키를 붙인다(요청마다 새 세션처럼 다뤄 시계를 멀리 움직이는 테스트에서도 만료되지 않는다).
+     * 없는 회원이면 세션 행 없이 쿠키만 붙어 비로그인으로 처리된다.
      */
     protected static RequestPostProcessor as(long memberId) {
         return request -> {
-            request.addHeader("X-Member-Id", String.valueOf(memberId));
+            String raw = "test-session-" + memberId;
+            JdbcTemplate jdbc = currentJdbc;
+            Integer exists = jdbc.queryForObject("SELECT COUNT(*) FROM member WHERE id = ?", Integer.class, memberId);
+            if (exists != null && exists > 0) {
+                LocalDateTime now = LocalDateTime.ofInstant(currentClock.instant(), ZoneOffset.UTC);
+                jdbc.update("INSERT INTO login_session (token_hash, member_id, created_at, last_used_at) "
+                        + "VALUES (?, ?, ?, ?) AS new ON DUPLICATE KEY UPDATE last_used_at = new.last_used_at",
+                        sha256Hex(raw), memberId, now, now);
+            }
+            request.setCookies(new jakarta.servlet.http.Cookie("camgong_session", raw));
             return request;
         };
+    }
+
+    private static String sha256Hex(String raw) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @TestConfiguration(proxyBeanMethods = false)
