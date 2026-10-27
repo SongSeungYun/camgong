@@ -29,11 +29,7 @@ export const authHandlers = [
       mockState.sessionExpired = false
       return HttpResponse.json(toMember(m))
     }
-    // ui-api-map.md는 인증 전 계정에 403 EMAIL_NOT_VERIFIED를 쓰지만 002 계약은 401과 같이 취급할지 '결정 대기'다.
-    // 아직 바뀌지 않은 쪽(ui-api-map)을 따른다.
-    if (!m && mockState.pending.some((p) => p.email === email.trim().toLowerCase() && p.password === password)) {
-      return problem(403, 'EMAIL_NOT_VERIFIED')
-    }
+    // 인증 전 계정도 같은 401 INVALID_CREDENTIALS다(002 확정 2026-10-27, EMAIL_NOT_VERIFIED 없음).
     mockState.loginFailures++
     return problem(401, 'INVALID_CREDENTIALS')
   }),
@@ -53,7 +49,7 @@ export const authHandlers = [
     if (displayName.length < 2 || displayName.length > 20) errors.push({ field: 'displayName', message: '2~20자로 입력해 주세요' })
     if (password.length < 8) errors.push({ field: 'password', message: '8자 이상 입력해 주세요' })
     if (b.consent !== true) errors.push({ field: 'consent', message: '동의가 필요해요' })
-    if (errors.length) return problem(400, 'VALIDATION_FAILED', { errors })
+    if (errors.length) return problem(400, 'Bad Request', { errors })
     if (mockState.members.some((m) => m.email === email)) return problem(409, 'ALREADY_REGISTERED')
 
     const prev = mockState.pending.find((p) => p.email === email)
@@ -66,7 +62,7 @@ export const authHandlers = [
   http.post('/api/auth/signup/resend', async ({ request }) => {
     const { email } = (await request.json()) as { email?: string }
     if (!email || !/^[^@\s]+@[^@\s]+$/.test(email)) {
-      return problem(400, 'VALIDATION_FAILED', { errors: [{ field: 'email', message: '이메일 형식이 아니에요' }] })
+      return problem(400, 'Bad Request', { errors: [{ field: 'email', message: '이메일 형식이 아니에요' }] })
     }
     const p = mockState.pending.find((x) => x.email === email.trim().toLowerCase())
     if (!p) return problem(404, 'NOT_FOUND')

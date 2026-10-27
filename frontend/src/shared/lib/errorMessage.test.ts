@@ -14,7 +14,6 @@ describe('errorMessage', () => {
     expect(errorMessage(e(401, 'UNAUTHENTICATED'), { fromForm: true })).toBe('로그인이 필요해요. 입력하던 내용은 저장되지 않아요.'))
   test('401 INVALID_CREDENTIALS는 어느 쪽인지 알리지 않음', () =>
     expect(errorMessage(e(401, 'INVALID_CREDENTIALS'))).toBe('이메일 또는 비밀번호가 맞지 않아요.'))
-  test('403 EMAIL_NOT_VERIFIED', () => expect(errorMessage(e(403, 'EMAIL_NOT_VERIFIED'))).toBe('이메일 인증이 필요해요.'))
   test('403 ORGANIZER_NOT_ALLOWED', () =>
     expect(errorMessage(e(403, 'ORGANIZER_NOT_ALLOWED'))).toBe('개설자는 직접 참여할 수 없어요. 수량은 공구 수정에서 바꿔요.'))
   test('403 ORGANIZER_ONLY', () => expect(errorMessage(e(403, 'ORGANIZER_ONLY'))).toBe('개설자만 쓸 수 있어요.'))
