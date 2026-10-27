@@ -97,7 +97,7 @@ describe('상세 화면 (US2-5·6)', () => {
     expect(chat.getAttribute('href')).toBe('https://open.kakao.com/o/abc')
     expect(chat.getAttribute('target')).toBe('_blank')
     expect(chat.getAttribute('rel')).toBe('noopener noreferrer')
-    screen.getByRole('link', { name: '체크표' })
+    screen.getByRole('link', { name: '참여자 체크' })
     a.unmount()
     // 모집 중이면 참여자에게 서버가 오픈채팅을 주지 않는다 → 화면에도 없다
     seedGroupBuy({ openChatUrl: 'https://open.kakao.com/o/abc' })
