@@ -30,6 +30,11 @@ public class ApiExceptionHandler {
         if (e.getReason() != null) {
             response.getBody().setProperty("reason", e.getReason());
         }
+        if (e.getRetryAt() != null) {
+            response.getBody().setProperty("retryAt", e.getRetryAt());
+            return ResponseEntity.status(e.getStatus()).header("Retry-After", String.valueOf(e.getRetryAfterSeconds()))
+                    .body(response.getBody());
+        }
         return response;
     }
 

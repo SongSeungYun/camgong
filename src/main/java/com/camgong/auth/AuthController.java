@@ -33,6 +33,12 @@ class AuthController {
         return signupService.signup(request);
     }
 
+    @PostMapping("/signup/resend")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    SignupResponse resend(@Valid @RequestBody ResendRequest request) {
+        return signupService.resend(request);
+    }
+
     @PostMapping("/verify")
     ResponseEntity<AuthResponse> verify(@Valid @RequestBody VerifyRequest request) {
         return withSession(signupService.verify(request));

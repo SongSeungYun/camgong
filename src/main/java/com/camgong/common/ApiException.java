@@ -1,5 +1,8 @@
 package com.camgong.common;
 
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -14,6 +17,8 @@ public class ApiException extends RuntimeException {
     private final String title;
     private final List<Field> errors;
     private final String reason;
+    private OffsetDateTime retryAt;
+    private Long retryAfterSeconds;
 
     public ApiException(HttpStatus status, String title, String detail, List<Field> errors) {
         this(status, title, detail, errors, null);
@@ -34,6 +39,23 @@ public class ApiException extends RuntimeException {
 
     public ApiException(HttpStatus status, String title, String detail) {
         this(status, title, detail, List.of());
+    }
+
+    /** 한도 오류용: 본문 속성 retryAt 과 Retry-After(초, 올림) 헤더를 함께 싣는다. */
+    public ApiException retryAt(Instant retryAt, Instant now) {
+        // ponytail: 응답 오프셋은 KST 고정(001·002 응답과 같다).
+        this.retryAt = retryAt.atOffset(ZoneOffset.ofHours(9));
+        long millis = Math.max(0, retryAt.toEpochMilli() - now.toEpochMilli());
+        this.retryAfterSeconds = (millis + 999) / 1000;
+        return this;
+    }
+
+    public OffsetDateTime getRetryAt() {
+        return retryAt;
+    }
+
+    public Long getRetryAfterSeconds() {
+        return retryAfterSeconds;
     }
 
     public HttpStatus getStatus() {
