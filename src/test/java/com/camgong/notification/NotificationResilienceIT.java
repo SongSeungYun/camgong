@@ -168,4 +168,59 @@ class NotificationResilienceIT extends NotificationTestBase {
 
         assertThat(notificationCount()).isEqualTo(1500 - 2);
     }
+
+    @Autowired
+    NotificationProperties props;
+
+    @Test
+    void retriesWaitOneFourThenSixteenTimesTheBaseDelay() {
+        doAnswer(inv -> { throw new IllegalStateException("청크 실패"); }).when(writer).batchChunk(any());
+        doAnswer(inv -> { throw new IllegalStateException("계속 실패"); }).when(writer).insertOne(any());
+        List<java.time.Duration> pauses = new java.util.ArrayList<>();
+        doAnswer(inv -> { pauses.add(inv.getArgument(0)); return null; }).when(writer).pause(any());
+
+        publish(new GroupBuyCompleted(UUID.randomUUID().toString(), 1L, "t", List.of(1L)));
+
+        java.time.Duration base = props.retryBaseDelay();
+        assertThat(pauses).containsExactly(base, base.multipliedBy(4), base.multipliedBy(16));    // 운영 값은 1초·4초·16초
+    }
+
+    @Test
+    void giveUpsInDifferentChunksDoNotAddUpToAnAbort(CapturedOutput output) {
+        seedMembers(100, 1099);
+        doAnswer(inv -> { throw new IllegalStateException("청크 실패"); }).when(writer).batchChunk(any());
+        doAnswer(inv -> {
+            NotificationRow row = inv.getArgument(0);
+            if (row.recipientId() == 599L || row.recipientId() == 600L) {              // 청크 1 의 마지막, 청크 2 의 처음
+                throw new IllegalStateException("독 행");
+            }
+            return inv.callRealMethod();
+        }).when(writer).insertOne(any());
+        List<Long> everyone = new java.util.ArrayList<>();
+        for (long m = 100; m < 1100; m++) {
+            everyone.add(m);
+        }
+
+        publish(new GroupBuyCompleted(UUID.randomUUID().toString(), 1L, "t", everyone));
+
+        assertThat(notificationCount()).isEqualTo(1000 - 2);
+        assertThat(output.getAll()).doesNotContain("notification-aborted");
+    }
+
+    @Test
+    void theAbortLogSaysHowManyWereWrittenAndHowManyAreLeft(CapturedOutput output) {
+        seedMembers(100, 1099);
+        doAnswer(inv -> inv.callRealMethod()).doAnswer(inv -> { throw new IllegalStateException("청크 실패"); })
+                .when(writer).batchChunk(any());                                        // 청크 1 은 정상, 청크 2 부터 장애
+        doAnswer(inv -> { throw new IllegalStateException("DB 장애"); }).when(writer).insertOne(any());
+        List<Long> everyone = new java.util.ArrayList<>();
+        for (long m = 100; m < 1100; m++) {
+            everyone.add(m);
+        }
+        String eventId = UUID.randomUUID().toString();
+
+        publish(new GroupBuyCompleted(eventId, 1L, "t", everyone));
+
+        assertThat(output.getAll()).contains("notification-aborted eventId=" + eventId + " written=500 unwritten=500 total=1000");
+    }
 }

@@ -46,21 +46,26 @@ class NotificationWriter {
 
     void write(List<NotificationRow> rows) {
         int chunk = props.insertChunkSize();
-        int giveUpsInARow = 0;
+        int written = 0;
         for (int from = 0; from < rows.size(); from += chunk) {
             List<NotificationRow> part = rows.subList(from, Math.min(rows.size(), from + chunk));
             try {
                 tx.executeWithoutResult(s -> batchChunk(part));
-                giveUpsInARow = 0;
+                written += part.size();
             } catch (RuntimeException e) {
                 // 청크 하나의 실패가 다른 청크나 같은 청크의 다른 수신자를 막지 않는다: 이 청크만 행마다 따로 넣는다.
+                // 연속 포기 횟수는 청크 안에서만 센다(청크 경계를 넘겨 세면 서로 먼 두 실패가 이벤트를 중단시킨다).
+                int giveUpsInARow = 0;
                 for (NotificationRow row : part) {
-                    giveUpsInARow = insertWithRetry(row) ? 0 : giveUpsInARow + 1;
-                    if (giveUpsInARow >= GIVE_UPS_BEFORE_ABORT) {
-                        // 연달아 포기했다면 그 행만의 문제가 아니라 DB 장애 같은 전체 문제일 가능성이 크다. 행마다 21초씩 자며 실행기 스레드를
-                        // 몇 시간 붙잡지 않도록 이 사건의 나머지는 포기한다(유실로 취급, 허용된 한계).
-                        log.warn("notification-aborted eventId={} recipients={} reason=consecutive-failures", part.get(0).eventId(),
-                                rows.size());
+                    if (insertWithRetry(row)) {
+                        written++;
+                        giveUpsInARow = 0;
+                    } else if (++giveUpsInARow >= GIVE_UPS_BEFORE_ABORT) {
+                        // 한 청크 안에서 연달아 포기했다면 그 행만의 문제가 아니라 DB 장애 같은 전체 문제일 가능성이 크다. 행마다 21초씩 자며
+                        // 실행기 스레드를 몇 시간 붙잡지 않도록 이 사건의 나머지는 포기한다(유실로 취급, 허용된 한계). 같은 eventId 로 다시
+                        // 처리해도 (event_id, recipient_id) 유니크가 이미 쓴 행을 걸러 준다.
+                        log.warn("notification-aborted eventId={} written={} unwritten={} total={} reason=consecutive-failures",
+                                row.eventId(), written, rows.size() - written, rows.size());
                         return;
                     }
                 }
@@ -94,7 +99,7 @@ class NotificationWriter {
         Duration delay = props.retryBaseDelay();
         for (int attempt = 0; attempt <= props.retryAttempts(); attempt++) {
             if (attempt > 0) {
-                sleep(delay);
+                pause(delay);
                 delay = delay.multipliedBy(4);                      // 1초, 4초, 16초
             }
             try {
@@ -110,7 +115,8 @@ class NotificationWriter {
         return false;
     }
 
-    private static void sleep(Duration d) {
+    /** 재시도 사이의 대기. 테스트가 대기 값을 확인하려고 가로채는 지점이다. */
+    void pause(Duration d) {
         try {
             Thread.sleep(d.toMillis());
         } catch (InterruptedException e) {
