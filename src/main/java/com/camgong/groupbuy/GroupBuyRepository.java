@@ -38,4 +38,8 @@ public interface GroupBuyRepository extends JpaRepository<GroupBuy, Long> {
     @Query(value = "SELECT * FROM group_buy WHERE id = :id AND status = 'OPEN' AND deadline <= :cutoff "
             + "AND secured_quantity < total_quantity FOR UPDATE SKIP LOCKED", nativeQuery = true)
     Optional<GroupBuy> claimForClose(@Param("id") Long id, @Param("cutoff") Instant cutoff);
+
+    /** 이벤트에 담을 제목 스냅샷. 값으로 읽어 영속성 컨텍스트의 엔티티 상태와 무관하다. */
+    @Query("select g.title from GroupBuy g where g.id = :id")
+    String findTitle(@Param("id") Long id);
 }

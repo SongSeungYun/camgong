@@ -50,6 +50,19 @@ camgong:
   mail:
     # smtp(기본) | logging(local/test/benchmark 프로파일에서만). SMTP 접속 정보는 SPRING_MAIL_* 환경변수로만 받는다.
     sender: ${MAIL_SENDER:smtp}
+  notification:
+    async:
+      enabled: true         # false 면 알림을 요청 스레드에서 바로 만든다(테스트용). 운영은 true
+      core-size: 2
+      max-size: 4
+      queue-capacity: 1000
+    insert-chunk-size: 500
+    retry-attempts: 3
+    retry-base-delay: 1s    # 재시도 대기는 이 값에서 4배씩 늘린다(1초, 4초, 16초)
+    retention: 30d
+    cleanup:
+      enabled: true
+      interval: 1d
   scheduler:
     close:
       enabled: true         # 테스트는 false 로 두고 서비스를 직접 호출한다

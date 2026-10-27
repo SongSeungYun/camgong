@@ -8,16 +8,20 @@ public final class GroupBuyEvents {
     private GroupBuyEvents() {
     }
 
-    /** recipientIds: 개설자를 뺀 참여자. changedFields: 요청 본문의 필드 이름(openChatUrl 제외). */
-    public record GroupBuyChanged(Long groupBuyId, List<Long> recipientIds, List<String> changedFields) {
+    /**
+     * recipientIds: 개설자를 뺀 참여자. changedFields: 요청 본문의 필드 이름(openChatUrl 제외).
+     * eventId 는 발행 때 한 번 만든 UUID, groupBuyTitle 은 사건 시점의 제목 스냅샷(수정은 수정 후 제목)이다 — 알림 기능이 중복 방지·표시에 쓴다.
+     */
+    public record GroupBuyChanged(String eventId, Long groupBuyId, String groupBuyTitle, List<Long> recipientIds,
+            List<String> changedFields) {
     }
 
-    /** recipientIds: 개설자를 뺀 참여자. */
-    public record GroupBuyCancelled(Long groupBuyId, List<Long> recipientIds) {
+    /** recipientIds: 개설자를 뺀 참여자. groupBuyTitle: 취소된 공구는 이후 읽을 수 없어서 사건 시점에 담는다. */
+    public record GroupBuyCancelled(String eventId, Long groupBuyId, String groupBuyTitle, List<Long> recipientIds) {
     }
 
     /** recipientIds: 개설자를 포함한 모든 참여자. */
-    public record GroupBuyCompleted(Long groupBuyId, List<Long> recipientIds) {
+    public record GroupBuyCompleted(String eventId, Long groupBuyId, String groupBuyTitle, List<Long> recipientIds) {
     }
 
     /**

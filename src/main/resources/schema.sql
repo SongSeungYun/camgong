@@ -88,3 +88,19 @@ CREATE TABLE IF NOT EXISTS create_guard (
     created_at   DATETIME(6) NOT NULL,
     PRIMARY KEY (member_id, fingerprint)
 );
+
+CREATE TABLE IF NOT EXISTS notification (
+    id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    event_id        CHAR(36)     NOT NULL,
+    recipient_id    BIGINT       NOT NULL,
+    type            VARCHAR(30)  NOT NULL,
+    group_buy_id    BIGINT       NOT NULL,
+    group_buy_title VARCHAR(100) NOT NULL,
+    changed_fields  VARCHAR(200) NULL,
+    created_at      DATETIME(6)  NOT NULL,
+    read_at         DATETIME(6)  NULL,
+    CONSTRAINT uq_notification_event_recipient UNIQUE (event_id, recipient_id),
+    KEY idx_notification_recipient_id (recipient_id, id),
+    KEY idx_notification_recipient_read (recipient_id, read_at),
+    KEY idx_notification_created_at (created_at)
+);

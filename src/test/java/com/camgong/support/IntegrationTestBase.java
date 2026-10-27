@@ -91,6 +91,7 @@ public abstract class IntegrationTestBase {
         jdbc.update("DELETE FROM login_attempt");
         jdbc.update("DELETE FROM participation");
         jdbc.update("DELETE FROM group_buy");
+        jdbc.update("DELETE FROM notification");
         jdbc.update("DELETE FROM create_guard");
         jdbc.update("DELETE FROM member");
         seedMember(1, "개설자");
@@ -235,7 +236,7 @@ public abstract class IntegrationTestBase {
 
         /** 메일 리스너(@Async)를 요청 스레드에서 돌려 테스트가 발송 시점을 기다리지 않게 한다. */
         @Bean
-        org.springframework.core.task.SyncTaskExecutor taskExecutor() {
+        org.springframework.core.task.SyncTaskExecutor mailExecutor() {
             return new org.springframework.core.task.SyncTaskExecutor();
         }
 
