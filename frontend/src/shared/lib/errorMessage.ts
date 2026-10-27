@@ -12,7 +12,8 @@ const GENERIC = '잠시 문제가 생겼어요. 다시 시도해 주세요.'
 
 const retryNote = (err: ApiError, nowMs: number) => {
   const at = err.extra.retryAt
-  return typeof at === 'string' && remainingText(at, nowMs) ? ` (${remainingText(at, nowMs)})` : ''
+  // 이미 지난 시각이면 '마감됨'이 아니라 아무것도 덧붙이지 않는다
+  return typeof at === 'string' && Date.parse(at) > nowMs ? ` (${remainingText(at, nowMs)})` : ''
 }
 
 /** ui-api-map.md 3절 문구표. 서버의 detail은 쓰지 않는다. */

@@ -1,3 +1,4 @@
+import { uniqueById } from '../shared/lib/uniqueById'
 import { useNavigate } from 'react-router'
 import { NotificationItem } from '../features/notification/NotificationItem'
 import s from '../features/notification/Notification.module.css'
@@ -9,7 +10,7 @@ export default function NotificationsPage() {
   const q = useNotifications()
   const read = useMarkRead()
   const navigate = useNavigate()
-  const items = q.data?.pages.flatMap((p) => p.items) ?? []
+  const items = uniqueById(q.data?.pages.flatMap((p) => p.items) ?? [])
   const state = q.isPending ? 'loading' : q.isError && items.length === 0 ? 'error' : items.length === 0 ? 'empty' : 'ready'
 
   // 읽음 처리가 실패해도 이동은 막지 않는다(읽음은 부가 기능).

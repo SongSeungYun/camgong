@@ -1,9 +1,9 @@
-import { useId, type ComponentProps, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ComponentProps, type ReactNode } from 'react'
 import { isKnownStatus, type KnownStatus } from '../api/types'
 import s from './ui.module.css'
 
 export function Layout({ children }: { children: ReactNode }) {
-  return <main className={s.page}>{children}</main>
+  return <main className={s.page} tabIndex={-1}>{children}</main> // tabIndex: 대화상자가 닫힌 뒤 포커스를 받을 수 있게
 }
 
 type ButtonProps = ComponentProps<'button'> & { variant?: 'primary' | 'secondary'; pending?: boolean }
@@ -65,7 +65,7 @@ export function Badge({ status }: { status: string }) {
 export function ProgressBar({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0
   return (
-    <div className={s.progress} role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max}>
+    <div className={s.progress} role="progressbar" aria-label={`확보 ${value}개 / 총 ${max}개`} aria-valuenow={value} aria-valuemin={0} aria-valuemax={max}>
       <div style={{ width: `${pct}%` }} />
     </div>
   )
@@ -103,11 +103,61 @@ interface ConfirmDialogProps {
   onCancel: () => void
 }
 
+const FOCUSABLE = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+
+/** 열리면 포커스가 안으로 가고, Tab은 안에서만 돌며, Esc는 취소, 닫으면 열기 전 요소로 포커스가 돌아온다. */
 export function ConfirmDialog({ open, title, message, confirmLabel = '확인', cancelLabel = '취소', pending, onConfirm, onCancel }: ConfirmDialogProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const cancelRef = useRef(onCancel)
+  cancelRef.current = onCancel
+  const pendingRef = useRef(pending)
+  pendingRef.current = pending
+
+  useEffect(() => {
+    if (!open) return
+    const opener = document.activeElement as HTMLElement | null
+    const node = ref.current!
+    const items = () => Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE))
+    // 취소(첫 버튼)에 먼저 포커스: 실수로 Enter를 눌러도 되돌릴 수 없는 확인이 실행되지 않는다
+    ;(items()[0] ?? node).focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        if (!pendingRef.current) cancelRef.current() // 요청이 진행 중이면 닫지 않는다(결과를 못 보고 이동하는 것을 막는다)
+      } else if (e.key === 'Tab') {
+        const list = items()
+        if (list.length === 0) return e.preventDefault()
+        const first = list[0]!
+        const last = list[list.length - 1]!
+        if (e.shiftKey && (document.activeElement === first || !node.contains(document.activeElement))) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && (document.activeElement === last || !node.contains(document.activeElement))) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      // 열었던 버튼으로 돌려보낸다. 성공해서 화면이 바뀌며 그 버튼이 사라지는 경우(예: 참여 취소)는
+      // 다음 화면 갱신이 끝난 뒤 확인해 사라졌으면 본문으로 보내, 포커스가 문서 처음으로 날아가지 않게 한다.
+      const restore = () => {
+        if (opener && document.contains(opener)) opener.focus()
+        else document.querySelector<HTMLElement>('main')?.focus()
+      }
+      restore()
+      setTimeout(() => {
+        if (document.activeElement === document.body || !document.contains(document.activeElement)) restore()
+      }, 0)
+    }
+  }, [open])
+
   if (!open) return null
   return (
     <div className={s.backdrop}>
-      <div className={s.dialog} role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={ref} className={s.dialog} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
         <h2>{title}</h2>
         {message && <p>{message}</p>}
         <div className={s.actions}>

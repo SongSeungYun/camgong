@@ -1,3 +1,4 @@
+import { uniqueById } from '../shared/lib/uniqueById'
 import { useLocation } from 'react-router'
 import { GroupBuyCard } from '../features/groupbuy/list/GroupBuyCard'
 import s from '../features/groupbuy/list/GroupBuyCard.module.css'
@@ -10,7 +11,7 @@ export default function ListPage() {
   const { params, qInput, setQInput, setParams } = useListParams()
   const q = useGroupBuyList(params)
   const notice = (useLocation().state as { notice?: string } | null)?.notice
-  const items = q.data?.pages.flatMap((p) => p.items) ?? []
+  const items = uniqueById(q.data?.pages.flatMap((p) => p.items) ?? [])
   // FR-014: 정렬을 뺀 조건(검색어·카테고리·기본이 아닌 상태)이 하나라도 걸려 있으면 '결과 없음'
   const filtered = !!params.q || params.category !== null || params.status !== 'OPEN'
   const state = q.isPending ? 'loading' : q.isError && items.length === 0 ? 'error' : items.length === 0 ? 'empty' : 'ready'

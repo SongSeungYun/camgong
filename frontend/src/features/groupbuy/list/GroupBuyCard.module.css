@@ -5,6 +5,6 @@
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
 .chip { min-height: var(--touch); padding: 0 var(--space-3); border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-bg); font: inherit; cursor: pointer; }
-.chip[aria-pressed='true'] { background: var(--color-primary); color: var(--color-primary-text); border-color: var(--color-primary); }
+.chip[aria-pressed='true'], .chip[aria-selected='true'] { background: var(--color-primary); color: var(--color-primary-text); border-color: var(--color-primary); }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 .more { margin: var(--space-4) auto; display: block; }

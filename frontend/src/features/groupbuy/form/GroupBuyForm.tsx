@@ -5,6 +5,7 @@ import { CATEGORY_LABELS, type KnownCategory } from '../../../shared/api/types'
 import { applyServerErrors } from '../../../shared/lib/formErrors'
 import { errorMessage } from '../../../shared/lib/errorMessage'
 import { amount, formatWon } from '../../../shared/lib/money'
+import { toKstLocalInput } from '../../../shared/lib/time'
 import { Button, SelectField, TextAreaField, TextField } from '../../../shared/ui'
 import { EMPTY_VALUES, FORM_FIELDS, toRequestBody, type FormValues, type GroupBuyRequest } from './fieldMap'
 
@@ -13,11 +14,13 @@ interface Props {
   defaultValues?: FormValues
   /** 수정 폼의 안내 문구 */
   notes?: ReactNode
+  /** 수정 폼: 마감을 건드리지 않았으면 초까지 있는 원래 값을 그대로 보낸다 */
+  originalDeadline?: string
   onSubmit: (body: GroupBuyRequest) => Promise<unknown>
 }
 
 /** 개설·수정 공용 폼. 범위는 안내용이고 최종 판단은 서버 응답이다(FR-024). */
-export function GroupBuyForm({ submitLabel, defaultValues = EMPTY_VALUES, notes, onSubmit }: Props) {
+export function GroupBuyForm({ submitLabel, defaultValues = EMPTY_VALUES, notes, originalDeadline, onSubmit }: Props) {
   const { register, handleSubmit, setError, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({ defaultValues })
   const [topErrors, setTopErrors] = useState<string[]>([])
 
@@ -29,7 +32,10 @@ export function GroupBuyForm({ submitLabel, defaultValues = EMPTY_VALUES, notes,
     setTopErrors([])
     if (!v.deadline) return setError('deadline', { type: 'required', message: '마감 시각을 입력해 주세요' })
     try {
-      await onSubmit(toRequestBody(v))
+      const body = toRequestBody(v)
+      // datetime-local은 분 단위라, 값이 처음 그대로면 초가 잘리지 않게 원래 ISO를 쓴다
+      if (originalDeadline && v.deadline === toKstLocalInput(originalDeadline)) body.deadline = originalDeadline
+      await onSubmit(body)
     } catch (e) {
       setTopErrors(e instanceof ApiError ? applyServerErrors(e, setError, FORM_FIELDS) : [errorMessage(new ApiError(0))])
     }

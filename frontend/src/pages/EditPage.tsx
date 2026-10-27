@@ -30,7 +30,7 @@ export default function EditPage() {
   const navigate = useNavigate()
   const back = <Link to={`/groupbuys/${id}`}>상세로</Link>
 
-  if (q.error instanceof ApiError && q.error.status === 404) return <Layout><p>찾을 수 없는 공구예요.</p><Link to="/">목록으로</Link></Layout>
+  if (!Number.isInteger(id) || (q.error instanceof ApiError && q.error.status === 404)) return <Layout><p>찾을 수 없는 공구예요.</p><Link to="/">목록으로</Link></Layout>
   return (
     <Layout>
       <h1>공구 수정</h1>
@@ -42,8 +42,10 @@ export default function EditPage() {
             key={q.data.id}
             submitLabel="수정 저장"
             defaultValues={valuesOf(q.data)}
+            originalDeadline={q.data.deadline}
             notes={
               <>
+                {q.data.myParticipation === null && <p role="status">내 수량을 불러오지 못했어요. 직접 입력해 주세요.</p>}
                 <p>마감은 늘리기만 할 수 있어요.</p>
                 <p>총 수량은 확보 수량({q.data.securedQuantity}개) 이상이어야 해요.</p>
               </>

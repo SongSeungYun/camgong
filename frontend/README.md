@@ -62,15 +62,16 @@ npm run lint
 | 대상 | 결과 |
 |------|------|
 | 001 개설·수정·취소·상세 (201+Location, 204, 400 `errors[]`, 403, 404, 409 `NOT_MODIFIABLE`+reason, 10초 중복 `DUPLICATE_REQUEST`) | 일치. 목 테스트(`mocks/groupbuys.test.ts`)가 근거 |
-| 002 가입·인증·로그인·로그아웃·me (401 `INVALID_CREDENTIALS`, `LOGIN_LOCKED`+retryAt, 재발송 한도, 토큰 오류 3종, `DISPLAY_NAME_TAKEN`) | 일치. `mocks/auth.test.ts` |
+| 002 가입(이메일만, 변경 B2)·인증(token+이름·비밀번호·동의, 토큰→본문→충돌 순서, 본문 오류는 토큰 미소진)·로그인·로그아웃·me (401 `INVALID_CREDENTIALS`, `LOGIN_LOCKED`+retryAt, 재발송 한도, 토큰 오류 3종, `DISPLAY_NAME_TAKEN`) | 일치(2026-10-28 B2 반영). `mocks/auth.test.ts` |
 | 003 목록·상세·내 활동 (불투명 커서, 400 조건, `myQuantity`, 취소 제외, 노출 규칙) | 일치 |
 | 004 참여·수량 변경·참여 취소 (거부 사유 9종, 재시도 안전 200) | 일치. `Participation.test.tsx` |
 | 006 체크표·입금/수령 PUT (summary 전체 기준, 멱등, 400/403/404/409) + 003 `myParticipation` 확장 | 일치. `CheckSheet.test.tsx` |
 | 007 알림 목록·unread-count·읽음 (수신자 비노출, 남의 알림 404) | 일치. `Notification.test.tsx` |
+| Vite 프록시의 `Origin` 검사 | `changeOrigin: false`를 명시(Host가 localhost:5173으로 유지되어야 백엔드 Origin 검사 통과). **실제 백엔드 연동 때 쓰기 요청(예: 로그인 POST) 한 번을 직접 호출해 403 `FORBIDDEN_ORIGIN`이 없는지 확인할 것 — 아직 확인 못 함** |
 | 시간 표기 | **차이**: 목은 `toISOString()`(`...Z`)로 내려 주고 계약 예시는 `+09:00`. 같은 시각이고 클라이언트는 어느 쪽이든 KST로 표시·`+09:00`으로 전송 |
-| 편집 폼 마감의 초 단위 | 수정 폼이 마감을 분 단위로 자른다. 서버가 초가 있는 마감을 주면 저장 시 초가 사라진다(관제탑 확인 중) |
-| 개설자의 `myParticipation.quantity`를 수정 폼의 "내 수량"으로 사용 | 003 백엔드 동작 **확인 못 함** |
-| 가입 동의 문구·버전 `v1` | 초안. 사용자가 확정해야 함 |
+| 편집 폼 마감의 초 단위 | 해결: 마감 필드를 건드리지 않으면 원래 ISO(초 포함)를 그대로 보낸다. 바꾸면 분 단위 + `+09:00` |
+| 개설자의 `myParticipation.quantity`를 수정 폼의 "내 수량"으로 사용 | 관제탑 확인: 003 백엔드는 개설자에게 `{quantity, amount}`를 준다(실제 백엔드로는 **확인 못 함**). `null`이어도 상세·수정 폼이 깨지지 않고 "내 수량을 불러오지 못했어요" 안내를 보인다 |
+| 개인정보 동의 안내문·버전 `v1` (인증 화면 `/verify`) | 초안. 사용자가 확정해야 함 |
 
 ### 36개 시나리오 (T067, 목 모드)
 

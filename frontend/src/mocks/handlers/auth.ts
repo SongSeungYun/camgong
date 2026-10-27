@@ -39,22 +39,16 @@ export const authHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  // 변경 B2: 신청은 이메일만 받는다(이름·비밀번호·동의는 verify에서)
   http.post('/api/auth/signup', async ({ request }) => {
     const b = (await request.json()) as Record<string, unknown>
-    const errors: { field: string; message: string }[] = []
     const email = String(b.email ?? '').trim().toLowerCase()
-    const displayName = String(b.displayName ?? '').trim()
-    const password = String(b.password ?? '')
-    if (!/^[^@\s]+@school\.ac\.kr$/.test(email)) errors.push({ field: 'email', message: '허용된 학교 이메일이 아니에요' })
-    if (displayName.length < 2 || displayName.length > 20) errors.push({ field: 'displayName', message: '2~20자로 입력해 주세요' })
-    if (password.length < 8) errors.push({ field: 'password', message: '8자 이상 입력해 주세요' })
-    if (b.consent !== true) errors.push({ field: 'consent', message: '동의가 필요해요' })
-    if (errors.length) return problem(400, 'Bad Request', { errors })
+    if (!/^[^@\s]+@school\.ac\.kr$/.test(email)) return problem(400, 'Bad Request', { errors: [{ field: 'email', message: '허용된 학교 이메일이 아니에요' }] })
     if (mockState.members.some((m) => m.email === email)) return problem(409, 'ALREADY_REGISTERED')
 
     const prev = mockState.pending.find((p) => p.email === email)
     if (prev && Date.now() - prev.lastSentAt < RESEND_MS) return tooMany(prev.lastSentAt + RESEND_MS)
-    const next = { email, displayName, password, token: prev?.token ?? `tok-${mockState.nextToken++}`, lastSentAt: Date.now() }
+    const next = { email, token: prev?.token ?? `tok-${mockState.nextToken++}`, lastSentAt: Date.now() }
     mockState.pending = [...mockState.pending.filter((p) => p.email !== email), next]
     return HttpResponse.json({ email, resendAvailableAt: isoKst(next.lastSentAt + RESEND_MS) }, { status: 202 })
   }),
@@ -72,15 +66,27 @@ export const authHandlers = [
   }),
 
   // 토큰 `expired-token`·`used-token`은 시나리오용 고정 값이다.
+  // 002 처리 순서: 토큰(400/409/410) → 본문 검증(400, 토큰 미소진) → 이름·이메일 충돌(409, 토큰 유효) → 성공
   http.post('/api/auth/verify', async ({ request }) => {
-    const { token, displayName } = (await request.json()) as { token: string; displayName?: string }
+    const b = (await request.json()) as Record<string, unknown>
+    const token = String(b.token ?? '')
     if (token === 'expired-token') return problem(410, 'TOKEN_EXPIRED')
     if (token === 'used-token') return problem(409, 'TOKEN_USED')
     const p = mockState.pending.find((x) => x.token === token)
     if (!p) return problem(400, 'INVALID_TOKEN')
-    const name = (displayName ?? p.displayName).trim()
+
+    const name = typeof b.displayName === 'string' ? b.displayName.trim() : ''
+    const password = typeof b.password === 'string' ? b.password : ''
+    const errors: { field: string; message: string }[] = []
+    if (name.length < 2 || name.length > 20) errors.push({ field: 'displayName', message: '2~20자로 입력해 주세요' })
+    if (password.length < 8) errors.push({ field: 'password', message: '8자 이상 입력해 주세요' })
+    else if (new TextEncoder().encode(password).length > 72) errors.push({ field: 'password', message: '72바이트 이하로 입력해 주세요' })
+    if (b.consent !== true) errors.push({ field: 'consent', message: '동의가 필요해요' })
+    if (typeof b.consentVersion !== 'string' || !b.consentVersion) errors.push({ field: 'consentVersion', message: '동의 안내문 버전이 필요해요' })
+    if (errors.length) return problem(400, 'Bad Request', { errors })
+
     if (mockState.members.some((m) => m.displayName === name)) return problem(409, 'DISPLAY_NAME_TAKEN')
-    const member = { id: mockState.nextMemberId++, displayName: name, email: p.email, password: p.password }
+    const member = { id: mockState.nextMemberId++, displayName: name, email: p.email, password }
     mockState.members.push(member)
     mockState.pending = mockState.pending.filter((x) => x !== p)
     mockState.sessionMemberId = member.id
