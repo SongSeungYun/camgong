@@ -5,7 +5,7 @@ import { routes } from '../app/router'
 
 /** 테스트마다 새 QueryClient·라우터·세션으로 앱을 렌더한다(캐시·세션이 새지 않는다). */
 export function renderApp(path = '/') {
-  const client = createQueryClient()
+  const client = createQueryClient({ retry: false })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   const utils = render(
     <AppProviders client={client}>

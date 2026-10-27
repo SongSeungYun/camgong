@@ -5,7 +5,7 @@ import { renderApp } from '../test/utils'
 
 test('공개 라우트는 비로그인으로 열린다', async () => {
   renderApp('/')
-  await screen.findByRole('heading', { name: '목록' })
+  await screen.findByRole('heading', { name: '공구 목록' })
 })
 
 test('보호 라우트는 비로그인이면 /login으로 보낸다', async () => {
