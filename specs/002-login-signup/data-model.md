@@ -1,13 +1,13 @@
 # Data Model: 회원 가입·로그인·로그아웃
 
-> 초안: 추천안 기준([research.md](research.md), 2026-10-26 확정).
+> 초안: 추천안 기준([research.md](research.md), 2026-10-26 확정). 2026-10-28 변경 B2(안 2): `pending_signup`에서 `display_name`·`password_hash`·`consent_at`·`consent_version` 컬럼을 제거했다. 이 값들은 `POST /verify`에서 받아 `member`에 바로 쓴다.
 
 ## 변경 요약
 
 | 대상 | 변경 |
 |------|------|
 | `member` | 컬럼 확장: `email`, `email_key`, `password_hash`, `display_name_key`, `consent_at`, `consent_version`, `created_at` |
-| `pending_signup` | 새 테이블 (인증 전 가입 정보와 메일 한도) |
+| `pending_signup` | 새 테이블 (인증 전 가입 신청: 이메일 키·토큰·만료·메일 한도. 이름·비밀번호·동의는 없다, 변경 B2) |
 | `login_session` | 새 테이블 (서버 세션) |
 | `login_attempt` | 새 테이블 (이메일 키 로그인 실패 횟수와 잠금) |
 
@@ -24,25 +24,22 @@
 | `display_name_key` | `VARCHAR(20)` | 필수, `UNIQUE`. 이름을 소문자·앞뒤 공백 제거로 정규화한 값 | FR-003 |
 | `email` | `VARCHAR(254)` | 필수, 인증을 마친 이메일 원문 | FR-002 |
 | `email_key` | `VARCHAR(254)` | 필수, `UNIQUE`. 소문자·trim | FR-002 |
-| `password_hash` | `VARCHAR(100)` | 필수. BCrypt 해시. 원문은 저장하지 않는다 | FR-002, SC-009 |
-| `consent_at` | `DATETIME(6)` | 필수. 개인정보 수집·이용 동의 시각 | FR-017 |
+| `password_hash` | `VARCHAR(100)` | 필수. BCrypt 해시(인증 시 받은 비밀번호). 원문은 저장하지 않는다 | FR-002, SC-009 |
+| `consent_at` | `DATETIME(6)` | 필수. 인증 화면에서 동의한 시각 | FR-017 |
 | `consent_version` | `VARCHAR(20)` | 필수. 동의한 안내문 버전 | FR-017 |
 | `created_at` | `DATETIME(6)` | 필수. 가입 완료(인증) 시각 | |
 
 표시 이름·이메일의 유일성은 DB 기본 collation(`utf8mb4_0900_ai_ci`)을 따르므로 대소문자뿐 아니라 악센트도 무시한다(`José`와 `Jose`는 같은 이름). 2026-10-28 검수에서 확인했고 그대로 두기로 했다.
 
-`member`에는 인증을 마친 회원만 있다. 001~007의 테스트가 이름만으로 회원을 시드하던 방식은 `IntegrationTestBase`가 `email`·`password_hash`·`consent_*`를 채우도록 바꿔야 한다(교차 영향).
+`member`에는 인증을 마친 회원만 있다(표시 이름·비밀번호 해시·동의는 인증 요청에서 처음 생긴다). 001~007의 테스트가 이름만으로 회원을 시드하던 방식은 `IntegrationTestBase`가 `email`·`password_hash`·`consent_*`를 채우도록 바꿔야 한다(교차 영향).
 
-## pending_signup (인증 전 가입 신청)
+## pending_signup (인증 전 가입 신청, 이메일만)
 
 | 컬럼 | 타입 | 규칙 | 근거 |
 |------|------|------|------|
 | `id` | `BIGINT AUTO_INCREMENT` | PK | |
 | `email_key` | `VARCHAR(254)` | 필수, `UNIQUE` (이메일당 신청 하나) | FR-006 |
 | `email` | `VARCHAR(254)` | 필수 | |
-| `display_name` | `VARCHAR(20)` | 필수. 점유하지 않는다(유일 제약 없음) | FR-003 |
-| `password_hash` | `VARCHAR(100)` | 필수 | |
-| `consent_at` / `consent_version` | `DATETIME(6)` / `VARCHAR(20)` | 필수 | FR-017 |
 | `token_hash` | `CHAR(64)` | 필수. 인증 토큰의 SHA-256 | FR-004 |
 | `token_expires_at` | `DATETIME(6)` | 필수. 발송 시각 + 24시간 | FR-004 |
 | `last_sent_at` | `DATETIME(6)` | 필수. 마지막 발송 시각 | FR-005 |
@@ -79,7 +76,8 @@
 | (002) | 이메일과 표시 이름은 인증을 마친 회원 사이에서만 유일하다 | `member`의 `UNIQUE (email_key)`, `UNIQUE (display_name_key)` |
 | (002) | 인증 링크는 24시간, 한 번만 유효하며 재발송하면 이전 것은 무효 | `pending_signup.token_hash` 교체, 사용 시 `used_at` 기록(행은 정리 작업이 지운다) |
 | (002) | 인증 메일은 같은 이메일에 1분 간격, 24시간 5회 이하 | `pending_signup`의 조건부 `UPDATE` |
-| (002) | 비밀번호·토큰·세션 id는 원문으로 저장되지 않는다 | 해시 컬럼만 둔다 |
+| (002) | 비밀번호·토큰·세션 id는 원문으로 저장되지 않는다. 비밀번호는 인증 링크를 누른 사람만 정한다(신청에는 없음) | 해시 컬럼만 둔다, `pending_signup`에 비밀번호 컬럼 없음 |
+| (002) | 인증 검증 오류·이름/이메일 충돌에서는 토큰이 소진되지 않는다 | 본문 검증을 `used_at` 선점 앞에 두고, 선점·`member` INSERT를 한 트랜잭션으로 묶어 충돌 시 롤백 |
 | (002) | 연속 5회 실패하면 15분간 잠긴다 (없는 계정도 동일) | `login_attempt`의 조건부 `UPDATE` |
 | (002) | 로그아웃한 세션은 즉시 쓸 수 없다 | 세션 행 삭제 |
 | (002) | 다른 회원에게는 표시 이름만 보인다 | 응답 DTO에 `email`을 두지 않는다 |

@@ -30,7 +30,41 @@ description: "회원 가입·로그인·로그아웃 구현 태스크"
 | b | 인증을 마치지 않은 이메일의 로그인은 `401 INVALID_CREDENTIALS`로 **존재하지 않는 계정과 똑같이** 답한다. `EMAIL_NOT_VERIFIED`는 쓰지 않는다 | FR-010은 안내를 "할 수 있다"일 뿐이고, 구분하면 가입 신청 여부가 새어 나간다. "인증이 필요하면 가입 때 받은 메일을 확인하라"는 문구는 프론트 로그인 화면에 고정으로 둔다(008) |
 | c | `Origin`과 `Referer`가 **둘 다 없는** 상태 변경 요청은 허용한다 | 브라우저는 상태 변경 요청에 `Origin`을 보낸다. 없는 쪽은 curl·테스트 같은 비브라우저이고, 쿠키는 `SameSite=Lax`가 한 번 더 막는다 |
 | d | 같은 신청이 동시에 와서 하나가 먼저 INSERT되면 나머지는 `429 TOO_MANY_REQUESTS`다 | FR-015: 회원 정보 하나, 메일 1통. 한도 규칙(1분 간격)과 같은 응답이라 규칙이 하나로 합쳐진다 |
-| e | 동의(`consent`, `consentVersion`)는 FR-017로 data-model·contract에 있으나 spec.md에는 FR-017이 없다. 구현은 data-model/contract를 따른다 | spec 보완은 관제탑이 따로 한다. 세션은 막히지 않는다 |
+| e | 동의(`consent`, `consentVersion`)는 FR-017로 data-model·contract·spec에 있다. **변경 B2(2026-10-28)로 동의는 신청이 아니라 `POST /verify`에서 받는다**(아래 블록) | 계정 선점 방지 |
+
+## 변경 B2 (2026-10-28): 신청은 이메일만, 이름·비밀번호·동의는 인증 단계에서
+
+사용자가 "안 2"를 결정했다. 공격자가 먼저 피해자의 학교 이메일로 자기 비밀번호를 넣어 신청해 두면, 피해자가 인증하는 순간 공격자가 아는 비밀번호의 계정이 되는 계정 선점(pre-hijacking)을 막기 위해서다. 이전 "안 B(재제출은 이름·비밀번호 유지)"는 폐기한다. 근거: spec.md 2026-10-28 Clarification·FR-001/002/003/006/017, research.md 결정 13, contracts/auth-api.md, data-model.md, quickstart.md. **아래 T001~T040은 이미 구현되어 있으므로 ID·체크박스는 바꾸지 않는다. 구현 세션은 이 블록만 보고 후속 수정을 한다(새 태스크 ID는 만들지 않는다).** 아래 각 항목의 "변경 전" 서술이 본문 태스크에 남아 있어도 이 블록이 우선한다.
+
+**새 동작 요약**
+
+- `POST /api/auth/signup` 본문은 `{ "email" }` 하나. 검증: 이메일 형식, 허용 도메인. 이미 `member`에 있으면 409 `ALREADY_REGISTERED`, 한도(1분 간격, 24시간 5회)면 429(`Retry-After`, `retryAt`). 성공 202 `{ email, resendAvailableAt }`. 같은 인증 전 이메일로 다시 제출하면 토큰·한도만 갱신하고 새 메일(옛 토큰 무효).
+- `pending_signup`은 `id, email_key, email, token_hash, token_expires_at, last_sent_at, window_started_at, sent_count, used_at, created_at`만 남긴다(`display_name`, `password_hash`, `consent_at`, `consent_version` 컬럼 제거).
+- `POST /api/auth/verify` 본문은 `{ token, displayName, password, consent: true, consentVersion }` 전부 필수. 순서: ① 토큰 조회(400 `INVALID_TOKEN` / 409 `TOKEN_USED` / 410 `TOKEN_EXPIRED`) → ② 본문 검증 오류(표시 이름 2~20자·공백만 불가, 비밀번호 8자 이상·UTF-8 72바이트 이하, `consent`가 `true`, `consentVersion` 존재)면 400 `errors[]`이고 **토큰은 소진되지 않는다** → ③ `used_at` 조건부 `UPDATE` 선점(영향 행 0이면 409 `TOKEN_USED`) → ④ BCrypt 해시로 `member` INSERT(`name`, `display_name_key`, `email`, `email_key`, `password_hash`, `consent_at = now`, `consent_version`, `created_at`) → ⑤ 이름 충돌 409 `DISPLAY_NAME_TAKEN`, 이메일 충돌 409 `ALREADY_REGISTERED`이면 같은 트랜잭션 롤백으로 토큰이 유효한 채로 남는다 → 성공 200 + `Set-Cookie` + `{ member: { id, displayName } }`.
+- 비밀번호는 verify의 응답·로그·오류(400/409 포함)에도 새지 않아야 한다.
+
+**태스크별 수정**
+
+| 태스크 | 변경 후 동작 / 해야 할 일 |
+|--------|---------------------------|
+| T004 (`schema.sql`) | `pending_signup`에서 `display_name`, `password_hash`, `consent_at`, `consent_version` 컬럼을 삭제한다. `member`는 그대로(비밀번호·동의 컬럼은 인증 때 채운다). 로컬 개발 DB는 새 컨테이너가 필요함을 승인 요약에 적는다 |
+| T006 (`PendingSignup` record) | 위 컬럼 4개를 필드에서 제거 |
+| T008 (`IntegrationTestBase`) | 시드 회원은 그대로. 신청 행을 직접 심는 헬퍼가 있으면 삭제된 컬럼을 채우지 않게 고친다. 인증 요청을 쉽게 보내는 헬퍼 `verify(token, displayName, password)`(동의 true, 고정 `consentVersion`)를 두면 아래 테스트에서 재사용된다(선택) |
+| T012 (`SignupRequest`, `VerifyRequest`) | `SignupRequest`는 `email`(`@NotBlank @Email @Size(max=254)`)만. `VerifyRequest(String token, String displayName, String password, Boolean consent, String consentVersion)`: `token` `@NotBlank`, `displayName` `@NotBlank` + 앞뒤 공백 제거 후 2~20자(공백뿐이면 거부), `password` `@NotBlank @Size(min=8)` + UTF-8 72바이트 이하 검사, `consent` `@AssertTrue`, `consentVersion` `@NotBlank @Size(max=20)`. 필드 누락은 `null`을 거절한다(`displayName`은 더 이상 선택이 아님) |
+| T013 (`SignupService.signup`) | 비밀번호 바이트 검사·BCrypt 해시·이름/동의 저장을 모두 제거한다. 순서: 이메일 정규화·도메인 검사(T030) → `email_key`가 `member`에 있으면 409 → 토큰 생성 → `pending_signup` INSERT(이메일·토큰 해시·만료·한도 컬럼만). 나머지(이벤트 발행, 응답, 중복 키 처리)는 그대로 |
+| T014 (`SignupService.verify`) | `verify(token, displayName, password, consent, consentVersion)`로 바꾼다. 순서는 위 "새 동작 요약" ①~⑤. **본문 검증(②)이 `used_at` 선점(③)보다 앞**이어야 한다(검증 오류가 토큰을 소진하면 안 됨). 컨트롤러의 `@Valid`가 본문을 먼저 검증하면 토큰 조회(①)보다 400이 앞서게 되므로, 토큰 오류(400 `INVALID_TOKEN`/409/410)가 본문 오류보다 먼저 나가야 한다면 `@Valid`를 쓰지 말고 서비스에서 ① 뒤에 직접 검증해 `errors[]`를 모아 돌려준다(필드 누락 같은 형식 오류의 우선순위를 테스트로 고정). BCrypt 해시는 ② 통과 후 ④에서 만든다. `// ponytail:` 주석에 "가입 입력은 인증 링크를 누른 사람만 정한다(계정 선점 방지, 변경 B2)"를 남긴다 |
+| T016 (`AuthController`) | 시그니처만 맞춘다(`signup` 본문 `SignupRequest`, `verify` 본문 `VerifyRequest`) |
+| T030 | 도메인 검사는 이메일뿐이라 다른 입력 검증과 "모아서" 돌려주는 부분이 이메일 하나로 줄어든다 |
+| T031 (재제출·`resend`) | 조건부 `UPDATE`에서 갱신하는 컬럼은 토큰·한도 컬럼뿐이고, 이름·비밀번호·동의 컬럼은 이제 존재하지 않는다. 시그니처·SQL은 사실상 그대로 |
+| T010 (`SignupIT`) | **수정**: 시나리오 1(본문은 `{email}`만), 4, 5의 신청 쪽만 남긴다 — 형식 틀린 이메일, 이메일 필드 누락 → 400 `errors[email]`. **삭제**: 짧은 비밀번호·공백뿐인 이름·`consent=false`·`consentVersion` 누락·비밀번호 73바이트·표시 이름 경계(1·2·20·21자)·비밀번호 경계(7·8자, 72·73바이트)·`pending_signup.password_hash`가 `$2`로 시작하는지 검사. **추가**: 신청 본문에 `password`/`displayName` 같은 알 수 없는 필드를 보내도 무시되고 `pending_signup`에 저장되지 않는다(컬럼 자체가 없음을 `information_schema`로 확인) |
+| T011 (`VerifyEmailIT`) | **수정**: 시나리오 2는 `{token, displayName, password, consent:true, consentVersion}`로 verify → 200, `member` 1행에 `password_hash`($2…)·`consent_at`·`consent_version` 기록. 시나리오 6은 "신청 후 인증 때 이미 쓰이는 이름(대소문자·공백 무시)으로 verify → 409 `DISPLAY_NAME_TAKEN`, `member` 늘지 않음, 같은 토큰에 새 이름으로 다시 → 200". 동시 N개 verify → 200 정확히 1건(각 요청에 올바른 본문). 마지막 줄 "같은 이름의 신청 두 건이 모두 202"는 신청에 이름이 없으므로 삭제하고 "서로 다른 두 이메일이 인증 때 같은 이름을 정하면 먼저 끝난 쪽만 200, 나머지 409 `DISPLAY_NAME_TAKEN`"으로 바꾼다. **추가**: (a) 본문 검증 오류 각각(이름 1자·21자·공백뿐, 비밀번호 7자·73바이트, `consent=false`, `consentVersion` 누락, 필드 전체 누락) → 400 `errors[필드]`이고 **`pending_signup.used_at`이 NULL인 채**이며 같은 토큰으로 고쳐 다시 보내면 200. (b) 이메일 충돌(verify 전에 같은 이메일이 `member`에 생김) → 409 `ALREADY_REGISTERED`, 롤백, `used_at` NULL. (c) 알 수 없는 토큰 + 잘못된 본문 → 400 `INVALID_TOKEN`(토큰 오류가 본문 오류보다 먼저). (d) 경계: 비밀번호 8자·72바이트 성공, 표시 이름 2·20자 성공 |
+| T028 (`ResendIT`) | 시나리오 15를 "인증 전 같은 이메일로 다시 신청 → 202, 행 1개, 새 토큰, 옛 토큰으로 verify → 400 `INVALID_TOKEN`, 한도 이어서 셈"으로 바꾸고, "다른 이름·비밀번호를 다시 신청" 부분은 삭제. 시나리오 14·20·13은 그대로(단 verify 호출에 새 본문 필드를 채운다) |
+| T017 등 가입 흐름을 쓰는 다른 IT (`LoginLogoutIT`, `PrivacyIT`, `SessionIT` 등) | signup+verify로 회원을 만드는 곳은 verify 본문을 새 형식으로 고치고, "인증 뒤 로그인은 처음 비밀번호로만 된다"는 "인증 때 정한 비밀번호로 로그인된다"로 바꾼다 |
+| T036 (`PrivacyIT`) | 범위를 **verify 요청**으로 확대: 비밀번호 원문이 verify의 성공/400/409 응답 본문과 애플리케이션 로그(`OutputCaptureExtension`)에 없다. `pending_signup.password_hash` 검사는 삭제 |
+| T038 (수동 검증) | quickstart 시나리오 1·2·5·6·15·21을 새 정의로 대조한다 |
+| T037, T015, T021, T022~T026, T029, T032~T035 | 변경 없음 |
+
+**기타**: plan.md·research.md·contracts·data-model·quickstart는 이미 B2로 고쳤다. 코드 변경 뒤 승인 요약에 "T004·T006·T012~T014·T031 및 위 테스트를 B2에 맞게 고쳤다"를 적고, 프론트(008) 변경 B2 블록과 계약이 맞는지 확인한다.
 
 ## Phase 1: Setup
 
@@ -114,20 +148,20 @@ description: "회원 가입·로그인·로그아웃 구현 태스크"
 
 ## Phase 5: User Story 3 - 학교 이메일이 아닌 사람 걸러내기, 인증 메일 문제 풀기 (Priority: P2)
 
-**Goal**: 허용 도메인이 아닌 이메일을 거부하고, 인증 메일을 한도 안에서 다시 받으며, 인증 전 재제출은 이름·비밀번호를 바꾸지 않고 토큰만 새로 받는다.
+**Goal**: 허용 도메인이 아닌 이메일을 거부하고, 인증 메일을 한도 안에서 다시 받으며, 인증 전 재제출은 (신청에 이메일뿐이므로) 토큰·한도만 갱신해 새 토큰을 받는다.
 
 **Independent Test**: `student@gmail.com` 신청이 400이고, 1분 안의 재발송이 429, 1분 뒤 재발송이 202이며 이전 링크가 무효가 된다.
 
 ### Tests for User Story 3
 
 - [ ] T027 [P] [US3] `test/auth/SignupDomainIT.java`: 시나리오 12 — `student@gmail.com`, `student@evil.school.ac.kr.attacker.com`, `student@school.ac.kr.evil.com`, `student@sub.school.ac.kr`(목록에 없는 하위 도메인), `a@b@school.ac.kr`은 400 `errors[email]`이고 `pending_signup`에 행이 없다. `Student@SCHOOL.AC.KR`·앞뒤 공백은 통과한다
-- [ ] T028 [P] [US3] `test/auth/ResendIT.java`: 시나리오 13(신청 직후 재발송 → 429 `TOO_MANY_REQUESTS`와 `Retry-After` 헤더·본문 `retryAt`, `MutableClock` 61초 뒤 → 202 + 새 메일, 24시간 창에서 6번째 → 429 `retryAt`이 창이 끝나는 시각, 창이 지나면 다시 1번부터), 14의 나머지(재발송 전 이전 토큰으로 verify → 400 `INVALID_TOKEN`, 새 토큰은 성공), 15(인증 전에 같은 이메일로 다른 이름·비밀번호를 다시 신청 → 202, `pending_signup`은 여전히 1행이고 새 정보와 새 토큰으로 바뀜, 한도는 이어서 센다), 20(같은 신청을 동시에 N개 → 상태가 202 정확히 1건이고 나머지 429, `pending_signup` 1행, 메일 1통), 재발송 동시 N개 → 202 정확히 1건. 이미 인증된 이메일·신청 내역이 없는 이메일의 재발송은 **똑같은 404**
+- [ ] T028 [P] [US3] `test/auth/ResendIT.java`: 시나리오 13(신청 직후 재발송 → 429 `TOO_MANY_REQUESTS`와 `Retry-After` 헤더·본문 `retryAt`, `MutableClock` 61초 뒤 → 202 + 새 메일, 24시간 창에서 6번째 → 429 `retryAt`이 창이 끝나는 시각, 창이 지나면 다시 1번부터), 14의 나머지(재발송 전 이전 토큰으로 verify → 400 `INVALID_TOKEN`, 새 토큰은 성공), 15(인증 전에 같은 이메일로 다시 신청 → 202, `pending_signup`은 여전히 1행이고 새 토큰·`last_sent_at`·`sent_count`만 바뀜, 옛 토큰은 `INVALID_TOKEN`, 한도는 이어서 센다. 신청 본문에 이름·비밀번호가 없다: 변경 B2), 20(같은 신청을 동시에 N개 → 상태가 202 정확히 1건이고 나머지 429, `pending_signup` 1행, 메일 1통), 재발송 동시 N개 → 202 정확히 1건. 이미 인증된 이메일·신청 내역이 없는 이메일의 재발송은 **똑같은 404**
 
 ### Implementation for User Story 3
 
 - [ ] T029 [US3] `main/common/ApiException.java`, `ApiExceptionHandler.java`에 추가 속성·헤더 지원: `ApiException`이 `Map<String,Object> properties`와 `Retry-After`(초)를 가질 수 있게 하고(기존 `reason` 처리와 같은 방식), 핸들러가 `ProblemDetail.setProperty`와 응답 헤더로 내보낸다. `retryAt`은 오프셋 포함 ISO-8601. 기존 001 테스트가 그대로 통과해야 한다
 - [ ] T030 [US3] `SignupService.signup`에 허용 도메인 검사 추가: 이메일을 `Keys.normalize`한 뒤 마지막 `@` 뒤의 도메인이 `camgong.auth.allowed-email-domains` 목록과 **정확히 일치**해야 한다(`endsWith`·`contains` 금지. `@`가 둘 이상이면 거부). 위반은 `errors[email]` 400. 다른 입력 검증과 함께 모아서 한 번에 돌려준다. 이 검사는 BCrypt 해시보다 먼저 한다(거부된 요청이 비싼 연산을 쓰지 않게)
-- [ ] T031 [US3] `main/auth/SignupService.java`에 재제출 갱신과 `resend` **(핵심 로직)**: T013의 중복 키 분기를 data-model의 조건부 `UPDATE` 한 문장으로 바꾼다 — `UPDATE pending_signup SET sent_count = IF(window_started_at < :now − INTERVAL 24 HOUR, 1, sent_count + 1), window_started_at = IF(window_started_at < :now − INTERVAL 24 HOUR, :now, window_started_at), last_sent_at = :now, token_hash = :hash, token_expires_at = :now + INTERVAL 24 HOUR (재제출이어도 display_name, password_hash, consent_*는 바꾸지 않는다: 2026-10-28 사용자 결정 B, 계정 가로채기 방지) WHERE email_key = :k AND last_sent_at <= :now − INTERVAL 1 MINUTE AND (window_started_at < :now − INTERVAL 24 HOUR OR sent_count < 5)`. **`SET`절의 평가 순서(왼쪽에서 오른쪽, spikes #10)를 테스트로 확인**하고 어긋나면 승인 요약에 알린다. 영향 행 0이면 `SELECT`로 이유를 구분(1분 간격이면 `retryAt = last_sent_at + 1분`, 일일 한도면 `window_started_at + 24시간`)해 429. `now`는 DB `NOW()`가 아니라 `Clock` 파라미터. 재제출이 성공하면 이전 토큰은 `token_hash` 교체로 무효가 된다. `resend(email)`와 재제출은 같은 조건부 `UPDATE`(표시 이름·비밀번호는 그대로)로 새 토큰을 만들고 이벤트 발행. 신청이 없거나 이미 `member`에 있거나 `used_at`이 있는 이메일은 같은 404. 영향 행 판정은 JDBC `useAffectedRows=true`를 전제한다. 주석: `-- ponytail: MySQL 전용 문법`
+- [ ] T031 [US3] `main/auth/SignupService.java`에 재제출 갱신과 `resend` **(핵심 로직)**: T013의 중복 키 분기를 data-model의 조건부 `UPDATE` 한 문장으로 바꾼다 — `UPDATE pending_signup SET sent_count = IF(window_started_at < :now − INTERVAL 24 HOUR, 1, sent_count + 1), window_started_at = IF(window_started_at < :now − INTERVAL 24 HOUR, :now, window_started_at), last_sent_at = :now, token_hash = :hash, token_expires_at = :now + INTERVAL 24 HOUR (신청에는 이메일뿐이라 갱신할 이름·비밀번호·동의가 없다: 변경 B2) WHERE email_key = :k AND last_sent_at <= :now − INTERVAL 1 MINUTE AND (window_started_at < :now − INTERVAL 24 HOUR OR sent_count < 5)`. **`SET`절의 평가 순서(왼쪽에서 오른쪽, spikes #10)를 테스트로 확인**하고 어긋나면 승인 요약에 알린다. 영향 행 0이면 `SELECT`로 이유를 구분(1분 간격이면 `retryAt = last_sent_at + 1분`, 일일 한도면 `window_started_at + 24시간`)해 429. `now`는 DB `NOW()`가 아니라 `Clock` 파라미터. 재제출이 성공하면 이전 토큰은 `token_hash` 교체로 무효가 된다. `resend(email)`와 재제출은 같은 조건부 `UPDATE`(이메일 외 갱신할 값 없음, 변경 B2)로 새 토큰을 만들고 이벤트 발행. 신청이 없거나 이미 `member`에 있거나 `used_at`이 있는 이메일은 같은 404. 영향 행 판정은 JDBC `useAffectedRows=true`를 전제한다. 주석: `-- ponytail: MySQL 전용 문법`
 - [ ] T032 [US3] `main/auth/AuthController.java`에 `POST /api/auth/signup/resend`(본문 `{ "email": "..." }`, 이메일 형식 400, 성공 202 `SignupResponse`)
 
 **Checkpoint**: T027·T028이 통과하고 시나리오 20(더블 제출)이 동시성 테스트에서 안정적이다.
@@ -150,7 +184,7 @@ description: "회원 가입·로그인·로그아웃 구현 태스크"
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T036 [P] `test/auth/PrivacyIT.java`: 시나리오 21 — 가입·인증·로그인·`/me`·공구 상세(개설자·참여자 시점)·오류 응답의 JSON 전체에 `email`·`password`·`passwordHash`·`@school.ac.kr`이 나타나지 않는다(`AuthResponse`의 `member`는 `id`·`displayName`만). 테스트 중 수집한 애플리케이션 로그에 비밀번호 원문과 인증 토큰이 없다(`OutputCaptureExtension` 등). DB에 비밀번호 원문이 없다(`member.password_hash`·`pending_signup.password_hash`가 BCrypt 형식)
+- [ ] T036 [P] `test/auth/PrivacyIT.java`: 시나리오 21 — 가입·인증·로그인·`/me`·공구 상세(개설자·참여자 시점)·오류 응답의 JSON 전체에 `email`·`password`·`passwordHash`·`@school.ac.kr`이 나타나지 않는다(`AuthResponse`의 `member`는 `id`·`displayName`만). 테스트 중 수집한 애플리케이션 로그에 비밀번호 원문과 인증 토큰이 없다(`OutputCaptureExtension` 등). DB에 비밀번호 원문이 없다(`member.password_hash`가 BCrypt 형식. `pending_signup`에는 비밀번호 컬럼이 없다: 변경 B2). **범위가 `verify` 요청으로 확대**: 비밀번호 원문이 verify의 응답·오류 본문(검증 400, 409 포함)·로그에 없다
 - [ ] T037 `main/auth/SessionCleanup.java`: `@Scheduled(fixedDelay = 1h)`로 (1) `login_session` 중 `last_used_at < now − session-ttl` 삭제, (2) `login_attempt` 중 `updated_at < now − 1일`이고 잠금이 풀린 행 삭제, (3) `pending_signup` 중 `token_expires_at < now − 7일`이거나 `used_at < now − 1일`인 행 삭제. 테스트 프로파일에서는 자동 실행을 끄고(`camgong.auth.cleanup.enabled=false`) 메서드를 직접 호출해 `MutableClock`으로 검증하는 `test/auth/SessionCleanupIT.java`도 추가. 주석: `// ponytail: 단일 인스턴스 전제, 다중 인스턴스면 락 필요`
 - [ ] T038 `./gradlew test` 전체 통과 확인 후 quickstart.md 시나리오 1~22를 수동(`bootRun` + curl/HTTP 파일)으로도 한 번 실행해 기대 결과와 대조한다. **시나리오 22**: 로그인 100회의 p95가 1초 이내인지 `bcrypt-cost`별(10, 12)로 재서 승인 요약에 **측정값**을 적는다(측정하지 못하면 "확인 못 함"). 실제 SMTP로 한 번 보내 보는 것은 사용자의 계정이 필요하므로 계정이 없으면 "확인 못 함"으로 적는다
 - [ ] T039 [P] `ponytail:` 주석이 남은 한계(인증 테이블 JdbcClient 전용, MySQL 전용 한도 쿼리, 발송 실패는 로그만, 정리 작업 단일 인스턴스, 이메일 키 잠금의 계정 잠금 악용, `schema.sql`→Flyway, 도메인 목록 설정값)를 모두 담았는지 확인하고, `grep -rn "X-Member-Id" src/main`이 비어 있는지, `grep -rn "X-Member-Id" src/test`에는 위조 시도 테스트만 있는지 확인한다. 이 기능이 끝나면 `docs/architecture.md` 6.5의 "로그인 전 공개 배포 금지" 제한이 풀리므로 관제탑에 알린다(세션은 문서를 고치지 않는다)

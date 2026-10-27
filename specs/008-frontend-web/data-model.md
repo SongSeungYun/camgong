@@ -81,7 +81,9 @@
 
 ### 가입·로그인 폼 (S01·S02)
 
-`email, displayName, password`(+ `consent`, `consentVersion`, 002 계약). 비밀번호는 `type=password`, 화면 상태에만 있고 저장하지 않는다.
+- 가입 폼(S01, `/signup`): `email`만. 서버 필드 이름 `email`과 같게 둔다.
+- 인증 폼(`/verify`): `displayName, password, consent, consentVersion`(+ URL의 `token`, 002 계약 verify 본문). 비밀번호는 `type=password`, 화면 상태에만 있고 저장하지 않는다. 오류 시에도 비밀번호 입력값을 로그·주소·저장소에 남기지 않는다(오류 뒤 화면 상태 유지는 허용).
+- 로그인 폼(S02): `email, password`.
 
 ## 6. 오류 모델 (ApiError)
 

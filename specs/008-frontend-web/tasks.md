@@ -17,6 +17,30 @@ description: "모바일 우선 웹 화면(PWA) 구현 태스크"
 
 **축소 순서(헌법 I, 일정이 막힐 때)**: US7(알림함) → US6(체크표) → US5(내 활동) 순으로 통째로 뺄 수 있게 이 세 스토리는 서로 독립이다. US1~US4는 줄이지 않는다.
 
+## 변경 B2 (2026-10-28): 가입은 이메일만, 이름·비밀번호·동의는 인증 화면에서
+
+사용자가 002의 "안 2"를 결정했다(계정 선점 방지: 공격자가 먼저 피해자 이메일로 자기 비밀번호를 넣어 신청해 두는 일을 막기 위해, 이름·비밀번호·동의는 인증 링크를 누른 사람이 인증 단계에서 정한다). 근거: spec.md 2026-10-28 반영(US2 시나리오 2·3, FR-016·017·019), contracts/ui-api-map.md 1·3절, data-model.md 폼 절, quickstart.md 시나리오 8·9, 002 `contracts/auth-api.md`. **T017·T027·T030·T032·T033·T036은 이미 구현되어 있으므로 ID·체크박스는 바꾸지 않는다. 구현 세션은 이 블록만 보고 후속 수정을 한다(새 태스크 ID 없음). 아래 "변경 전" 서술이 본문 태스크에 남아 있어도 이 블록이 우선한다.**
+
+**새 계약 (002 기준)**
+
+- `POST /api/auth/signup` 본문 `{ email }` 하나 → 202 `{ email, resendAvailableAt }`. 오류: 400 `errors[email]`(형식·도메인), 409 `ALREADY_REGISTERED`, 429 `TOO_MANY_REQUESTS`(`retryAt`, `Retry-After`).
+- `POST /api/auth/verify` 본문 `{ token, displayName, password, consent: true, consentVersion }` 전부 필수 → 200 + `Set-Cookie` + `{ member: { id, displayName } }`. 오류 순서: 토큰 먼저(400 `INVALID_TOKEN` / 409 `TOKEN_USED` / 410 `TOKEN_EXPIRED`) → 본문 오류 400 `errors[]`(토큰 소진 안 됨) → 409 `DISPLAY_NAME_TAKEN`/`ALREADY_REGISTERED`(역시 토큰 유효).
+
+**태스크별 수정**
+
+| 태스크 | 변경 후 동작 / 해야 할 일 |
+|--------|---------------------------|
+| T010 (`types.ts`) | 가입 요청 타입은 `{ email }`, 인증 요청 타입은 `{ token, displayName, password, consent, consentVersion }`로 나눈다 |
+| T017 (MSW 인증 핸들러) | `signup`: 본문 `{email}`만 받는다(이메일 형식·학교 도메인 400 `errors[email]`, 이미 가입 409, 이른 재제출 429, 성공 202). `verify`: 토큰 검사(INVALID/USED/EXPIRED)를 먼저 하고, 그다음 본문 검증(표시 이름 2~20자·공백만 불가, 비밀번호 8자 이상·UTF-8 72바이트 이하, `consent === true`, `consentVersion` 존재)을 해 400 `errors[{field,message}]`를 돌려주며 **이때 토큰을 사용 처리하지 않는다**. 그다음 이름 충돌 시 409 `DISPLAY_NAME_TAKEN`(토큰 유효 유지), 성공 시 200 + 쿠키 세션 + `{member:{id,displayName}}`로 토큰을 사용 처리. 시나리오 토글: 만료 410, 이미 사용 409, 잘못된 토큰 400, 이름 충돌 |
+| T030 (`api.ts`, `useAuth.ts`) | `signup(email)`, `verify({token, displayName, password, consent, consentVersion})`로 시그니처 변경. 비밀번호를 어디에도 저장하지 않는다 |
+| T032 (`SignupPage`) | 이메일 입력 하나 + 학교 이메일 안내 문구만. 표시 이름·비밀번호·동의 입력란과 관련 상태를 모두 제거한다. 제출 성공 → "인증 메일을 보냈어요" 안내 + 재발송 버튼(`resendAvailableAt` 이전 비활성/대기 안내, 429 대기 안내). `ALREADY_REGISTERED` → 로그인 링크. 400 `errors[email]`은 이메일 옆에 |
+| T033 (`VerifyPage`) | `/verify?token=…`가 열리면 곧바로 요청하지 않고 폼을 보여준다: 표시 이름(2~20자 안내), 비밀번호(`type=password`, 8자 이상·72바이트 이하 안내), 개인정보 수집·이용 동의 체크박스(+ 안내문 보기, `consentVersion` 상수 전송), 제출 버튼. 제출 버튼으로만 `POST /api/auth/verify`(링크를 열기만 해서는 소진 안 됨). 처리: 필드 오류(`errors[]`)는 각 입력란 옆에 한 번에 표시하고 입력값 유지(비밀번호 입력값도 화면 상태로만 유지), `DISPLAY_NAME_TAKEN` → 이름 입력란 오류로 표시하고 이름만 고쳐 다시 제출, `TOKEN_USED`/`TOKEN_EXPIRED`/`INVALID_TOKEN` → 이유 안내 + 가입 화면(`/signup`) 링크(만료는 "인증 메일을 다시 받을 수 있어요" 재발송 안내), 성공 → 세션 갱신 후 `/`. `token` 쿼리가 없으면 `INVALID_TOKEN`과 같은 안내 |
+| T027 (`auth.test.tsx`) | **수정**: 가입 제출 테스트는 이메일 하나만 입력(이름·비밀번호 입력란이 없는지 확인), 인증 테스트(시나리오 9)를 "링크 열기 → 요청 안 감 → 폼 제출 성공 → `/`"로 바꾼다. **추가**: 인증 폼 필드 오류가 각 입력란 옆에 표시되고 입력값 유지, 같은 토큰으로 고쳐 다시 제출 성공(목이 첫 400에서 토큰을 소진하지 않음), 동의 체크 안 하고 제출하면 동의 오류, `DISPLAY_NAME_TAKEN`이 이름 입력란 오류로 나오고 이름 변경 후 재제출 성공, `TOKEN_USED`/`TOKEN_EXPIRED`/`INVALID_TOKEN` 안내와 가입 화면 링크, 비밀번호 `type=password`이며 `localStorage`/`sessionStorage`/주소에 남지 않음. **삭제**: 가입 화면에서 표시 이름·비밀번호를 검증하는 단언, "이름 충돌 시 이름 입력란 노출(확인 화면에 새로 노출)" 방식의 단언 |
+| T036 (`auth.spec.ts`) | 가입 → 인증 흐름을 "이메일만 가입 → 목이 기록한 링크 열기 → 이름·비밀번호·동의 입력 후 제출 → 로그인된 목록"으로 바꾼다 |
+| T014·T031·T034 외 | 변경 없음. 로그인 화면(T031)의 고정 안내 "아직 인증 전이라면 인증 메일 다시 받기"는 그대로 |
+
+**검증**: quickstart 시나리오 8·9를 새 정의로 목 모드에서 다시 돌리고, 002 백엔드가 B2로 고쳐진 뒤에는 목 없이 같은 시나리오를 다시 돌려 목이 계약에서 벗어나지 않았는지 확인한다(T066 계약 일치 점검에 포함).
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: 다른 파일이고 미완료 태스크에 의존하지 않아 병렬 가능
@@ -92,7 +116,7 @@ description: "모바일 우선 웹 화면(PWA) 구현 태스크"
 
 ### Tests for User Story 2
 
-- [ ] T027 [P] [US2] `frontend/src/features/auth/auth.test.tsx`: 비로그인으로 보호 라우트 접근 → `/login`, 로그인 후 항상 `/`(7); 가입 제출 → 인증 메일 안내와 재발송(이른 재발송 429 시 대기 안내)(8); 인증 링크 성공/만료/이미 사용/잘못된 토큰(9); 이름 충돌(409 `DISPLAY_NAME_TAKEN`) 시 이름 입력란 노출; 로그인 실패는 어느 쪽인지 알리지 않음, 5회 실패 잠금 안내, 로그인 화면의 인증 메일 재발송 고정 안내(인증 전 계정도 401 `INVALID_CREDENTIALS`, 10); 로그아웃 후 캐시 비움·뒤로 가기에서 이전 내용 없음(13); 폼 작성 중 401 → 로그인 + 소실 안내(31). 비밀번호 `type=password`, 어디에도 저장하지 않음. 근거: US2, FR-002, FR-003, FR-016~019
+- [ ] T027 [P] [US2] `frontend/src/features/auth/auth.test.tsx`: 비로그인으로 보호 라우트 접근 → `/login`, 로그인 후 항상 `/`(7); 가입(이메일만) 제출 → 인증 메일 안내와 재발송(이른 재발송 429 시 대기 안내)(8); 인증 링크 열기 → 이름·비밀번호·동의 폼 제출 성공/필드 오류/만료/이미 사용/잘못된 토큰(9); 이름 충돌(409 `DISPLAY_NAME_TAKEN`) 시 이름 입력란 오류(변경 B2 블록 참조); 로그인 실패는 어느 쪽인지 알리지 않음, 5회 실패 잠금 안내, 로그인 화면의 인증 메일 재발송 고정 안내(인증 전 계정도 401 `INVALID_CREDENTIALS`, 10); 로그아웃 후 캐시 비움·뒤로 가기에서 이전 내용 없음(13); 폼 작성 중 401 → 로그인 + 소실 안내(31). 비밀번호 `type=password`, 어디에도 저장하지 않음. 근거: US2, FR-002, FR-003, FR-016~019
 - [ ] T028 [P] [US2] `frontend/src/features/groupbuy/detail/GroupBuyDetail.test.tsx`: 개설자/참여자/비참여자 세 역할의 필드와 버튼 노출(`data-model.md` 3 노출 규칙 표를 한 행씩), 내 참여 수량·금액 vs '참여 안 함'(5), 없는/취소된 공구는 찾을 수 없음 + 목록으로(6, 12), `openChatUrl`·`participants`는 서버 값이 있을 때만(11), 외부 링크는 새 창·https만(33), 제목의 HTML이 문자 그대로 표시(34). 근거: US2-5·6, FR-020~023, FR-009, FR-010
 
 ### Implementation for User Story 2
@@ -100,8 +124,8 @@ description: "모바일 우선 웹 화면(PWA) 구현 태스크"
 - [ ] T029 [P] [US2] `frontend/src/mocks/handlers/groupbuys.ts`에 `GET /api/groupbuys/{id}`: 로그인 필수(401), 역할별 응답(개설자: `isOrganizer`, `participants`, 모집 완료 시 `openChatUrl`; 참여자: `myParticipation`, 완료 시 `openChatUrl`; 비참여자: 둘 다 `null`), 취소/없음 404. 근거: 003 계약 상세, ui-api-map.md 1
 - [ ] T030 [P] [US2] `frontend/src/features/auth/api.ts`와 `useAuth.ts`: signup/resend/verify/login/logout 호출과 변이 훅, 오류를 `ApiError`로 전달. 로그인 성공 시 세션 갱신 후 `/`로 이동. 근거: ui-api-map.md 1, 002 계약
 - [ ] T031 [US2] `frontend/src/pages/LoginPage.tsx`: 이메일·비밀번호 폼, 실패 문구(`INVALID_CREDENTIALS`), 잠금(429 `retryAt` 표시), "아직 인증 전이라면 인증 메일 다시 받기" 고정 안내 + 재발송 진입(`EMAIL_NOT_VERIFIED`는 없다), 가입 링크. 이미 로그인 상태면 `/`로. 근거: FR-018, 시나리오 10
-- [ ] T032 [US2] `frontend/src/pages/SignupPage.tsx`: 이메일, 표시 이름(2~20자), 비밀번호(8자 이상·72바이트 이하 안내), 개인정보 수집·이용 동의(`consent`, `consentVersion`) 폼. 규칙은 안내용이고 최종 판단은 서버(필드 오류를 필드 옆에). 접수 후 "인증 메일을 보냈다" 안내 + 재발송 버튼(`resendAvailableAt` 이전 비활성/대기 안내). 근거: FR-016, FR-019, 시나리오 8
-- [ ] T033 [US2] `frontend/src/pages/VerifyPage.tsx`(`/verify?token=…`): 링크를 열면 확인 버튼이 있는 화면이 나오고, 사용자의 확인 동작으로 `POST /api/auth/verify`(링크만 열어도 소진되지 않게). 성공 → 로그인 상태로 `/`, 만료/이미 사용/잘못된 토큰 → 이유 + 재발송, `DISPLAY_NAME_TAKEN` → 새 표시 이름 입력 후 재확인. 근거: FR-017, 002 계약 verify, 시나리오 9
+- [ ] T032 [US2] `frontend/src/pages/SignupPage.tsx`: **이메일 입력(+학교 이메일 안내)만**(변경 B2: 이름·비밀번호·동의는 VerifyPage로 이동). 규칙은 안내용이고 최종 판단은 서버(필드 오류를 필드 옆에). 접수 후 "인증 메일을 보냈다" 안내 + 재발송 버튼(`resendAvailableAt` 이전 비활성/대기 안내). 근거: FR-016, FR-019, 시나리오 8
+- [ ] T033 [US2] `frontend/src/pages/VerifyPage.tsx`(`/verify?token=…`): 링크를 열면 확인 버튼이 있는 화면이 나오고, 사용자의 제출 버튼으로만 `POST /api/auth/verify`(링크만 열어도 소진되지 않게). **변경 B2: 열리면 이름·비밀번호·동의 폼을 보여주고 제출 시 `{token, displayName, password, consent, consentVersion}`를 보낸다.** 성공 → 로그인 상태로 `/`, 만료/이미 사용/잘못된 토큰 → 이유 + 가입 화면 링크(만료는 재발송 안내), `DISPLAY_NAME_TAKEN` → 이름 입력란 오류. 상세는 변경 B2 블록. 근거: FR-017, 002 계약 verify, 시나리오 9
 - [ ] T034 [P] [US2] `frontend/src/features/groupbuy/detail/useGroupBuyDetail.ts`: `useQuery(['groupbuy', id])`, 404/401 처리. 근거: FR-003, FR-023
 - [ ] T035 [US2] `frontend/src/features/groupbuy/detail/GroupBuyDetail.tsx`와 `pages/DetailPage.tsx`: 제목, 설명, 상품명, 카테고리, 구매처 링크(`safeLink`), 개당 가격, 총·확보·남은 수량, 마감(KST), 상태 뱃지, 개설자 이름, 참여 인원 수, 내 참여 수량·금액 또는 '참여 안 함', 서버가 준 경우에만 오픈채팅 링크·참여자 명단. 버튼 영역은 US3·US4·US6이 채우는 슬롯으로 `data-model.md` 3의 노출 규칙을 함수 `visibleActions(detail)`로 구현. 근거: FR-020~023, FR-021
 - [ ] T036 [US2] `frontend/tests/e2e/auth.spec.ts`: 보호 라우트 → 로그인 → `/`, 가입 → 인증 → 로그인된 목록, 인증 만료 리다이렉트. 근거: SC-005, 시나리오 7·9·31

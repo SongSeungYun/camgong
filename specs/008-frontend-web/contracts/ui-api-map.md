@@ -7,8 +7,8 @@
 | 화면 | 주소(앱 라우트) | 호출 | 인증 | 계약 |
 |------|------------------|------|------|------|
 | S03 목록 | `/` | `GET /api/groupbuys?status&category&q&sort&cursor&size` | 불필요 | 003 |
-| S01 가입 | `/signup` | `POST /api/auth/signup`, `POST /api/auth/signup/resend` | 불필요 | 002 |
-| 인증 확인 | `/verify?token=…` | `POST /api/auth/verify` (사용자의 확인 동작으로 전송) | 불필요 | 002 |
+| S01 가입 | `/signup` | `POST /api/auth/signup` `{ email }`, `POST /api/auth/signup/resend` (이메일만 받는다, 변경 B2) | 불필요 | 002 |
+| 인증 확인 | `/verify?token=…` | `POST /api/auth/verify` `{ token, displayName, password, consent, consentVersion }` (화면이 열리면 이름·비밀번호·동의 폼을 보여주고 제출 버튼으로만 전송) | 불필요 | 002 |
 | S02 로그인 | `/login` | `POST /api/auth/login`, `POST /api/auth/logout`, 시작 시 `GET /api/auth/me` | — | 002 |
 | S04 상세 | `/groupbuys/:id` | `GET /api/groupbuys/{id}` | 필수 | 003, 006 확장 |
 | S05 개설 | `/groupbuys/new` | `POST /api/groupbuys` | 필수 | 001 |
@@ -32,7 +32,7 @@
 
 | 상태 | 코드(`title`) / `reason` | 화면 동작·문구 |
 |------|---------------------------|----------------|
-| 400 | (필드 오류 `errors[]`) | 해당 폼 필드 옆에 모두 표시. 매핑 안 되는 것은 폼 상단. 입력값 유지 |
+| 400 | (필드 오류 `errors[]`) | 해당 폼 필드 옆에 모두 표시. 매핑 안 되는 것은 폼 상단. 입력값 유지. 인증 화면의 본문 오류는 토큰을 소진하지 않으므로 고쳐서 다시 제출할 수 있다 |
 | 401 | `UNAUTHENTICATED` / (없음) | 세션 비우고 로그인으로. "로그인이 필요해요. 입력하던 내용은 저장되지 않아요." (폼에서 발생한 경우) |
 | 401 | `INVALID_CREDENTIALS` | "이메일 또는 비밀번호가 맞지 않아요." (어느 쪽인지 알리지 않음). 인증 전 계정의 로그인도 같은 응답이다(002 확정 2026-10-27, `EMAIL_NOT_VERIFIED` 없음). 로그인 화면은 이 문구 아래에 **고정 안내** "가입했는데 아직 인증 전이라면 인증 메일 다시 받기"와 재발송 진입을 항상 둔다 |
 | 403 | `ORGANIZER_NOT_ALLOWED` | "개설자는 직접 참여할 수 없어요. 수량은 공구 수정에서 바꿔요." |
@@ -49,10 +49,10 @@
 | 409 | `BUSY` | "요청이 몰렸어요. 잠시 뒤 다시 시도해 주세요." |
 | 409 | `DUPLICATE_REQUEST` | "같은 공구가 이미 열려 있어요."라고 안내만 한다(001 409 본문에 기존 공구 id가 없어 상세로 보내지 않는다) |
 | 409 | `NOT_CHECKABLE` | "모집이 완료된 공구에서만 체크할 수 있어요." |
-| 409 | `ALREADY_REGISTERED` | "이미 가입된 이메일이에요." + 로그인 안내 |
-| 409 | `DISPLAY_NAME_TAKEN` | "이미 쓰이는 이름이에요. 다른 이름을 입력해 주세요." (인증 확인 화면에서 이름 입력란 노출) |
-| 409 / 410 | `TOKEN_USED` / `TOKEN_EXPIRED` | "이미 쓴 링크예요." / "링크가 만료됐어요." + 재발송 |
-| 400 | `INVALID_TOKEN` | "올바르지 않은 링크예요." + 재발송 |
+| 409 | `ALREADY_REGISTERED` | "이미 가입된 이메일이에요." + 로그인 안내 (가입 화면 신청 시, 또는 인증 화면 제출 시의 드문 경합) |
+| 409 | `DISPLAY_NAME_TAKEN` | "이미 쓰이는 이름이에요. 다른 이름을 입력해 주세요." (인증 화면의 이름 입력란 오류로 표시. 토큰은 유효하므로 이름만 바꿔 다시 제출) |
+| 409 / 410 | `TOKEN_USED` / `TOKEN_EXPIRED` | "이미 쓴 링크예요." / "링크가 만료됐어요." + 가입 화면 링크 (만료는 인증 메일을 다시 받을 수 있다는 재발송 안내) |
+| 400 | `INVALID_TOKEN` | "올바르지 않은 링크예요." + 가입 화면 링크 |
 | 429 | `TOO_MANY_REQUESTS` (+`retryAt`, `Retry-After`) | "잠시 뒤에 다시 시도해 주세요." (남은 시간 표시) |
 | 429 | `LOGIN_LOCKED` (+`retryAt`) | "로그인 시도가 너무 많아요. 잠시 뒤 다시 시도해 주세요." |
 | 5xx / 네트워크 | — | "잠시 문제가 생겼어요. 다시 시도해 주세요." + 다시 시도 버튼. 입력값 유지. 서버 정보 노출 안 함 |

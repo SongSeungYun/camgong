@@ -8,12 +8,12 @@
 
 ## Summary
 
-학교 이메일로 가입을 신청하고 인증 메일의 링크를 확인해 가입을 마치며, 이메일과 비밀번호로 로그인한다. 임시 `X-Member-Id` 헤더를 실제 로그인으로 바꾼다.
+학교 이메일만 넣어 가입을 신청하고, 인증 메일의 링크를 연 사람이 인증 화면에서 표시 이름·비밀번호·동의를 정해 가입을 마치며(변경 B2, 계정 선점 방지), 이메일과 비밀번호로 로그인한다. 임시 `X-Member-Id` 헤더를 실제 로그인으로 바꾼다.
 
 추천안의 골자:
 
 - 로그인 상태는 **서버가 저장하는 세션**(DB)과 `HttpOnly` 쿠키다. 로그아웃 즉시 무효, 14일 슬라이딩, 다기기를 서버가 직접 통제할 수 있어야 해서 상태 없는 토큰보다 맞다.
-- 인증 전 가입 정보는 **`pending_signup` 테이블**에 따로 둔다. `member`에는 인증을 마친 회원만 있어서 이메일·이름 유일성 제약이 단순하다.
+- 인증 전 가입 신청(이메일·토큰 해시·한도)은 **`pending_signup` 테이블**에 따로 둔다. `member`에는 인증을 마친 회원만 있어서 이메일·이름 유일성 제약이 단순하다.
 - 인증 링크는 화면이 `POST`로 확인한다(메일 보안 스캐너가 `GET` 링크를 미리 열어 한 번뿐인 토큰을 소진하는 일을 막는다).
 - 로그인 실패 횟수는 **이메일 키**로 센다(없는 계정도 똑같이 세어 계정 존재 여부를 숨긴다).
 - 테스트는 `as(memberId)` 헬퍼로 인증하게 해서 헤더 → 쿠키 전환이 헬퍼 한 곳에서 끝나게 한다(001 이후 모든 테스트에 영향).
@@ -34,7 +34,7 @@
 
 **Performance Goals**: SC-010 로그인 95%가 1초 이내(BCrypt 비용 때문에 로그인이 가장 느린 요청이다), SC-002 가입 신청 95%가 1분 이내에 인증 메일 발송
 
-**Constraints**: FR-014 헤더로는 어떤 요청도 인증되지 않음, FR-012 로그아웃 즉시 무효, FR-009(가입 신청 중복 방지)·FR-005 메일 한도(1분 간격, 24시간 5회)는 다중 인스턴스에서도 지켜져야 함, 비밀번호 원문은 어디에도 남지 않음
+**Constraints**: FR-014 헤더로는 어떤 요청도 인증되지 않음, FR-012 로그아웃 즉시 무효, FR-015(가입 신청 중복 방지)·FR-005 메일 한도(1분 간격, 24시간 5회)는 다중 인스턴스에서도 지켜져야 함, 비밀번호 원문은 어디에도 남지 않음
 
 **Scale/Scope**: 기숙사 단위 수백~수천 명
 
@@ -73,7 +73,7 @@ specs/002-login-signup/
 ```text
 src/main/java/com/camgong/auth/                    # 새 최상위 패키지 (architecture 5절의 auth/)
 ├── AuthController.java        # signup, signup/resend, verify, login, logout, me
-├── SignupService.java         # 신청·재발송·인증 완료(회원 생성), 메일 한도
+├── SignupService.java         # 신청(이메일만)·재발송·인증 완료(이름·비밀번호·동의를 받아 회원 생성), 메일 한도
 ├── LoginService.java          # 로그인·실패 횟수·잠금
 ├── SessionService.java        # 세션 발급·검증·슬라이딩·폐기
 ├── AuthFilter.java            # 쿠키 → 세션 → 현재 회원 (FR-014: X-Member-Id는 무시)
@@ -97,14 +97,14 @@ src/main/resources/
 src/test/java/com/camgong/
 ├── support/IntegrationTestBase.java  # (수정) as(memberId) 인증 헬퍼, 메일 캡처
 └── auth/
-    ├── SignupIT.java          # 신청·검증 오류·중복·더블 제출·메일 한도
-    ├── VerifyEmailIT.java     # 인증 성공·만료·사용됨·이름 충돌
+    ├── SignupIT.java          # 신청(이메일만)·검증 오류·중복·더블 제출·메일 한도
+    ├── VerifyEmailIT.java     # 인증 성공·만료·사용됨·본문 검증 오류(토큰 미소진)·이름 충돌(토큰 유효)
     ├── LoginLogoutIT.java     # 로그인·실패 안내·로그아웃·다기기
     ├── LoginThrottleIT.java   # 5회 실패 잠금, 풀림, 없는 계정도 동일
     ├── SessionIT.java         # 14일 슬라이딩·만료
     ├── SignupDomainIT / ResendIT / OriginCheckIT / OriginCheckFilterTest / SessionServiceIT / SessionCleanupIT / AuthConfigIT / KeysTest   # 구현에서 추가
     ├── AuthGuardIT.java       # 보호 엔드포인트 전부 401, 헤더 위조 거부
-    └── PrivacyIT.java         # 이메일·비밀번호가 응답·로그에 없음
+    └── PrivacyIT.java         # 이메일·비밀번호가 응답·로그에 없음 (verify 요청의 비밀번호 포함)
 ```
 
 **Structure Decision**: 인증은 공구 애그리거트와 무관한 독립 기능이라 최상위 패키지 `auth`를 둔다(회원 엔티티는 기존 `member`). `groupbuy.*`는 `auth`의 `CurrentMember`만 쓰고, 반대 의존은 없다.
