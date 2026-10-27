@@ -33,7 +33,7 @@ export const routes: RouteObject[] = [
     element: <Root />,
     errorElement: <RootError />,
     children: [
-      { path: '/', lazy: stub('목록') },
+      { path: '/', lazy: () => import('../pages/ListPage').then((m) => ({ Component: m.default })) },
       { path: '/signup', lazy: stub('가입') },
       { path: '/login', lazy: stub('로그인') },
       { path: '/verify', lazy: stub('인증 확인') },
