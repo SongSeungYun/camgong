@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { isKnownCategory, isKnownStatus } from '../../../shared/api/types'
 
@@ -44,8 +44,11 @@ export function useListParams() {
   const params = useMemo(() => parseListParams(sp), [sp])
   const [qInput, setQInput] = useState(params.q)
 
+  // 디바운스 타이머가 오래된 params로 다른 조건(카테고리 등)을 덮어쓰지 않도록 최신 값을 ref로 읽는다.
+  const latest = useRef(params)
+  latest.current = params
   const setParams = (patch: Partial<ListParams>) =>
-    setSp(serializeListParams({ ...params, ...patch }), { replace: true })
+    setSp(serializeListParams({ ...latest.current, ...patch }), { replace: true })
 
   // 검색어는 디바운스 후 주소에 반영한다(키 입력마다 요청하지 않음).
   // ponytail: 주소가 밖에서 바뀌면(뒤로 가기 등) 입력칸은 따라가지 않는다. 필요해지면 params.q로 동기화.
