@@ -3,8 +3,9 @@ import { categoryLabel, type GroupBuyDetail as Detail } from '../../../shared/ap
 import { formatWon } from '../../../shared/lib/money'
 import { externalLinkProps, safeHttpsUrl } from '../../../shared/lib/safeLink'
 import { formatKst, remainingText } from '../../../shared/lib/time'
-import { Badge, Button, ProgressBar } from '../../../shared/ui'
+import { Badge, ProgressBar } from '../../../shared/ui'
 import s from './GroupBuyDetail.module.css'
+import { ParticipationPanel } from '../../participation/ParticipationPanel'
 import { OrganizerActions } from './OrganizerActions'
 import { visibleActions } from './visibleActions'
 
@@ -43,10 +44,7 @@ export function GroupBuyDetail({ d, nowMs }: { d: Detail; nowMs: number }) {
 
       <div className={s.actions}>
         {v.edit && <OrganizerActions d={d} />}
-        {/* ponytail: 아래 변경 버튼은 US4에서 동작을 붙인다. 그 전까지 비활성. */}
-        {v.join && <Button disabled>참여하기</Button>}
-        {v.changeParticipation && <Button variant="secondary" disabled>수량 변경</Button>}
-        {v.changeParticipation && <Button variant="secondary" disabled>참여 취소</Button>}
+        <ParticipationPanel d={d} />
         {v.checkSheet && <Link className={s.linkButton} to={`/groupbuys/${d.id}/check`}>체크표</Link>}
         {v.openChat && chatUrl && <a className={s.linkButton} href={chatUrl} {...externalLinkProps}>오픈채팅 입장 (새 창, 서비스 밖)</a>}
       </div>
