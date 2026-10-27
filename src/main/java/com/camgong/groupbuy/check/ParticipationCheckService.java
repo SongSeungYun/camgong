@@ -122,7 +122,27 @@ public class ParticipationCheckService {
         }
         jdbc.sql(updateSql).param("now", LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC))
                 .param("groupBuyId", groupBuyId).param("memberId", memberId).update();
-        return toRow(rows.findOne(groupBuyId, memberId).get(0), head.unitPrice());
+        return toRow(readCommitted(groupBuyId, memberId), head.unitPrice());
+    }
+
+    /**
+     * 응답에 쓸 행을 **잠금 읽기**로 다시 읽는다. 이 트랜잭션의 스냅샷은 첫 읽기(접근 검사)에서 고정되는데, 동시 요청이 먼저 같은 상태로
+     * 바꿔 내 UPDATE 가 아무것도 바꾸지 못하면 InnoDB 는 새 행 버전을 만들지 않아 일반 SELECT 가 스냅샷의 낡은 값을 돌려준다
+     * (예: 이미 입금 확인된 행인데 응답은 null). FOR SHARE 는 방금 커밋된 최신 값을 읽는다.
+     */
+    private CheckQueryRepository.Raw readCommitted(Long groupBuyId, Long memberId) {
+        return jdbc.sql("""
+                SELECT p.member_id, m.name, p.quantity, p.paid_at, p.received_at
+                FROM participation p JOIN member m ON m.id = p.member_id
+                WHERE p.group_buy_id = :groupBuyId AND p.member_id = :memberId FOR SHARE""")
+                .param("groupBuyId", groupBuyId).param("memberId", memberId)
+                .query((rs, i) -> new CheckQueryRepository.Raw(rs.getLong(1), rs.getString(2), rs.getInt(3),
+                        instant(rs.getObject(4, LocalDateTime.class)), instant(rs.getObject(5, LocalDateTime.class))))
+                .single();
+    }
+
+    private static Instant instant(LocalDateTime t) {
+        return t == null ? null : t.toInstant(ZoneOffset.UTC);
     }
 
     private static CheckRow toRow(CheckQueryRepository.Raw r, long unitPrice) {

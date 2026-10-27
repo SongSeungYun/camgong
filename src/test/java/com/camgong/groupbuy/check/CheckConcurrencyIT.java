@@ -45,17 +45,21 @@ class CheckConcurrencyIT extends CheckTestBase {
     }
 
     @Test
-    void manyConcurrentTrueRequestsKeepASingleTimestamp() throws Exception {
+    void manyConcurrentTrueRequestsKeepTheFirstTimestamp() throws Exception {
         for (int round = 0; round < REPEAT; round++) {
             jdbc.update("DELETE FROM participation");
             jdbc.update("DELETE FROM group_buy");
+            clock.set(START);
             long id = completedGroupBuy();
+            pay(ORGANIZER, id, PARTICIPANT, TRUE).andExpect(status().isOk());       // 첫 확인은 START
+            clock.advance(java.time.Duration.ofMinutes(10));                          // 이후 요청의 now 는 START 와 다르다
 
             List<Callable<Integer>> calls = new ArrayList<>();
             for (int i = 0; i < 8; i++) {
                 calls.add(() -> pay(ORGANIZER, id, PARTICIPANT, TRUE).andReturn().getResponse().getStatus());
             }
             assertThat(Concurrent.all(calls)).containsOnly(200);
+            // COALESCE(paid_at, :now) 가 아니라 paid_at = :now 였다면 마지막 요청의 시각으로 덮어써졌을 것이다
             assertThat(paidAt(id, PARTICIPANT)).isEqualTo(LocalDateTime.ofInstant(START, ZoneOffset.UTC));
         }
     }
