@@ -23,8 +23,8 @@ export const toCard = (g: SeedGroupBuy) => ({
 })
 
 // 불투명 커서: 조건 서명 + 오프셋. 조건이 다르면 거부한다(003: sort·필터와 맞지 않으면 400).
-const encodeCursor = (sig: string, offset: number) => btoa(JSON.stringify({ sig, offset }))
-const decodeCursor = (c: string, sig: string): number | null => {
+export const encodeCursor = (sig: string, offset: number) => btoa(JSON.stringify({ sig, offset }))
+export const decodeCursor = (c: string, sig: string): number | null => {
   try {
     const v = JSON.parse(atob(c)) as { sig: string; offset: number }
     return v.sig === sig && Number.isInteger(v.offset) && v.offset >= 0 ? v.offset : null

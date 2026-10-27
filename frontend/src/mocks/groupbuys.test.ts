@@ -133,3 +133,12 @@ describe('001 목 핸들러', () => {
     }
   })
 })
+
+test('내 활동 목: role 누락·잘못된 값은 400, 비로그인은 401', async () => {
+  mockState.sessionMemberId = 1
+  expect(await rejects(get('/api/me/groupbuys'))).toMatchObject({ status: 400, code: 'Bad Request' })
+  expect(await rejects(get('/api/me/groupbuys?role=x'))).toMatchObject({ status: 400 })
+  expect(await rejects(get('/api/me/groupbuys?role=organizer&size=0'))).toMatchObject({ status: 400 })
+  mockState.sessionMemberId = null
+  expect(await rejects(get('/api/me/groupbuys?role=organizer'))).toMatchObject({ status: 401 })
+})
