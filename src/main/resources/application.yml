@@ -20,3 +20,26 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+
+camgong:
+  auth:
+    # 운영 도메인은 환경변수로만 준다. 저장소에 넣지 않는다.
+    allowed-email-domains: ${ALLOWED_EMAIL_DOMAINS:school.ac.kr}
+    session-ttl: 14d
+    session-touch-interval: 10m
+    verify-token-ttl: 24h
+    mail:
+      resend-interval: 1m
+      daily-limit: 5
+    login:
+      max-failures: 5
+      lock-duration: 15m
+    # 기본은 Secure. 로컬 개발은 local 프로파일(application-local.yml)에서만 끈다 — 운영에서 환경변수를 빠뜨려도 조용히 풀리지 않게.
+    cookie-secure: ${COOKIE_SECURE:true}
+    bcrypt-cost: 10
+    # 프록시 뒤에서 호스트가 달라지면 여기에 프론트 출처를 쉼표로 적는다(Origin 검사 허용 목록).
+    allowed-origins: ${ALLOWED_ORIGINS:}
+    verify-link-base-url: ${VERIFY_LINK_BASE_URL:http://localhost:5173/verify?token=}
+  mail:
+    # smtp(기본) | logging(local/test/benchmark 프로파일에서만). SMTP 접속 정보는 SPRING_MAIL_* 환경변수로만 받는다.
+    sender: ${MAIL_SENDER:smtp}

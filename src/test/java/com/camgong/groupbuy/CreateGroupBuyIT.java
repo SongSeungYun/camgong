@@ -68,7 +68,7 @@ class CreateGroupBuyIT extends IntegrationTestBase {
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/groupbuys").with(as(99)).contentType(MediaType.APPLICATION_JSON).content(invalid))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(post("/api/groupbuys").header("X-Member-Id", "abc")
+        mockMvc.perform(post("/api/groupbuys").cookie(new jakarta.servlet.http.Cookie("camgong_session", "abc"))
                         .contentType(MediaType.APPLICATION_JSON).content(invalid))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(put("/api/groupbuys/1").contentType(MediaType.APPLICATION_JSON).content(invalid))

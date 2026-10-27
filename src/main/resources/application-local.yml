@@ -1,0 +1,6 @@
+# 로컬 개발용: ./gradlew bootRun --args='--spring.profiles.active=local'
+camgong:
+  auth:
+    cookie-secure: false
+  mail:
+    sender: logging
