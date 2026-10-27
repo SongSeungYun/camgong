@@ -69,3 +69,11 @@ test('204는 undefined', async () => {
   server.use(http.post('/api/x', () => new HttpResponse(null, { status: 204 })))
   expect(await post('/api/x')).toBeUndefined()
 })
+
+test('expect401 호출은 401이어도 onUnauthenticated를 부르지 않는다', async () => {
+  const cb = vi.fn()
+  setUnauthenticatedHandler(cb)
+  server.use(http.get('/api/a', () => HttpResponse.json({ title: 'UNAUTHENTICATED' }, { status: 401 })))
+  await get('/api/a', { expect401: true }).catch(() => {})
+  expect(cb).not.toHaveBeenCalled()
+})

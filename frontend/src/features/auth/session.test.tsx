@@ -37,3 +37,10 @@ test('로그아웃하면 anonymous가 되고 캐시를 비운다', async () => {
   expect(client.getQueryData(['groupbuys'])).toBeUndefined()
   expect(mockState.sessionMemberId).toBeNull()
 })
+
+test('시작 시 me가 401이어도 공개 화면의 쿼리 캐시를 비우지 않는다', async () => {
+  const { client } = renderApp('/')
+  client.setQueryData(['groupbuys', 'public'], { items: [] })
+  await screen.findByRole('link', { name: '로그인' })
+  expect(client.getQueryData(['groupbuys', 'public'])).toEqual({ items: [] })
+})

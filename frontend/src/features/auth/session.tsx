@@ -28,9 +28,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setUnauthenticatedHandler(clear)
     let alive = true
-    get<{ member: Member }>('/api/auth/me').then(
+    get<{ member: Member }>('/api/auth/me', { expect401: true }).then(
       (r) => alive && setState({ status: 'authenticated', member: r.member }),
-      () => alive && setState({ status: 'anonymous', member: null }), // 401은 handler가 이미 비웠다
+      () => alive && setState({ status: 'anonymous', member: null }), // 비로그인 401은 정상 응답(공개 화면의 캐시를 비우지 않는다)
     )
     return () => {
       alive = false
