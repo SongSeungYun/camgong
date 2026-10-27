@@ -81,7 +81,7 @@ src/main/java/com/camgong/auth/                    # 새 최상위 패키지 (ar
 ├── MailSender.java            # 인터페이스 (SmtpMailSender, LoggingMailSender 두 구현)
 ├── SmtpMailSender.java
 ├── LoggingMailSender.java     # 개발·테스트용: 발송 대신 기록
-├── PendingSignup.java, LoginSession.java, LoginAttempt.java   # 엔티티
+├── PendingSignup.java, LoginSession.java, LoginAttempt.java   # JdbcClient 결과 record (엔티티 아님, tasks T006)
 ├── AuthProperties.java        # 허용 도메인, 유지 기간, 잠금 기준, 메일 한도 등 설정
 └── SessionCleanup.java        # 만료 세션·인증 요청 정리 (@Scheduled, 005 패턴)
 src/main/java/com/camgong/member/                  # (수정) Member에 email, passwordHash, consent 컬럼
