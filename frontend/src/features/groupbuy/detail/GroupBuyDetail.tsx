@@ -45,7 +45,7 @@ export function GroupBuyDetail({ d, nowMs }: { d: Detail; nowMs: number }) {
       <div className={s.actions}>
         {v.edit && <OrganizerActions d={d} />}
         <ParticipationPanel d={d} />
-        {v.checkSheet && <Link className={s.linkButton} to={`/groupbuys/${d.id}/check`}>체크표</Link>}
+        {v.checkSheet && <Link className={s.linkButton} to={`/groupbuys/${d.id}/check`}>참여자 체크</Link>}
         {v.openChat && chatUrl && <a className={s.linkButton} href={chatUrl} {...externalLinkProps}>오픈채팅 입장 (새 창, 서비스 밖)</a>}
       </div>
 

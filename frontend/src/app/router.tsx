@@ -47,7 +47,7 @@ export const routes: RouteObject[] = [
           { path: '/groupbuys/new', lazy: page(() => import('../pages/CreatePage')) },
           { path: '/groupbuys/:id', lazy: page(() => import('../pages/DetailPage')) },
           { path: '/groupbuys/:id/edit', lazy: page(() => import('../pages/EditPage')) },
-          { path: '/groupbuys/:id/check', lazy: stub('체크표') },
+          { path: '/groupbuys/:id/check', lazy: page(() => import('../pages/CheckPage')) },
           { path: '/me', lazy: page(() => import('../pages/MyPage')) },
           { path: '/notifications', lazy: stub('알림함') },
         ],
