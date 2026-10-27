@@ -27,12 +27,14 @@ class AuthConfigIT extends IntegrationTestBase {
         assertThat(props.login().maxFailures()).isEqualTo(5);
         assertThat(props.login().lockDuration()).isEqualTo(Duration.ofMinutes(15));
         assertThat(props.cookieSecure()).isFalse();
+        assertThat(props.verifyLinkBaseUrl()).isEqualTo("http://localhost:5173/verify?token=");
     }
 
     @Test
     void encoderHashesAndMatches() {
         String hash = encoder.encode("password1");
         assertThat(hash).startsWith("$2").isNotEqualTo("password1");
+        assertThat(hash).contains("$" + String.format("%02d", props.bcryptCost()) + "$");
         assertThat(encoder.matches("password1", hash)).isTrue();
         assertThat(encoder.matches("password2", hash)).isFalse();
     }
