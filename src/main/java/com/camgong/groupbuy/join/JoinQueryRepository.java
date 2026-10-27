@@ -12,7 +12,7 @@ import com.camgong.groupbuy.GroupBuy;
 public interface JoinQueryRepository extends Repository<GroupBuy, Long> {
 
     @Query("select new com.camgong.groupbuy.join.GroupBuyHead(g.organizerId, g.status, g.unitPrice, g.securedQuantity, "
-            + "g.totalQuantity) from GroupBuy g where g.id = :id")
+            + "g.totalQuantity, g.deadline) from GroupBuy g where g.id = :id")
     Optional<GroupBuyHead> findHead(@Param("id") Long id);
 
     @Query("select p.quantity from Participation p where p.groupBuyId = :groupBuyId and p.memberId = :memberId")

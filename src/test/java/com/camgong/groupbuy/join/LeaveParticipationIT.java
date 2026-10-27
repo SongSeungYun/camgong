@@ -91,9 +91,15 @@ class LeaveParticipationIT extends JoinTestBase {
             joinAs(2, id, 6).andExpect(status().isCreated());
             joinAs(3, id, 4).andExpect(status().isCreated());
 
-            List<Integer> statuses = Concurrent.all(List.of(
-                    () -> leaveAs(2, id).andReturn().getResponse().getStatus(),
-                    () -> leaveAs(2, id).andReturn().getResponse().getStatus()));
+            Overlap.arm(2);
+            List<Integer> statuses;
+            try {
+                statuses = Concurrent.all(List.of(
+                        () -> leaveAs(2, id).andReturn().getResponse().getStatus(),
+                        () -> leaveAs(2, id).andReturn().getResponse().getStatus()));
+            } finally {
+                Overlap.disarm();
+            }
 
             assertThat(statuses).as("round %d", round).containsExactlyInAnyOrder(204, 404);
             assertThat(secured(id)).as("한 번만 차감").isEqualTo(13);            // 9 + 4

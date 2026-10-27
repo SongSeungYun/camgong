@@ -73,7 +73,7 @@ class ConditionalUpdateQuantityGate implements QuantityGate {
                     if (expectedUnitPrice != null && expectedUnitPrice != price) {
                         return GateResult.priceChanged(price);
                     }
-                    if (secured + delta > total) {
+                    if (delta > total - secured) {
                         return GateResult.insufficient(secured, total);
                     }
                     throw new RetryableConflict("조건을 만족하는데 갱신되지 않았다", null);

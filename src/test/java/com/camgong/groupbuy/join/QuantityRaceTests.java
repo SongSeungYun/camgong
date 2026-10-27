@@ -97,6 +97,20 @@ abstract class QuantityRaceTests extends JoinTestBase {
                 }
             }
             assertThat(accepted).as("round %d 성공 수량 합", round).isBetween(1, 10);   // 전부 거부하는 구현도 걸러낸다
+            // 거부는 "남은 수량 부족"이거나 완료 뒤의 NOT_JOINABLE 뿐이다(낙관적 방식만 BUSY 가 섞일 수 있다). 남은 수량은 줄기만 하므로
+            // 부족으로 거부된 요청의 수량은 최종 남은 수량보다 커야 한다 — 들어갈 자리가 있는데 거부한 경우(과소 수용)를 잡는다.
+            int remaining = 24 - secured(id);
+            for (int i = 0; i < quantities.length; i++) {
+                Outcome o = outcomes.get(i);
+                if (o.status() == 201) {
+                    continue;
+                }
+                assertThat(o.status()).as("round %d 요청 %d", round, i).isEqualTo(409);
+                assertThat(o.title()).isIn("INSUFFICIENT_QUANTITY", "NOT_JOINABLE", "BUSY");
+                if (o.title().equals("INSUFFICIENT_QUANTITY")) {
+                    assertThat(quantities[i]).as("round %d 요청 %d 수량", round, i).isGreaterThan(remaining);
+                }
+            }
             assertThat(secured(id)).isEqualTo(14 + accepted);
             assertInvariants(id);
         }
@@ -107,7 +121,13 @@ abstract class QuantityRaceTests extends JoinTestBase {
         for (int round = 0; round < REPEAT; round++) {
             long id = openGroupBuy(com.camgong.support.GroupBuyBodies.with(com.camgong.support.GroupBuyBodies.valid(),
                     "title", "이중 요청 " + round));
-            List<Outcome> outcomes = Concurrent.all(List.of(() -> join(2, id, 4), () -> join(2, id, 4)));
+            Overlap.arm(2);
+            List<Outcome> outcomes;
+            try {
+                outcomes = Concurrent.all(List.of(() -> join(2, id, 4), () -> join(2, id, 4)));
+            } finally {
+                Overlap.disarm();
+            }
 
             assertThat(outcomes).as("round %d", round).extracting(Outcome::status).containsExactlyInAnyOrder(200, 201);
             assertThat(participationRows(id)).isEqualTo(2);          // 개설자 + 회원 2

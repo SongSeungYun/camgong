@@ -75,6 +75,28 @@ class JoinParticipationIT extends JoinTestBase {
     }
 
     @Test
+    void hugeQuantitiesAreRejectedAsInsufficientNotAsOverflowOrServerError() throws Exception {
+        long id = openGroupBuy();                                             // 확보 9, 남은 15
+        // secured + delta 로 비교하면 int 가 넘쳐 음수가 되어 한도 안으로 오판한다
+        for (int q : new int[] { Integer.MAX_VALUE, Integer.MAX_VALUE - 8, Integer.MAX_VALUE - 9, 16 }) {
+            joinAs(2, id, q).andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.title").value("INSUFFICIENT_QUANTITY"))
+                    .andExpect(jsonPath("$.remainingQuantity").value(15));
+        }
+        assertThat(secured(id)).isEqualTo(9);
+        assertThat(participationRows(id)).isEqualTo(1);
+    }
+
+    @Test
+    void aQuantityGivenAsAJsonStringIsCoercedToANumber() throws Exception {
+        // 현재 동작을 고정한다(계약에도 적힘): "5" 는 숫자 5 로 받아들여진다. 거부하려면 Jackson 의 스칼라 강제 변환 설정을 끈다.
+        long id = openGroupBuy();
+        mockMvc.perform(post("/api/groupbuys/" + id + "/participations").with(as(2L))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":\"5\",\"expectedUnitPrice\":1200}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.quantity").value(5));
+    }
+
+    @Test
     void organizerCannotJoinHisOwnGroupBuy() throws Exception {
         long id = openGroupBuy();
         joinAs(ORGANIZER, id, 1).andExpect(status().isForbidden())

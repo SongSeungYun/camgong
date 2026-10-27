@@ -31,7 +31,8 @@ class PessimisticQuantityGate implements QuantityGate {
         if (expectedUnitPrice != null && expectedUnitPrice != g.getUnitPrice()) {
             return GateResult.priceChanged(g.getUnitPrice());
         }
-        if (g.getSecuredQuantity() + delta > g.getTotalQuantity()) {
+        // secured + delta 로 쓰면 delta 가 아주 클 때(Integer.MAX_VALUE) int 가 넘쳐 음수가 되어 한도 안으로 오판한다. 뺄셈으로 비교한다.
+        if (delta > g.getTotalQuantity() - g.getSecuredQuantity()) {
             return GateResult.insufficient(g.getSecuredQuantity(), g.getTotalQuantity());
         }
         g.reserve(delta, now);

@@ -110,13 +110,65 @@ class ChangeParticipationIT extends JoinTestBase {
                     "title", "이중 변경 " + round));
             joinAs(2, id, 6).andExpect(status().isCreated());
 
-            List<Integer> statuses = Concurrent.all(List.of(
-                    () -> changeAs(2, id, 3).andReturn().getResponse().getStatus(),
-                    () -> changeAs(2, id, 3).andReturn().getResponse().getStatus()));
+            Overlap.arm(2);
+            List<Integer> statuses;
+            try {
+                statuses = Concurrent.all(List.of(
+                        () -> changeAs(2, id, 3).andReturn().getResponse().getStatus(),
+                        () -> changeAs(2, id, 3).andReturn().getResponse().getStatus()));
+            } finally {
+                Overlap.disarm();
+            }
 
             assertThat(statuses).as("round %d", round).containsOnly(200);
             assertThat(secured(id)).isEqualTo(12);
             assertThat(i1Violations()).isEmpty();
         }
+    }
+
+    @Test
+    void hugeQuantitiesAreRejectedAsInsufficientNotAsOverflow() throws Exception {
+        long id = openGroupBuy();
+        joinAs(2, id, 6).andExpect(status().isCreated());                         // 확보 15, 내 수량 6, 남은 9
+        for (int q : new int[] { Integer.MAX_VALUE, Integer.MAX_VALUE - 8, Integer.MAX_VALUE - 14, 16 }) {
+            changeAs(2, id, q).andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.title").value("INSUFFICIENT_QUANTITY"))
+                    .andExpect(jsonPath("$.remainingQuantity").value(9));
+        }
+        assertThat(secured(id)).isEqualTo(15);
+        assertThat(i1Violations()).isEmpty();
+    }
+
+    @Test
+    void theSameQuantityIsRetrySafeAfterCompletionAndAfterTheDeadline() throws Exception {
+        long id = openGroupBuy();
+        joinAs(2, id, 6).andExpect(status().isCreated());
+        changeAs(2, id, 15).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        // 응답을 못 받고 같은 본문을 다시 보냈다: 이미 COMPLETED 여도 200, 이벤트는 다시 나가지 않는다
+        changeAs(2, id, 15).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.quantity").value(15));
+        assertThat(events.completed()).hasSize(1);
+        changeAs(2, id, 14).andExpect(status().isConflict()).andExpect(jsonPath("$.reason").value("COMPLETED"));   // 다른 수량은 여전히 거부
+
+        long late = openGroupBuy(com.camgong.support.GroupBuyBodies.with(com.camgong.support.GroupBuyBodies.valid(), "title", "마감 지남"));
+        joinAs(3, late, 2).andExpect(status().isCreated());
+        clock.advance(java.time.Duration.ofDays(7));
+        changeAs(3, late, 2).andExpect(status().isOk()).andExpect(jsonPath("$.quantity").value(2));
+        changeAs(3, late, 3).andExpect(status().isConflict()).andExpect(jsonPath("$.reason").value("DEADLINE_PASSED"));
+    }
+
+    @Test
+    void theSameQuantityOnAFailedGroupBuyIsRefusedAndOnACancelledOneIs404() throws Exception {
+        long failed = openGroupBuy();
+        joinAs(2, failed, 6).andExpect(status().isCreated());
+        jdbc.update("UPDATE group_buy SET status = 'FAILED' WHERE id = ?", failed);
+        changeAs(2, failed, 6).andExpect(status().isConflict()).andExpect(jsonPath("$.title").value("NOT_JOINABLE"))
+                .andExpect(jsonPath("$.reason").value("FAILED"));
+
+        long gone = openGroupBuy(com.camgong.support.GroupBuyBodies.with(com.camgong.support.GroupBuyBodies.valid(), "title", "취소될 공구"));
+        joinAs(2, gone, 6).andExpect(status().isCreated());
+        jdbc.update("UPDATE group_buy SET status = 'CANCELLED' WHERE id = ?", gone);
+        changeAs(2, gone, 6).andExpect(status().isNotFound());
     }
 }

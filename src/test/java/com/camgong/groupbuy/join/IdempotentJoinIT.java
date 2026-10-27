@@ -76,12 +76,34 @@ class IdempotentJoinIT extends JoinTestBase {
         for (int round = 0; round < 10; round++) {
             jdbc.update("DELETE FROM participation WHERE member_id = 2");
             jdbc.update("UPDATE group_buy SET secured_quantity = 17 WHERE id = ?", id);
-            java.util.List<Integer> statuses = com.camgong.support.Concurrent.all(java.util.List.of(
-                    () -> joinAs(2, id, 5).andReturn().getResponse().getStatus(),
-                    () -> joinAs(2, id, 5).andReturn().getResponse().getStatus()));
+            Overlap.arm(2);                                   // 둘 다 낡은 사전 검사를 통과한 채 게이트에서 만나게 한다
+            java.util.List<Integer> statuses;
+            try {
+                statuses = com.camgong.support.Concurrent.all(java.util.List.of(
+                        () -> joinAs(2, id, 5).andReturn().getResponse().getStatus(),
+                        () -> joinAs(2, id, 5).andReturn().getResponse().getStatus()));
+            } finally {
+                Overlap.disarm();
+            }
             assertThat(statuses).as("round %d", round).containsExactlyInAnyOrder(200, 201);
             assertThat(secured(id)).isEqualTo(22);
             assertThat(i1Violations()).isEmpty();
         }
+    }
+
+    @Test
+    void differentQuantityOnACompletedOrExpiredGroupBuyIsNotJoinableNotAlreadyJoined() throws Exception {
+        long done = openGroupBuy();
+        joinAs(2, done, 6).andExpect(status().isCreated());
+        joinAs(3, done, 9).andExpect(status().isCreated());                       // 가득 참 → COMPLETED
+        joinAs(2, done, 8).andExpect(status().isConflict()).andExpect(jsonPath("$.title").value("NOT_JOINABLE"))
+                .andExpect(jsonPath("$.reason").value("COMPLETED"));
+
+        long late = openGroupBuy(com.camgong.support.GroupBuyBodies.with(com.camgong.support.GroupBuyBodies.valid(), "title", "마감 지남"));
+        joinAs(2, late, 6).andExpect(status().isCreated());
+        clock.advance(java.time.Duration.ofDays(7));
+        joinAs(2, late, 8).andExpect(status().isConflict()).andExpect(jsonPath("$.title").value("NOT_JOINABLE"))
+                .andExpect(jsonPath("$.reason").value("DEADLINE_PASSED"));
+        joinAs(2, late, 6).andExpect(status().isOk());                            // 같은 수량 재시도는 마감 뒤에도 200
     }
 }

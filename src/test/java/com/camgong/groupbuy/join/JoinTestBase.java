@@ -15,6 +15,7 @@ import com.camgong.support.GroupBuyBodies;
 import com.camgong.support.IntegrationTestBase;
 
 /** 참여·수량 변경·취소 요청 헬퍼와 불변식 검증 쿼리(data-model.md). */
+@org.springframework.context.annotation.Import(Overlap.Config.class)
 abstract class JoinTestBase extends IntegrationTestBase {
 
     protected static Map<String, Object> body(int quantity, int expectedUnitPrice) {

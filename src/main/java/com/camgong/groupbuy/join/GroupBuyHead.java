@@ -7,5 +7,5 @@ import com.camgong.groupbuy.GroupBuyStatus;
  * 이어지는 FOR UPDATE 조회가 최신 값으로 갱신되지 않으므로 값만 읽는다.
  */
 public record GroupBuyHead(Long organizerId, GroupBuyStatus status, int unitPrice, int securedQuantity,
-        int totalQuantity) {
+        int totalQuantity, java.time.Instant deadline) {
 }

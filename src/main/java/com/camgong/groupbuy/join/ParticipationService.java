@@ -26,6 +26,7 @@ import com.camgong.groupbuy.ParticipationRepository;
 @Service
 public class ParticipationService {
 
+    /** 한 요청이 처리를 시도하는 최대 횟수(첫 시도 포함, 재시도는 2번). */
     private static final int MAX_ATTEMPTS = 3;
 
     /** created 가 true 면 새 참여(201), false 면 변화 없는 재시도·변경(200). */
@@ -65,6 +66,11 @@ public class ParticipationService {
                 if (existing.equals(r.quantity())) {
                     return new Joined(response(groupBuyId, existing, head), false);
                 }
+                // 다른 수량: 완료·마감이면 ALREADY_JOINED 가 아니라 NOT_JOINABLE 이 먼저다(FAILED/마감/완료 → ALREADY_JOINED).
+                String closed = notJoinableReason(head, now);
+                if (closed != null) {
+                    throw notJoinable(closed);
+                }
                 throw new ApiException(HttpStatus.CONFLICT, "ALREADY_JOINED", "이미 참여한 공구입니다. 수량 변경을 사용해 주세요.");
             }
 
@@ -83,12 +89,23 @@ public class ParticipationService {
         });
     }
 
-    /** 수량 변경. delta = 새 수량 − 기존 수량이고 delta 가 0 이어도 상태·마감·가격 확인을 위해 게이트를 지난다. */
+    /**
+     * 수량 변경. delta = 새 수량 − 기존 수량. 같은 수량(delta = 0)은 POST 와 같은 재시도 규칙을 따른다: 완료·마감 뒤에도 변화 없이 200,
+     * 단 FAILED 는 409 NOT_JOINABLE, 취소된 공구는 404. 모집 중인 공구에서는 상태·마감·가격 확인을 위해 delta 가 0 이어도 게이트를 지난다.
+     */
     public ParticipationResponse change(Long memberId, Long groupBuyId, ParticipationRequest r) {
         return retrying(() -> {
             Instant now = Instant.now(clock);
-            requireJoinable(groupBuyId, memberId);
+            GroupBuyHead head = requireJoinable(groupBuyId, memberId);
             int old = query.findQuantity(groupBuyId, memberId).orElseThrow(ParticipationService::participationNotFound);
+            if (r.quantity() == old) {
+                if (head.status() == GroupBuyStatus.FAILED) {
+                    throw notJoinable("FAILED");
+                }
+                if (notJoinableReason(head, now) != null) {
+                    return response(groupBuyId, old, head);
+                }
+            }
 
             GateResult res = reserve(groupBuyId, memberId, old, r.quantity() - old, r.expectedUnitPrice(), now);
             Participation mine = lockedMine(groupBuyId, memberId, old);
@@ -171,6 +188,16 @@ public class ParticipationService {
         }
     }
 
+    /** 사전 검사용(락 없음). 모집 중이 아니거나 마감 시각 ≤ 지금이면 사유를, 참여 가능하면 null. */
+    private static String notJoinableReason(GroupBuyHead head, Instant now) {
+        return switch (head.status()) {
+            case COMPLETED -> "COMPLETED";
+            case FAILED -> "FAILED";
+            case OPEN -> head.deadline().isAfter(now) ? null : "DEADLINE_PASSED";
+            case CANCELLED -> throw new IllegalStateException("취소된 공구는 호출 전에 걸러진다");
+        };
+    }
+
     private static ParticipationResponse response(Long groupBuyId, int quantity, GateResult res) {
         return ParticipationResponse.of(groupBuyId, quantity, res.unitPrice(), res.securedQuantity(), res.totalQuantity(),
                 res.completed() ? GroupBuyStatus.COMPLETED : GroupBuyStatus.OPEN);
@@ -182,14 +209,20 @@ public class ParticipationService {
     }
 
     /**
-     * 새 트랜잭션에서 다시 처리하면 풀리는 충돌(낙관적 버전 충돌, 교착, 동시 이중 요청)을 최대 3번까지 다시 시도한다.
+     * 새 트랜잭션에서 다시 처리하면 풀리는 충돌(낙관적 버전 충돌, 교착, 동시 이중 요청)을 최대 3회 시도한다(재시도는 2번).
      * 재시도는 반드시 새 트랜잭션이어야 한다: REPEATABLE READ 의 스냅샷은 트랜잭션 안에서 바뀌지 않는다.
+     * 락 대기 시간 초과(MySQL 1205)는 다시 해도 같은 락을 또 오래 기다릴 뿐이고 그동안 커넥션을 쥐고 있으니 재시도하지 않고
+     * 바로 BUSY 로 돌려준다(교착은 한쪽이 즉시 롤백되므로 재시도한다).
      */
     private <T> T retrying(Supplier<T> work) {
         for (int attempt = 1;; attempt++) {
             try {
                 return tx.execute(status -> work.get());
             } catch (RetryableConflict | ConcurrencyFailureException e) {
+                if (isLockWaitTimeout(e)) {
+                    BenchCounters.BUSY.increment();
+                    throw busy();
+                }
                 if (attempt >= MAX_ATTEMPTS) {
                     BenchCounters.BUSY.increment();
                     throw busy();
@@ -198,6 +231,19 @@ public class ParticipationService {
                 sleepBriefly();
             }
         }
+    }
+
+    /** 원인 사슬에 MySQL 락 대기 시간 초과(오류 1205)가 있는가. */
+    static boolean isLockWaitTimeout(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.sql.SQLException sql && sql.getErrorCode() == 1205) {
+                return true;
+            }
+            if (t.getCause() == t) {
+                break;
+            }
+        }
+        return false;
     }
 
     private static void sleepBriefly() {

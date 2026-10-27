@@ -44,7 +44,7 @@ class NoLockQuantityGate implements QuantityGate {
         if (expectedUnitPrice != null && expectedUnitPrice != r.price()) {
             return GateResult.priceChanged(r.price());
         }
-        if (r.secured() + delta > r.total()) {
+        if (delta > r.total() - r.secured()) {
             return GateResult.insufficient(r.secured(), r.total());
         }
         int secured = r.secured() + delta;
