@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 import com.camgong.groupbuy.GroupBuyRepository;
 
@@ -41,5 +42,24 @@ class QuantityGateConfig implements InitializingBean {
     @ConditionalOnProperty(name = "camgong.quantity-gate", havingValue = "pessimistic", matchIfMissing = true)
     QuantityGate pessimisticQuantityGate(GroupBuyRepository groupBuys) {
         return new PessimisticQuantityGate(groupBuys);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "camgong.quantity-gate", havingValue = "conditional")
+    QuantityGate conditionalQuantityGate(JdbcClient jdbc) {
+        return new ConditionalUpdateQuantityGate(jdbc);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "camgong.quantity-gate", havingValue = "optimistic")
+    QuantityGate optimisticQuantityGate(GroupBuyRepository groupBuys) {
+        return new OptimisticQuantityGate(groupBuys);
+    }
+
+    /** 프로파일 검사는 afterPropertiesSet 이 한다: benchmark 가 아니면 기동 오류. */
+    @Bean
+    @ConditionalOnProperty(name = "camgong.quantity-gate", havingValue = "none")
+    QuantityGate noLockQuantityGate(JdbcClient jdbc) {
+        return new NoLockQuantityGate(jdbc);
     }
 }
