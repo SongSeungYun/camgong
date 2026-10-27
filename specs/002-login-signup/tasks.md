@@ -114,7 +114,7 @@ description: "회원 가입·로그인·로그아웃 구현 태스크"
 
 ## Phase 5: User Story 3 - 학교 이메일이 아닌 사람 걸러내기, 인증 메일 문제 풀기 (Priority: P2)
 
-**Goal**: 허용 도메인이 아닌 이메일을 거부하고, 인증 메일을 한도 안에서 다시 받으며, 인증 전 재제출이 새 정보로 바뀐다.
+**Goal**: 허용 도메인이 아닌 이메일을 거부하고, 인증 메일을 한도 안에서 다시 받으며, 인증 전 재제출은 이름·비밀번호를 바꾸지 않고 토큰만 새로 받는다.
 
 **Independent Test**: `student@gmail.com` 신청이 400이고, 1분 안의 재발송이 429, 1분 뒤 재발송이 202이며 이전 링크가 무효가 된다.
 
@@ -127,7 +127,7 @@ description: "회원 가입·로그인·로그아웃 구현 태스크"
 
 - [ ] T029 [US3] `main/common/ApiException.java`, `ApiExceptionHandler.java`에 추가 속성·헤더 지원: `ApiException`이 `Map<String,Object> properties`와 `Retry-After`(초)를 가질 수 있게 하고(기존 `reason` 처리와 같은 방식), 핸들러가 `ProblemDetail.setProperty`와 응답 헤더로 내보낸다. `retryAt`은 오프셋 포함 ISO-8601. 기존 001 테스트가 그대로 통과해야 한다
 - [ ] T030 [US3] `SignupService.signup`에 허용 도메인 검사 추가: 이메일을 `Keys.normalize`한 뒤 마지막 `@` 뒤의 도메인이 `camgong.auth.allowed-email-domains` 목록과 **정확히 일치**해야 한다(`endsWith`·`contains` 금지. `@`가 둘 이상이면 거부). 위반은 `errors[email]` 400. 다른 입력 검증과 함께 모아서 한 번에 돌려준다. 이 검사는 BCrypt 해시보다 먼저 한다(거부된 요청이 비싼 연산을 쓰지 않게)
-- [ ] T031 [US3] `main/auth/SignupService.java`에 재제출 갱신과 `resend` **(핵심 로직)**: T013의 중복 키 분기를 data-model의 조건부 `UPDATE` 한 문장으로 바꾼다 — `UPDATE pending_signup SET sent_count = IF(window_started_at < :now − INTERVAL 24 HOUR, 1, sent_count + 1), window_started_at = IF(window_started_at < :now − INTERVAL 24 HOUR, :now, window_started_at), last_sent_at = :now, token_hash = :hash, token_expires_at = :now + INTERVAL 24 HOUR (재제출이면 display_name, password_hash, consent_*도) WHERE email_key = :k AND last_sent_at <= :now − INTERVAL 1 MINUTE AND (window_started_at < :now − INTERVAL 24 HOUR OR sent_count < 5)`. **`SET`절의 평가 순서(왼쪽에서 오른쪽, spikes #10)를 테스트로 확인**하고 어긋나면 승인 요약에 알린다. 영향 행 0이면 `SELECT`로 이유를 구분(1분 간격이면 `retryAt = last_sent_at + 1분`, 일일 한도면 `window_started_at + 24시간`)해 429. `now`는 DB `NOW()`가 아니라 `Clock` 파라미터. 재제출이 성공하면 이전 토큰은 `token_hash` 교체로 무효가 된다. `resend(email)`: 같은 조건부 `UPDATE`(표시 이름·비밀번호는 그대로)로 새 토큰을 만들고 이벤트 발행. 신청이 없거나 이미 `member`에 있거나 `used_at`이 있는 이메일은 같은 404. 영향 행 판정은 JDBC `useAffectedRows=true`를 전제한다. 주석: `-- ponytail: MySQL 전용 문법`
+- [ ] T031 [US3] `main/auth/SignupService.java`에 재제출 갱신과 `resend` **(핵심 로직)**: T013의 중복 키 분기를 data-model의 조건부 `UPDATE` 한 문장으로 바꾼다 — `UPDATE pending_signup SET sent_count = IF(window_started_at < :now − INTERVAL 24 HOUR, 1, sent_count + 1), window_started_at = IF(window_started_at < :now − INTERVAL 24 HOUR, :now, window_started_at), last_sent_at = :now, token_hash = :hash, token_expires_at = :now + INTERVAL 24 HOUR (재제출이어도 display_name, password_hash, consent_*는 바꾸지 않는다: 2026-10-28 사용자 결정 B, 계정 가로채기 방지) WHERE email_key = :k AND last_sent_at <= :now − INTERVAL 1 MINUTE AND (window_started_at < :now − INTERVAL 24 HOUR OR sent_count < 5)`. **`SET`절의 평가 순서(왼쪽에서 오른쪽, spikes #10)를 테스트로 확인**하고 어긋나면 승인 요약에 알린다. 영향 행 0이면 `SELECT`로 이유를 구분(1분 간격이면 `retryAt = last_sent_at + 1분`, 일일 한도면 `window_started_at + 24시간`)해 429. `now`는 DB `NOW()`가 아니라 `Clock` 파라미터. 재제출이 성공하면 이전 토큰은 `token_hash` 교체로 무효가 된다. `resend(email)`와 재제출은 같은 조건부 `UPDATE`(표시 이름·비밀번호는 그대로)로 새 토큰을 만들고 이벤트 발행. 신청이 없거나 이미 `member`에 있거나 `used_at`이 있는 이메일은 같은 404. 영향 행 판정은 JDBC `useAffectedRows=true`를 전제한다. 주석: `-- ponytail: MySQL 전용 문법`
 - [ ] T032 [US3] `main/auth/AuthController.java`에 `POST /api/auth/signup/resend`(본문 `{ "email": "..." }`, 이메일 형식 400, 성공 202 `SignupResponse`)
 
 **Checkpoint**: T027·T028이 통과하고 시나리오 20(더블 제출)이 동시성 테스트에서 안정적이다.
