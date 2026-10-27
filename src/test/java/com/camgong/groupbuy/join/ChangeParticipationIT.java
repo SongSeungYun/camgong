@@ -171,4 +171,23 @@ class ChangeParticipationIT extends JoinTestBase {
         jdbc.update("UPDATE group_buy SET status = 'CANCELLED' WHERE id = ?", gone);
         changeAs(2, gone, 6).andExpect(status().isNotFound());
     }
+
+    @Test
+    void theSameQuantityWritesNothingAndIgnoresAChangedPrice() throws Exception {
+        long id = openGroupBuy();
+        joinAs(2, id, 6).andExpect(status().isCreated());
+        long version = jdbc.queryForObject("SELECT version FROM group_buy WHERE id = ?", Long.class, id);
+        java.time.LocalDateTime updated = jdbc.queryForObject("SELECT updated_at FROM group_buy WHERE id = ?",
+                java.time.LocalDateTime.class, id);
+        clock.advance(java.time.Duration.ofMinutes(5));
+        jdbc.update("UPDATE group_buy SET unit_price = 1500 WHERE id = ?", id);           // 가격이 바뀐 뒤
+
+        // 같은 수량 재시도는 가격 확인도 쓰기도 없이 200 (POST 의 같은 수량 재시도와 같은 규칙)
+        changeAs(2, id, 6, 1200).andExpect(status().isOk()).andExpect(jsonPath("$.quantity").value(6));
+
+        assertThat(jdbc.queryForObject("SELECT version FROM group_buy WHERE id = ?", Long.class, id)).isEqualTo(version);
+        assertThat(jdbc.queryForObject("SELECT updated_at FROM group_buy WHERE id = ?", java.time.LocalDateTime.class, id))
+                .isEqualTo(updated);
+        assertThat(secured(id)).isEqualTo(15);
+    }
 }

@@ -90,8 +90,10 @@ public class ParticipationService {
     }
 
     /**
-     * 수량 변경. delta = 새 수량 − 기존 수량. 같은 수량(delta = 0)은 POST 와 같은 재시도 규칙을 따른다: 완료·마감 뒤에도 변화 없이 200,
-     * 단 FAILED 는 409 NOT_JOINABLE, 취소된 공구는 404. 모집 중인 공구에서는 상태·마감·가격 확인을 위해 delta 가 0 이어도 게이트를 지난다.
+     * 수량 변경. delta = 새 수량 − 기존 수량. **같은 수량(delta = 0)은 게이트를 지나지 않는다** — POST 의 같은 수량 재시도와 같은 규칙
+     * (가격 확인 없이, 쓰기 없이 현재 상태로 200; 완료·마감 뒤에도 마찬가지)이고, 단 FAILED 는 409 NOT_JOINABLE, 취소된 공구는 404 다.
+     * 게이트를 지나지 않으니 version·updated_at 이 오르지 않아 낙관적 요청과 충돌하지 않고, 사전 검사와 게이트 사이에 완료·마감이
+     * 끼어들어 같은 요청이 200 이었다가 409 가 되는 일도 없다.
      */
     public ParticipationResponse change(Long memberId, Long groupBuyId, ParticipationRequest r) {
         return retrying(() -> {
@@ -102,9 +104,7 @@ public class ParticipationService {
                 if (head.status() == GroupBuyStatus.FAILED) {
                     throw notJoinable("FAILED");
                 }
-                if (notJoinableReason(head, now) != null) {
-                    return response(groupBuyId, old, head);
-                }
+                return response(groupBuyId, old, head);
             }
 
             GateResult res = reserve(groupBuyId, memberId, old, r.quantity() - old, r.expectedUnitPrice(), now);
