@@ -15,8 +15,6 @@ export interface MockNotification {
 
 interface Pending {
   email: string
-  displayName: string
-  password: string
   token: string
   lastSentAt: number
 }
