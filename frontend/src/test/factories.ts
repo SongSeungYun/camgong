@@ -12,10 +12,10 @@ export function seedGroupBuy(over: Partial<SeedGroupBuy> = {}): SeedGroupBuy {
     itemUrl: 'https://example.com/item/1',
     unitPrice: 1200,
     totalQuantity: 24,
-    deadline: '2099-11-01T18:00:00+09:00',
+    deadline: new Date(Math.floor((Date.now() + 7 * 86_400_000) / 60_000) * 60_000).toISOString(), // 분 단위(폼 입력 정밀도) // 개설 시점부터 30일 이내
     status: 'OPEN',
     organizerId: 1,
-    createdAt: '2026-10-25T07:30:00+09:00',
+    createdAt: new Date().toISOString(),
     openChatUrl: null,
     participations: [
       { memberId: 1, quantity: 3 },

@@ -38,7 +38,7 @@ const HOUR = 3_600_000
 
 /** 50개(모집 중 25개 이상): 상태 4종·카테고리 6종·마감 임박(24시간 이내) 포함. 기준 시각 now에서 상대적으로 만든다. */
 export function makeSeedGroupBuys(now: number): SeedGroupBuy[] {
-  const iso = (ms: number) => new Date(ms).toISOString()
+  const iso = (ms: number) => new Date(Math.floor(ms / 60_000) * 60_000).toISOString() // 분 단위: 마감 입력(datetime-local)과 같은 정밀도
   return Array.from({ length: 50 }, (_, k) => {
     const id = k + 1
     const status = STATUSES[id % STATUSES.length]!
@@ -66,7 +66,7 @@ export function makeSeedGroupBuys(now: number): SeedGroupBuy[] {
       status,
       organizerId,
       createdAt: iso(now - (51 - id) * HOUR),
-      openChatUrl: status === 'COMPLETED' ? 'https://open.kakao.com/o/mock' + id : null,
+      openChatUrl: 'https://open.kakao.com/o/mock' + id, // 노출 여부는 핸들러가 역할·상태로 정한다
       participations,
     }
   })

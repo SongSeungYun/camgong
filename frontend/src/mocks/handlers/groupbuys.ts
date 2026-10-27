@@ -33,6 +33,84 @@ const decodeCursor = (c: string, sig: string): number | null => {
   }
 }
 
+
+const DAY = 86_400_000
+const isHttps = (v: unknown) => typeof v === 'string' && v.length <= 500 && /^https:\/\/[^\s]+$/.test(v)
+const isInt = (v: unknown, min: number, max = Infinity): v is number => Number.isInteger(v) && (v as number) >= min && (v as number) <= max
+
+interface Body {
+  title?: unknown; description?: unknown; itemName?: unknown; unitPrice?: unknown; totalQuantity?: unknown
+  deadline?: unknown; organizerQuantity?: unknown; category?: unknown; itemUrl?: unknown; openChatUrl?: unknown
+}
+
+/** 001 계약 '공통 요청 본문' 검증. 개설과 수정의 차이는 마감·수량 규칙. */
+function validate(b: Body, ctx: { existing?: SeedGroupBuy; others?: number }): { field: string; message: string }[] {
+  const errors: { field: string; message: string }[] = []
+  const add = (field: string, message: string) => errors.push({ field, message })
+  const title = typeof b.title === 'string' ? b.title.trim() : ''
+  if (!title) add('title', '제목을 입력해 주세요')
+  else if (title.length > 100) add('title', '제목은 100자 이하여야 해요')
+  if (b.description != null && (typeof b.description !== 'string' || b.description.length > 2000)) add('description', '설명은 2000자 이하여야 해요')
+  const itemName = typeof b.itemName === 'string' ? b.itemName.trim() : ''
+  if (!itemName) add('itemName', '상품명을 입력해 주세요')
+  else if (itemName.length > 100) add('itemName', '상품명은 100자 이하여야 해요')
+  if (!isInt(b.unitPrice, 1, 1_000_000)) add('unitPrice', '개당 가격은 1~1,000,000원이어야 해요')
+  if (!isInt(b.totalQuantity, 2, 1000)) add('totalQuantity', '총 수량은 2~1,000개여야 해요')
+  if (typeof b.category !== 'string' || !isKnownCategory(b.category)) add('category', '카테고리를 선택해 주세요')
+  if (!isHttps(b.itemUrl)) add('itemUrl', '구매처 링크는 https 주소여야 해요')
+  if (!isHttps(b.openChatUrl)) add('openChatUrl', '오픈채팅 링크는 https 주소여야 해요')
+
+  const deadline = typeof b.deadline === 'string' ? Date.parse(b.deadline) : NaN
+  const base = ctx.existing ? Date.parse(ctx.existing.createdAt) : Date.now()
+  if (Number.isNaN(deadline)) add('deadline', '마감 시각을 입력해 주세요')
+  else if (deadline > base + 30 * DAY) add('deadline', '마감은 개설 시점부터 30일 이내여야 해요')
+  else if (!ctx.existing && deadline <= Date.now()) add('deadline', '마감 시각은 현재보다 미래여야 해요')
+  else if (ctx.existing && deadline < Date.parse(ctx.existing.deadline)) add('deadline', '마감은 늘리기만 할 수 있어요')
+
+  if (!isInt(b.organizerQuantity, 1)) add('organizerQuantity', '내 수량은 1 이상이어야 해요')
+  else if (isInt(b.totalQuantity, 2, 1000)) {
+    if (!ctx.existing && b.organizerQuantity >= b.totalQuantity) add('organizerQuantity', '내 수량은 총 수량보다 적어야 해요')
+    if (ctx.existing && (ctx.others ?? 0) + b.organizerQuantity > b.totalQuantity) add('totalQuantity', '총 수량은 확보 수량 이상이어야 해요')
+  }
+  return errors
+}
+
+const body001 = (g: SeedGroupBuy) => ({
+  id: g.id, title: g.title, itemName: g.itemName, unitPrice: g.unitPrice, totalQuantity: g.totalQuantity,
+  securedQuantity: secured(g), remainingQuantity: g.totalQuantity - secured(g), deadline: g.deadline, status: g.status,
+  organizerId: g.organizerId, organizerQuantity: g.participations.find((p) => p.memberId === g.organizerId)?.quantity ?? 0,
+  category: g.category, itemUrl: g.itemUrl, openChatUrl: g.openChatUrl, description: g.description, createdAt: g.createdAt,
+})
+
+function applyBody(g: SeedGroupBuy, b: Body) {
+  g.title = (b.title as string).trim()
+  g.description = typeof b.description === 'string' && b.description ? b.description : null
+  g.itemName = (b.itemName as string).trim()
+  g.category = b.category as string
+  g.itemUrl = b.itemUrl as string
+  g.openChatUrl = b.openChatUrl as string
+  g.unitPrice = b.unitPrice as number
+  g.totalQuantity = b.totalQuantity as number
+  g.deadline = new Date(Date.parse(b.deadline as string)).toISOString()
+  const mine = g.participations.find((p) => p.memberId === g.organizerId)
+  if (mine) mine.quantity = b.organizerQuantity as number
+  else g.participations.push({ memberId: g.organizerId, quantity: b.organizerQuantity as number })
+  if (secured(g) === g.totalQuantity) g.status = 'COMPLETED'
+}
+
+/** 수정·취소 공통 사전 검사: 401 → 404 → 403 → 409 */
+function guardOrganizer(id: string) {
+  const me = currentMember()
+  if (!me) return { res: problem(401, 'UNAUTHENTICATED') }
+  const g = mockState.groupBuys.find((x) => x.id === Number(id))
+  if (!g) return { res: problem(404, 'Not Found') }
+  if (g.organizerId !== me.id) return { res: problem(403, 'ORGANIZER_ONLY') }
+  if (g.status !== 'OPEN' || Date.parse(g.deadline) <= Date.now()) {
+    return { res: problem(409, 'NOT_MODIFIABLE', { reason: g.status === 'COMPLETED' ? 'COMPLETED' : 'DEADLINE_PASSED' }) }
+  }
+  return { g }
+}
+
 export const groupBuyHandlers = [
   http.get('/api/groupbuys', ({ request }) => {
     const sp = new URL(request.url).searchParams
@@ -104,10 +182,48 @@ export const groupBuyHandlers = [
             ...(isOrganizer ? {} : { paidConfirmedAt: null, receivedConfirmedAt: null }),
           }
         : null,
-      // 공개 규칙: 모집 완료일 때 개설자·참여자에게만 오픈채팅 링크를 준다
-      openChatUrl: g.status === 'COMPLETED' && (isOrganizer || mine) ? g.openChatUrl : null,
+      // 공개 규칙(003 data-model): 개설자는 OPEN·PENDING_CLOSE·COMPLETED에서 항상, 참여자는 COMPLETED일 때만
+      openChatUrl: (isOrganizer && ['OPEN', 'PENDING_CLOSE', 'COMPLETED'].includes(g.status)) || (mine && g.status === 'COMPLETED') ? g.openChatUrl : null,
       participants: isOrganizer ? g.participations.map((p) => ({ memberId: p.memberId, name: nameOf(p.memberId), quantity: p.quantity })) : null,
       createdAt: g.createdAt,
     })
+  }),
+
+  http.post('/api/groupbuys', async ({ request }) => {
+    const me = currentMember()
+    if (!me) return problem(401, 'UNAUTHENTICATED')
+    const b = (await request.json()) as Body
+    const key = `${me.id}:${JSON.stringify(b)}`
+    const now = Date.now()
+    mockState.recentCreates = mockState.recentCreates.filter((r) => now - r.at < 10_000)
+    if (mockState.recentCreates.some((r) => r.key === key)) return problem(409, 'DUPLICATE_REQUEST')
+    const errors = validate(b, {})
+    if (errors.length) return problem(400, 'Bad Request', { errors })
+    mockState.recentCreates.push({ key, at: now })
+    const g = {
+      id: Math.max(0, ...mockState.groupBuys.map((x) => x.id)) + 1,
+      status: 'OPEN', organizerId: me.id, createdAt: new Date(now).toISOString(), participations: [],
+    } as unknown as SeedGroupBuy
+    applyBody(g, b)
+    mockState.groupBuys.unshift(g)
+    return HttpResponse.json(body001(g), { status: 201, headers: { Location: `/api/groupbuys/${g.id}` } })
+  }),
+
+  http.put('/api/groupbuys/:id', async ({ params, request }) => {
+    const { g, res } = guardOrganizer(params.id as string)
+    if (!g) return res
+    const b = (await request.json()) as Body
+    const others = g.participations.filter((p) => p.memberId !== g.organizerId).reduce((n, p) => n + p.quantity, 0)
+    const errors = validate(b, { existing: g, others })
+    if (errors.length) return problem(400, 'Bad Request', { errors })
+    applyBody(g, b)
+    return HttpResponse.json(body001(g))
+  }),
+
+  http.post('/api/groupbuys/:id/cancel', ({ params }) => {
+    const { g, res } = guardOrganizer(params.id as string)
+    if (!g) return res
+    mockState.groupBuys = mockState.groupBuys.filter((x) => x !== g)
+    return new HttpResponse(null, { status: 204 })
   }),
 ]
