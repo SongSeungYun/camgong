@@ -6,6 +6,9 @@ spring:
     url: ${DB_URL:jdbc:mysql://localhost:3306/camgong?useAffectedRows=true}
     username: ${DB_USER:root}
     password: ${DB_PASSWORD:pw}
+    hikari:
+      # 락 대기 시간 초과를 짧게(기본 50초는 커넥션을 오래 쥔 채 풀을 말린다). DB_URL 을 바꿔도 적용되도록 URL 이 아니라 여기서 건다.
+      connection-init-sql: SET SESSION innodb_lock_wait_timeout=5
   jpa:
     hibernate:
       ddl-auto: validate
@@ -17,6 +20,10 @@ spring:
   sql:
     init:
       mode: always
+  jackson:
+    deserialization:
+      # 1.5 같은 소수가 정수 필드에 조용히 잘려 들어가지 않게 한다(수량·가격은 정수만, 계약의 400).
+      accept-float-as-int: false
   mvc:
     problemdetails:
       enabled: true

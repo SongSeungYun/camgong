@@ -1,0 +1,14 @@
+# 측정용 프로파일(헌법 II): 풀 크기를 20 으로 고정한다. none 게이트와 /bench 지표는 이 프로파일에서만 켜진다.
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 20
+logging:
+  level:
+    root: WARN
+    com.camgong: WARN
+
+camgong:
+  mail:
+    sender: logging       # 측정에는 메일이 필요 없다(기본 smtp 는 SMTP 설정 없이 기동하지 못한다)

@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.camgong.common.ApiException;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCancelled;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyChanged;
-import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCompleted;
 
 @Service
 public class GroupBuyService {
@@ -27,10 +26,12 @@ public class GroupBuyService {
     private final CreateGuard createGuard;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final GroupBuyCompletion completion;
 
     public GroupBuyService(GroupBuyRepository groupBuys,
             ParticipationRepository participations, CreateGuard createGuard, Clock clock,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events, GroupBuyCompletion completion) {
+        this.completion = completion;
         this.groupBuys = groupBuys;
         this.participations = participations;
         this.createGuard = createGuard;
@@ -116,7 +117,7 @@ public class GroupBuyService {
             events.publishEvent(new GroupBuyChanged(id, others, changed));
         }
         if (completed) {
-            events.publishEvent(new GroupBuyCompleted(id, everyone));
+            completion.publish(id, everyone);
         }
         return GroupBuyResponse.from(g, newOrganizerQuantity, g.getOpenChatUrl());
     }

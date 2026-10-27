@@ -36,4 +36,9 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// 경쟁 테스트의 반복 횟수: ./gradlew test -Drace.repeat=1000 (기본 20)
+	systemProperty 'race.repeat', System.getProperty('race.repeat', '20')
+	testLogging {
+		showStandardStreams = System.getProperty('race.repeat') != null
+	}
 }
