@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS group_buy (
     version           BIGINT        NOT NULL,
     created_at        DATETIME(6)   NOT NULL,
     updated_at        DATETIME(6)   NOT NULL,
+    KEY idx_group_buy_organizer_id (organizer_id, id),
     CONSTRAINT fk_group_buy_organizer FOREIGN KEY (organizer_id) REFERENCES member (id),
     CONSTRAINT chk_group_buy_secured CHECK (secured_quantity BETWEEN 1 AND total_quantity)
 );
@@ -72,6 +73,7 @@ CREATE TABLE IF NOT EXISTS participation (
     member_id     BIGINT      NOT NULL,
     quantity      INT         NOT NULL CHECK (quantity > 0),
     created_at    DATETIME(6) NOT NULL,
+    KEY idx_participation_member_group_buy (member_id, group_buy_id),
     CONSTRAINT fk_participation_group_buy FOREIGN KEY (group_buy_id) REFERENCES group_buy (id),
     CONSTRAINT fk_participation_member FOREIGN KEY (member_id) REFERENCES member (id),
     CONSTRAINT uq_participation_group_member UNIQUE (group_buy_id, member_id)

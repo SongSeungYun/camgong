@@ -15,4 +15,8 @@ public interface GroupBuyRepository extends JpaRepository<GroupBuy, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select g from GroupBuy g where g.id = :id")
     Optional<GroupBuy> findByIdForUpdate(@Param("id") Long id);
+
+    /** 상세용: 공구와 개설자 이름을 한 번에 읽는다(research 결정 7 의 1번 쿼리). */
+    @Query("select g from GroupBuy g join fetch g.organizer where g.id = :id and g.status <> com.camgong.groupbuy.GroupBuyStatus.CANCELLED")
+    Optional<GroupBuy> findDetailById(@Param("id") Long id);
 }

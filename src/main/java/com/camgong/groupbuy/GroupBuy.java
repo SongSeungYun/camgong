@@ -8,9 +8,14 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+
+import com.camgong.member.Member;
 
 /** 시간은 DB 기본값·@CreatedDate 없이 서비스가 Instant.now(clock)으로 넣는다. 상태 전이 메서드는 US3에서 추가. */
 @Entity
@@ -23,6 +28,11 @@ public class GroupBuy {
 
     @Column(name = "organizer_id")
     private Long organizerId;
+
+    /** 조회 전용(003). 같은 컬럼의 읽기 전용 연관관계라 쓰기 경로에서는 접근하지 않는다. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organizer_id", insertable = false, updatable = false)
+    private Member organizer;
 
     private String title;
 
@@ -133,6 +143,11 @@ public class GroupBuy {
 
     public Long getId() {
         return id;
+    }
+
+    /** 조회 전용(003). 쓰기 경로에서는 부르지 않는다. */
+    public Member getOrganizer() {
+        return organizer;
     }
 
     public Long getOrganizerId() {

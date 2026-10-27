@@ -6,10 +6,15 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-/** 연관관계 매핑 없이 Long 컬럼만 둔다(N+1 비교용 매핑은 조회 기능에서 결정). */
+import com.camgong.member.Member;
+
+/** 쓰기는 Long 컬럼으로 하고, 조회 전용 연관관계(003)를 같은 컬럼에 읽기 전용으로 병행한다. */
 @Entity
 @Table(name = "participation")
 public class Participation {
@@ -23,6 +28,14 @@ public class Participation {
 
     @Column(name = "member_id")
     private Long memberId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_buy_id", insertable = false, updatable = false)
+    private GroupBuy groupBuy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id", insertable = false, updatable = false)
+    private Member member;
 
     private int quantity;
 
@@ -53,6 +66,15 @@ public class Participation {
 
     public Long getMemberId() {
         return memberId;
+    }
+
+    /** 조회 전용. 쓰기 경로에서는 부르지 않는다. */
+    public GroupBuy getGroupBuy() {
+        return groupBuy;
+    }
+
+    public Member getMember() {
+        return member;
     }
 
     public int getQuantity() {

@@ -24,4 +24,8 @@ public interface ParticipationRepository extends JpaRepository<Participation, Lo
     Optional<Participation> findLockedByGroupBuyIdAndMemberId(Long groupBuyId, Long memberId);
 
     Optional<Participation> findByGroupBuyIdAndMemberId(Long groupBuyId, Long memberId);
+
+    // --- 조회(003) ---
+
+    long countByGroupBuyId(Long groupBuyId);
 }
