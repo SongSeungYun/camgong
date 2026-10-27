@@ -33,15 +33,14 @@ public interface ParticipationRepository extends JpaRepository<Participation, Lo
     long countByGroupBuyId(Long groupBuyId);
 
     /** 개설자용 명단. 순진한 구현: 이름은 호출 쪽이 participation.getMember() 지연 로딩으로 읽는다(N+1 기준선). */
-    @Query("select p from Participation p join fetch p.member where p.groupBuyId = :groupBuyId order by p.id")
-    List<Participation> findByGroupBuyIdOrderByIdAsc(@Param("groupBuyId") Long groupBuyId);
+    List<Participation> findByGroupBuyIdOrderByIdAsc(Long groupBuyId);
 
     /**
      * 내가 참여한 공구(내가 연 공구 포함), 공구 id 역순 키셋. 순진한 구현: 참여 행만 읽고
      * 호출 쪽이 participation.getGroupBuy() 를 지연 로딩한다(1 + N 쿼리, N+1 기준선).
      */
-    @Query("select p from Participation p join fetch p.groupBuy g where p.memberId = :me "
-            + "and g.status <> com.camgong.groupbuy.GroupBuyStatus.CANCELLED "
+    @Query("select p from Participation p where p.memberId = :me "
+            + "and p.groupBuy.status <> com.camgong.groupbuy.GroupBuyStatus.CANCELLED "
             + "and (:cursor is null or p.groupBuyId < :cursor) order by p.groupBuyId desc")
     List<Participation> findMine(@Param("me") Long me, @Param("cursor") Long cursor, Limit limit);
 }
