@@ -29,6 +29,8 @@
 | `consent_version` | `VARCHAR(20)` | 필수. 동의한 안내문 버전 | FR-017 |
 | `created_at` | `DATETIME(6)` | 필수. 가입 완료(인증) 시각 | |
 
+표시 이름·이메일의 유일성은 DB 기본 collation(`utf8mb4_0900_ai_ci`)을 따르므로 대소문자뿐 아니라 악센트도 무시한다(`José`와 `Jose`는 같은 이름). 2026-10-28 검수에서 확인했고 그대로 두기로 했다.
+
 `member`에는 인증을 마친 회원만 있다. 001~007의 테스트가 이름만으로 회원을 시드하던 방식은 `IntegrationTestBase`가 `email`·`password_hash`·`consent_*`를 채우도록 바꿔야 한다(교차 영향).
 
 ## pending_signup (인증 전 가입 신청)
