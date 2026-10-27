@@ -6,7 +6,7 @@
 
 | 이벤트 | 필드 | 발행 시점 | 소비 |
 |--------|------|-----------|------|
-| `GroupBuyFailed` | `groupBuyId`, `recipientIds` | 공구가 모집 실패로 확정되어 커밋된 직후(`AFTER_COMMIT`) | 알림 기능(007). 지금은 `GroupBuyEventLogger`가 로그만 남김 |
+| `GroupBuyFailed` | `eventId`(발행 때마다 새 UUID), `groupBuyId`, `groupBuyTitle`, `recipientIds`(개설자 포함) | 공구가 모집 실패로 확정되어 커밋된 직후(`AFTER_COMMIT`) | 알림 기능(007). 지금은 `GroupBuyEventLogger`가 로그만 남김 |
 
 - `recipientIds`: 개설자를 포함한 모든 참여 행의 회원 id. 중복 없음.
 - 공구 하나당 정확히 한 번 발행한다(중복 금지). 커밋 직후 서버가 멈추면 유실될 수 있다(허용된 한계).
