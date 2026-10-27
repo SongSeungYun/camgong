@@ -55,6 +55,7 @@ public abstract class IntegrationTestBase {
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("camgong.auth.bcrypt-cost", () -> 4); // 테스트 속도
+        registry.add("camgong.auth.cleanup.enabled", () -> false); // 정리는 SessionCleanupIT 가 직접 호출
     }
 
     @Autowired

@@ -223,6 +223,7 @@ public class SignupService {
                 "인증 메일을 너무 자주 요청했습니다. 잠시 뒤에 다시 시도해 주세요.").retryAt(retryAt, now);
     }
 
+    // ponytail: 허용 도메인은 설정값(ALLOWED_EMAIL_DOMAINS). 학교가 여럿으로 늘고 관리가 필요해지면 DB 테이블로
     /** 마지막 @ 뒤가 허용 목록과 정확히 같아야 한다. endsWith·contains 는 evil.school.ac.kr 같은 우회를 못 막는다. */
     private boolean allowedDomain(String emailKey) {
         int at = emailKey.lastIndexOf('@');
