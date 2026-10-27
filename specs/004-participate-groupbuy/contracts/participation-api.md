@@ -23,7 +23,7 @@
 | 409 | `ALREADY_JOINED` | 이미 참여했고 수량이 다름(수량 변경을 쓸 것) |
 | 409 | `NOT_JOINABLE` | 모집 중이 아님(완료, 실패)이거나 마감이 지남. 본문 `reason`: `DEADLINE_PASSED` / `COMPLETED` / `FAILED` (`docs/architecture.md` 6.1) |
 | 409 | `PRICE_CHANGED` | `expectedUnitPrice`가 현재와 다름. 본문에 `currentUnitPrice` |
-| 409 | `INSUFFICIENT_QUANTITY` | 수량이 남은 수량보다 큼. 본문에 `remainingQuantity` |
+| 409 | `INSUFFICIENT_QUANTITY` | 수량이 남은 수량보다 큼. 본문에 `remainingQuantity`(공구 전체의 남은 수량. 수량 변경(PUT) 때도 내 수량을 뺀 값이며, 변경 가능한 최대는 `remainingQuantity` + 내 현재 수량) |
 | 409 | `BUSY` | 낙관적 방식에서 재시도 소진(다른 방식에서는 나오지 않음) |
 
 ## PUT /api/groupbuys/{id}/participations/me — 수량 변경
