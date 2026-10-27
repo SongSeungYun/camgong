@@ -21,3 +21,8 @@ npm run lint
 ```
 
 환경 값은 `VITE_USE_MOCK`, `VITE_API_TARGET` 둘뿐이다. 시크릿은 두지 않는다.
+
+## 결정 기록 (2026-10-27, 사용자)
+
+- PWA precache: 아이콘 2개와 `manifest.webmanifest`가 precache에 남는 상태를 그대로 둔다(화면 HTML/JS는 캐시하지 않음).
+- `typescript-eslint`·`@eslint/js`는 추가하지 않는다. TS 검사는 `tsc` strict(`npm run typecheck`)로 하고, `lint`는 현 상태(.js만)를 유지한다.
