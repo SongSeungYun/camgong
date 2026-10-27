@@ -12,6 +12,10 @@ NEEDS CLARIFICATION은 없다. 결정 1~3은 사용자가 직접 고른 것이�
 - **Alternatives**: (a) 하나씩 구현·측정 후 교체, 방식별 태그로 보존 — 코드는 짧지만 재측정하려면 태그를 체크아웃해야 한다. (b) 최종 방식만 main, 나머지는 측정용 브랜치 — 깔끔하지만 비교 시점의 코드가 흩어진다.
 - **설명 체크**: 왜 이 구조에서만 4방식 차이가 한 클래스 안에 갇히는가?
 
+### 1-1. 운영 기본 방식은 pessimistic으로 확정 (2026-10-28 사용자 결정)
+
+측정(docs/benchmarks/participation-concurrency.md, 한 대 기계에서 앱·DB·k6 동거, 혼합 부하는 30초×5회)에서 `none`은 마지막 자리 100명 동시 30회가 모두 깨졌고(갱신 손실), pessimistic·conditional·optimistic은 초과 0·완료 이벤트 1회였다. pessimistic과 conditional은 지연이 같고(S1 p95 70.0/75.7ms), optimistic은 같은 행에 쓰기가 몰리는 혼합 부하에서 요청의 약 50%가 BUSY로 거부되어 이 서비스에 부적합하다. 001 수정·취소·005 마감 확정과 같은 락 모델(공구 → 참여 순서)이라 설명이 쉬운 **pessimistic을 기본으로 둔다.** 다른 방식은 설정 스위치로 코드에 남긴다(결정 1).
+
 ### 2. 참여 API는 리소스형이다
 
 - **Decision**: `POST /api/groupbuys/{id}/participations`(참여), `PUT /api/groupbuys/{id}/participations/me`(수량 변경), `DELETE /api/groupbuys/{id}/participations/me`(참여 취소). 상세는 [contracts/participation-api.md](contracts/participation-api.md).
