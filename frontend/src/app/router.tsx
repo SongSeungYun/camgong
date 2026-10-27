@@ -1,4 +1,5 @@
-import { Outlet, useRouteError, type RouteObject } from 'react-router'
+import type { ComponentType } from 'react'
+import { Outlet, ScrollRestoration, useRouteError, type RouteObject } from 'react-router'
 import { Layout, StateView } from '../shared/ui'
 import { Header } from './Header'
 import { RequireAuth } from './RequireAuth'
@@ -8,11 +9,14 @@ const stub = (name: string): RouteObject['lazy'] => async () => {
   return { element: <Stub name={name} /> }
 }
 
+const page = (load: () => Promise<{ default: ComponentType }>): RouteObject['lazy'] => async () => ({ Component: (await load()).default })
+
 function Root() {
   return (
     <>
       <Header />
       <Outlet />
+      <ScrollRestoration />
     </>
   )
 }
@@ -33,22 +37,22 @@ export const routes: RouteObject[] = [
     element: <Root />,
     errorElement: <RootError />,
     children: [
-      { path: '/', lazy: () => import('../pages/ListPage').then((m) => ({ Component: m.default })) },
-      { path: '/signup', lazy: stub('가입') },
-      { path: '/login', lazy: stub('로그인') },
-      { path: '/verify', lazy: stub('인증 확인') },
+      { path: '/', lazy: page(() => import('../pages/ListPage')) },
+      { path: '/signup', lazy: page(() => import('../pages/SignupPage')) },
+      { path: '/login', lazy: page(() => import('../pages/LoginPage')) },
+      { path: '/verify', lazy: page(() => import('../pages/VerifyPage')) },
       {
         element: <RequireAuth />,
         children: [
           { path: '/groupbuys/new', lazy: stub('공구 개설') },
-          { path: '/groupbuys/:id', lazy: stub('공구 상세') },
+          { path: '/groupbuys/:id', lazy: page(() => import('../pages/DetailPage')) },
           { path: '/groupbuys/:id/edit', lazy: stub('공구 수정') },
           { path: '/groupbuys/:id/check', lazy: stub('체크표') },
           { path: '/me', lazy: stub('내 활동') },
           { path: '/notifications', lazy: stub('알림함') },
         ],
       },
-      { path: '*', lazy: () => import('../pages/NotFoundPage').then((m) => ({ Component: m.default })) },
+      { path: '*', lazy: page(() => import('../pages/NotFoundPage')) },
     ],
   },
 ]

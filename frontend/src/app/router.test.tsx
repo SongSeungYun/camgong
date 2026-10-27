@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react'
 import { expect, test } from 'vitest'
 import { mockState } from '../mocks/state'
+import { seedGroupBuy } from '../test/factories'
 import { renderApp } from '../test/utils'
 
 test('공개 라우트는 비로그인으로 열린다', async () => {
@@ -15,9 +16,10 @@ test('보호 라우트는 비로그인이면 /login으로 보낸다', async () =
 })
 
 test('로그인 상태면 보호 라우트가 열린다', async () => {
+  seedGroupBuy()
   mockState.sessionMemberId = 1
   renderApp('/groupbuys/1')
-  await screen.findByRole('heading', { name: '공구 상세' })
+  await screen.findByRole('heading', { name: '햇반 24개 공구' })
 })
 
 test('me 확인 중에는 로그인으로 보내지 않는다(깜빡임 없음)', async () => {
