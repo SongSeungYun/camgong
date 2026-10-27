@@ -50,3 +50,10 @@ camgong:
   mail:
     # smtp(기본) | logging(local/test/benchmark 프로파일에서만). SMTP 접속 정보는 SPRING_MAIL_* 환경변수로만 받는다.
     sender: ${MAIL_SENDER:smtp}
+  scheduler:
+    close:
+      enabled: true         # 테스트는 false 로 두고 서비스를 직접 호출한다
+      interval: 30s         # 이전 실행이 끝난 뒤 다음 실행까지의 대기(fixedDelay)
+      margin: 1s            # 마감 시각 뒤 확정까지의 안전 여유(시계 오차 대비)
+      batch-size: 100       # 한 라운드의 후보 조회 개수
+      max-rounds: 50        # 한 실행에서 반복하는 최대 라운드 수

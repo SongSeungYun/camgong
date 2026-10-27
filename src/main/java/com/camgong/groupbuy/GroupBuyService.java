@@ -145,7 +145,8 @@ public class GroupBuyService {
             throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden", "개설자만 할 수 있습니다.");
         }
         if (!g.isModifiable(now)) {
-            String reason = g.getStatus() == GroupBuyStatus.OPEN ? "DEADLINE_PASSED" : "COMPLETED";
+            // 비-OPEN 은 상태 이름이 곧 사유다(COMPLETED / FAILED). 004 참여의 NOT_JOINABLE reason 과 같은 값이다.
+            String reason = g.getStatus() == GroupBuyStatus.OPEN ? "DEADLINE_PASSED" : g.getStatus().name();
             throw ApiException.withReason(HttpStatus.CONFLICT, "NOT_MODIFIABLE",
                     "모집이 끝났거나 마감이 지나 수정·취소할 수 없습니다.", reason);
         }
