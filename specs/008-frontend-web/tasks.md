@@ -77,7 +77,7 @@ description: "모바일 우선 웹 화면(PWA) 구현 태스크"
 - [ ] T022 [US1] `frontend/src/features/groupbuy/api.ts`와 `list/useGroupBuyList.ts`: `useInfiniteQuery`(키 `['groupbuys', 조건]`, `getNextPageParam = nextCursor`), 조건이 바뀌면 커서를 버림. 근거: research.md 결정 4, FR-013
 - [ ] T023 [P] [US1] `frontend/src/features/groupbuy/list/GroupBuyCard.tsx`: 제목, 상품명, 개당 가격, 진행률 바(확보/총), 마감 시각(KST)과 남은 시간, 상태 뱃지, 카테고리 이름. 카드 전체가 상세 링크. 근거: FR-011, FR-008
 - [ ] T024 [US1] `frontend/src/features/groupbuy/list/ListFilters.tsx`: 정렬(최신·마감 임박), 상태 필터(기본 모집 중), 카테고리 6개, 검색 입력(최대 50자). 선택한 조건이 화면에 표시된다. 근거: FR-012, 시나리오 3
-- [ ] T025 [US1] `frontend/src/pages/ListPage.tsx`: 필터 + 카드 목록 + 더 보기 + `StateView`(빈 목록 / 검색 결과 없음 문구 구분: `q` 유무로, 로딩, 오류+다시 시도). 비로그인도 열린다. 헤더에는 로그인/가입 링크(비로그인) 또는 내 활동·로그아웃. 근거: FR-014, FR-007, 시나리오 4
+- [ ] T025 [US1] `frontend/src/pages/ListPage.tsx`: 필터 + 카드 목록 + 더 보기 + `StateView`(빈 목록 / 검색 결과 없음 문구 구분: `q`·카테고리·상태 필터 중 하나라도 걸렸는지로(정렬 제외), 로딩, 오류+다시 시도). 비로그인도 열린다. 헤더에는 로그인/가입 링크(비로그인) 또는 내 활동·로그아웃. 근거: FR-014, FR-007, 시나리오 4
 - [ ] T026 [US1] `frontend/tests/e2e/list.spec.ts`: 360px에서 목록 열기, 카테고리·검색으로 조건 변경, 새로고침 후 조건 유지(주소), 가로 스크롤 없음 확인(`document.documentElement.scrollWidth <= innerWidth`). 근거: SC-003, FR-015, 시나리오 3·35
 
 **Checkpoint**: US1 단독으로 동작·테스트 가능(MVP).
