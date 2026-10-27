@@ -94,13 +94,33 @@ describe('GroupBuyList (US1)', () => {
     expect(qs).toEqual([null, '햇반'])
   })
 
+  test('3c. 검색어 입력 직후 카테고리를 바꿔도 두 조건이 모두 주소에 남는다', async () => {
+    server.use(http.get('/api/groupbuys', () => page([card(1)])))
+    const { router } = renderApp('/')
+    await screen.findByRole('link', { name: /공구 1/ })
+    await userEvent.type(screen.getByRole('searchbox'), '햇반')
+    await userEvent.click(screen.getByRole('button', { name: '식품' })) // 디바운스가 끝나기 전
+    await waitFor(() => expect(decodeURIComponent(router.state.location.search)).toContain('q=햇반'))
+    expect(router.state.location.search).toContain('category=FOOD')
+  })
+
   test('4. 빈 목록과 검색 결과 없음은 문구가 다르다', async () => {
     server.use(http.get('/api/groupbuys', () => page([])))
     const a = renderApp('/')
     await screen.findByText('아직 올라온 공구가 없어요.')
     a.unmount()
-    renderApp('/?q=없는물건')
+    const b = renderApp('/?q=없는물건')
     await screen.findByText('검색 결과가 없어요. 다른 검색어나 조건을 써보세요.')
+    b.unmount()
+    // FR-014: 카테고리·기본이 아닌 상태도 조건이다. 정렬은 조건이 아니다.
+    const c = renderApp('/?category=FOOD')
+    await screen.findByText('검색 결과가 없어요. 다른 검색어나 조건을 써보세요.')
+    c.unmount()
+    const d = renderApp('/?status=FAILED')
+    await screen.findByText('검색 결과가 없어요. 다른 검색어나 조건을 써보세요.')
+    d.unmount()
+    renderApp('/?sort=deadline')
+    await screen.findByText('아직 올라온 공구가 없어요.')
   })
 
   test('5. PENDING_CLOSE는 마감됨(확정 대기) 뱃지', async () => {

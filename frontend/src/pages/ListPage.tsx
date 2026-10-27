@@ -9,6 +9,8 @@ export default function ListPage() {
   const { params, qInput, setQInput, setParams } = useListParams()
   const q = useGroupBuyList(params)
   const items = q.data?.pages.flatMap((p) => p.items) ?? []
+  // FR-014: 정렬을 뺀 조건(검색어·카테고리·기본이 아닌 상태)이 하나라도 걸려 있으면 '결과 없음'
+  const filtered = !!params.q || params.category !== null || params.status !== 'OPEN'
   const state = q.isPending ? 'loading' : q.isError && items.length === 0 ? 'error' : items.length === 0 ? 'empty' : 'ready'
 
   return (
@@ -18,7 +20,7 @@ export default function ListPage() {
       <StateView
         state={state}
         onRetry={() => void q.refetch()}
-        emptyText={params.q ? '검색 결과가 없어요. 다른 검색어나 조건을 써보세요.' : '아직 올라온 공구가 없어요.'}
+        emptyText={filtered ? '검색 결과가 없어요. 다른 검색어나 조건을 써보세요.' : '아직 올라온 공구가 없어요.'}
       >
         <ul className={s.list}>
           {items.map((it) => (
