@@ -13,6 +13,8 @@ export const mockState = {
   members: [] as SeedMember[],
   groupBuys: [] as SeedGroupBuy[],
   pending: [] as Pending[],
+  /** 개설 중복 감지(10초) */
+  recentCreates: [] as { key: string; at: number }[],
   sessionMemberId: null as number | null,
   loginFailures: 0,
   nextMemberId: 4,
@@ -25,6 +27,7 @@ export const mockState = {
     this.members = SEED_MEMBERS.map((m) => ({ ...m }))
     this.groupBuys = makeSeedGroupBuys(Date.now())
     this.pending = []
+    this.recentCreates = []
     this.sessionMemberId = null
     this.loginFailures = 0
     this.nextMemberId = 4
