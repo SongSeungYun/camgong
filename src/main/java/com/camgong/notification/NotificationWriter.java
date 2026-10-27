@@ -51,6 +51,7 @@ class NotificationWriter {
             List<NotificationRow> part = rows.subList(from, Math.min(rows.size(), from + chunk));
             try {
                 tx.executeWithoutResult(s -> batchChunk(part));
+                giveUpsInARow = 0;
             } catch (RuntimeException e) {
                 // 청크 하나의 실패가 다른 청크나 같은 청크의 다른 수신자를 막지 않는다: 이 청크만 행마다 따로 넣는다.
                 for (NotificationRow row : part) {

@@ -140,4 +140,32 @@ class NotificationResilienceIT extends NotificationTestBase {
 
         assertThat(recipientsOf("GROUPBUY_COMPLETED")).containsExactly(1L, 3L, 5L);
     }
+
+    @Test
+    void aSuccessfulChunkBetweenTwoGiveUpsResetsTheConsecutiveCount() {
+        seedMembers(100, 1599);
+        AtomicInteger chunks = new AtomicInteger();
+        doAnswer(inv -> {
+            int n = chunks.incrementAndGet();                                            // 청크 1·3 은 실패, 청크 2 는 정상
+            if (n == 2) {
+                return inv.callRealMethod();
+            }
+            throw new IllegalStateException("청크 실패");
+        }).when(writer).batchChunk(any());
+        doAnswer(inv -> {
+            NotificationRow row = inv.getArgument(0);
+            if (row.recipientId() == 599L || row.recipientId() == 1100L) {               // 청크 1 의 마지막, 청크 3 의 처음
+                throw new IllegalStateException("독 행");
+            }
+            return inv.callRealMethod();
+        }).when(writer).insertOne(any());
+        List<Long> everyone = new java.util.ArrayList<>();
+        for (long m = 100; m < 1600; m++) {
+            everyone.add(m);
+        }
+
+        publish(new GroupBuyCompleted(UUID.randomUUID().toString(), 1L, "t", everyone));
+
+        assertThat(notificationCount()).isEqualTo(1500 - 2);
+    }
 }
