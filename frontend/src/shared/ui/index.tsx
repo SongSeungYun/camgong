@@ -3,7 +3,7 @@ import { isKnownStatus, type KnownStatus } from '../api/types'
 import s from './ui.module.css'
 
 export function Layout({ children }: { children: ReactNode }) {
-  return <main className={s.page}>{children}</main>
+  return <main className={s.page} tabIndex={-1}>{children}</main> // tabIndex: 대화상자가 닫힌 뒤 포커스를 받을 수 있게
 }
 
 type ButtonProps = ComponentProps<'button'> & { variant?: 'primary' | 'secondary'; pending?: boolean }
@@ -110,6 +110,8 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '확인', c
   const ref = useRef<HTMLDivElement>(null)
   const cancelRef = useRef(onCancel)
   cancelRef.current = onCancel
+  const pendingRef = useRef(pending)
+  pendingRef.current = pending
 
   useEffect(() => {
     if (!open) return
@@ -121,7 +123,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '확인', c
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        cancelRef.current()
+        if (!pendingRef.current) cancelRef.current() // 요청이 진행 중이면 닫지 않는다(결과를 못 보고 이동하는 것을 막는다)
       } else if (e.key === 'Tab') {
         const list = items()
         if (list.length === 0) return e.preventDefault()
@@ -139,7 +141,16 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '확인', c
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('keydown', onKey)
-      opener?.focus()
+      // 열었던 버튼으로 돌려보낸다. 성공해서 화면이 바뀌며 그 버튼이 사라지는 경우(예: 참여 취소)는
+      // 다음 화면 갱신이 끝난 뒤 확인해 사라졌으면 본문으로 보내, 포커스가 문서 처음으로 날아가지 않게 한다.
+      const restore = () => {
+        if (opener && document.contains(opener)) opener.focus()
+        else document.querySelector<HTMLElement>('main')?.focus()
+      }
+      restore()
+      setTimeout(() => {
+        if (document.activeElement === document.body || !document.contains(document.activeElement)) restore()
+      }, 0)
     }
   }, [open])
 

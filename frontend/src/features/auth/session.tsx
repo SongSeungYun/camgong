@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { get, post, setUnauthenticatedHandler } from '../../shared/api/client'
+import { ApiError, get, post, setUnauthenticatedHandler } from '../../shared/api/client'
 import type { Member } from '../../shared/api/types'
 
 type Status = 'checking' | 'anonymous' | 'authenticated'
@@ -53,7 +53,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // 서버가 로그아웃을 확인한 뒤에만 화면을 비운다. 실패하면 던져서 호출한 쪽이 안내하고 로그인 상태를 유지한다
       // (화면만 로그아웃되고 세션 쿠키가 살아 있는 상태를 만들지 않는다).
       logout: async () => {
-        await post('/api/auth/logout')
+        try {
+          // 로그아웃 요청의 401은 '이미 로그아웃된 상태'라 만료 안내(expired)를 켜지 않고 로그아웃으로 처리한다
+          await post('/api/auth/logout', undefined, { expect401: true })
+        } catch (e) {
+          if (!(e instanceof ApiError && e.status === 401)) throw e
+        }
         clear()
       },
     }),

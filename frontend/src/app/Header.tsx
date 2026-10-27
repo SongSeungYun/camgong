@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { useSession } from '../features/auth/session'
 import s from '../features/notification/Notification.module.css'
 import { useUnreadCount } from '../features/notification/hooks'
@@ -20,6 +20,8 @@ export function Header() {
   const { status, logout } = useSession()
   const navigate = useNavigate()
   const [logoutFailed, setLogoutFailed] = useState(false)
+  const { pathname } = useLocation()
+  useEffect(() => setLogoutFailed(false), [pathname, status]) // 화면을 옮기거나 로그인 상태가 바뀌면 안내를 걷는다
   const [loggingOut, setLoggingOut] = useState(false)
   const onLogout = async () => {
     setLoggingOut(true)

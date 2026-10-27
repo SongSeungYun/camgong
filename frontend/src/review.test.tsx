@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { delay, http, HttpResponse } from 'msw'
 import { describe, expect, test } from 'vitest'
@@ -115,14 +115,14 @@ describe('ALREADY_REGISTERED는 로그인 링크 (검수 11)', () => {
     await userEvent.click(screen.getByRole('checkbox'))
     await userEvent.click(screen.getByRole('button', { name: '인증 완료하기' }))
     await screen.findByText('이미 가입된 이메일이에요. 로그인해 주세요.')
-    expect(screen.getByRole('link', { name: '로그인' }).getAttribute('href')).toBe('/login')
+    expect(screen.getByRole('link', { name: '로그인하러 가기' }).getAttribute('href')).toBe('/login')
   })
   test('가입 화면', async () => {
     renderApp('/signup')
     await userEvent.type(await screen.findByLabelText('이메일'), 'organizer@school.ac.kr')
     await userEvent.click(screen.getByRole('button', { name: '가입하기' }))
     await screen.findByText('이미 가입된 이메일이에요. 로그인해 주세요.')
-    expect(screen.getAllByRole('link', { name: '로그인' }).some((a) => a.getAttribute('href') === '/login')).toBe(true)
+    expect(screen.getByRole('link', { name: '로그인하러 가기' }).getAttribute('href')).toBe('/login')
   })
 })
 
@@ -281,5 +281,73 @@ describe('접근성 보강 (검수 5)', () => {
     expect(screen.getByRole('tab', { name: '참여한 공구' }).getAttribute('aria-selected')).toBe('false')
     const panel = await screen.findByRole('tabpanel')
     expect(panel.getAttribute('aria-labelledby')).toBe(tab.id)
+  })
+})
+
+describe('재검수 보완', () => {
+  test('가입: 이미 가입된 이메일 오류 뒤 다른 이메일로 성공하고 되돌아와도 로그인 링크가 남지 않는다', async () => {
+    renderApp('/signup')
+    const email = await screen.findByLabelText('이메일')
+    await userEvent.type(email, 'organizer@school.ac.kr')
+    await userEvent.click(screen.getByRole('button', { name: '가입하기' }))
+    await screen.findByRole('link', { name: '로그인하러 가기' })
+    await userEvent.clear(email)
+    await userEvent.type(email, 'fresh@school.ac.kr')
+    await userEvent.click(screen.getByRole('button', { name: '가입하기' }))
+    await screen.findByRole('heading', { name: '인증 메일을 보냈어요' })
+    await userEvent.click(screen.getByRole('button', { name: '다른 이메일로 다시' }))
+    await screen.findByRole('heading', { name: '가입' })
+    expect(screen.queryByRole('link', { name: '로그인하러 가기' })).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  test('공구 취소 요청이 처리 중일 때 Esc는 대화상자를 닫지 않는다', async () => {
+    seedGroupBuy()
+    mockState.sessionMemberId = 1
+    server.use(http.post('/api/groupbuys/:id/cancel', async () => { await delay(300); return new HttpResponse(null, { status: 204 }) }))
+    renderApp('/groupbuys/1')
+    await userEvent.click(await screen.findByRole('button', { name: '공구 취소' }))
+    await userEvent.click(screen.getByRole('button', { name: '공구 취소하기' }))
+    await userEvent.keyboard('{Escape}')
+    screen.getByRole('dialog')
+    await screen.findByText('공구를 취소했어요. 목록에서 사라졌어요.')
+  })
+
+  test('참여 취소: 처리 중 Esc 무시, 성공해 버튼이 사라지면 포커스가 본문으로 간다', async () => {
+    seedGroupBuy()
+    mockState.sessionMemberId = 2
+    server.use(http.delete('/api/groupbuys/:id/participations/me', async () => { await delay(200); mockState.groupBuys[0]!.participations = mockState.groupBuys[0]!.participations.filter((p) => p.memberId !== 2); return new HttpResponse(null, { status: 204 }) }))
+    renderApp('/groupbuys/1')
+    await userEvent.click(await screen.findByRole('button', { name: '참여 취소' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getAllByRole('button').at(-1)!)
+    await userEvent.keyboard('{Escape}')
+    screen.getByRole('dialog')
+    await screen.findByRole('button', { name: '참여하기' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('main')))
+  })
+
+  test('로그아웃 실패 안내는 화면을 옮기면 사라진다', async () => {
+    seedGroupBuy()
+    mockState.sessionMemberId = 1
+    server.use(http.post('/api/auth/logout', () => new HttpResponse(null, { status: 500 })))
+    const { router } = renderApp('/')
+    await userEvent.click(await screen.findByRole('button', { name: '로그아웃' }))
+    await screen.findByText('로그아웃을 서버에 알리지 못했어요. 다시 시도해 주세요.')
+    await router.navigate('/me')
+    await waitFor(() => expect(screen.queryByText('로그아웃을 서버에 알리지 못했어요. 다시 시도해 주세요.')).toBeNull())
+  })
+
+  test('직접 로그아웃했는데 서버가 401이면 로그아웃으로 처리하고 만료 안내는 켜지 않는다', async () => {
+    seedGroupBuy()
+    mockState.sessionMemberId = 1
+    server.use(http.post('/api/auth/logout', () => HttpResponse.json({ title: 'UNAUTHENTICATED', status: 401 }, { status: 401 })))
+    const { router } = renderApp('/')
+    await userEvent.click(await screen.findByRole('button', { name: '로그아웃' }))
+    await screen.findByRole('heading', { name: '로그인' })
+    expect(screen.queryByText('로그인이 필요해요. 입력하던 내용은 저장되지 않아요.')).toBeNull()
+    await router.navigate('/login')
+    expect(screen.queryByText('로그인이 필요해요. 입력하던 내용은 저장되지 않아요.')).toBeNull()
   })
 })

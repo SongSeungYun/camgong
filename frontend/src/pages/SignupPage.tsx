@@ -33,7 +33,7 @@ export default function SignupPage() {
   return (
     <Layout>
       <h1>가입</h1>
-      <form noValidate onSubmit={handleSubmit((f) => { setTopErrors([]); m.mutate(f) })}>
+      <form noValidate onSubmit={handleSubmit((f) => { setTopErrors([]); setAlready(false); m.mutate(f) })}>
         <TextField label="이메일" type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
         <p>학교 이메일만 가입할 수 있어요.</p>
         <p>이름과 비밀번호는 메일의 링크를 열었을 때 정해요.</p>
