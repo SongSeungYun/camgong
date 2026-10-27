@@ -33,6 +33,7 @@ for gate in $GATES; do
   start_app "$gate"
   if [ $first = 1 ]; then mysql_exec < "$ROOT/load/seed.sql"; first=0; fi
   for rep in $(seq 1 "$REPS"); do
+    rm -f "$OUT/summary.json" "$OUT/stats.json" "$OUT/db.tsv"      # 한 반복이 실패해도 앞 반복의 값이 섞이지 않게 한다
     (echo "SET @TOTAL=$TOTAL, @ORG=$ORG;"; cat "$ROOT/load/reset.sql") | mysql_exec
     curl -s -X POST "127.0.0.1:$PORT/bench/reset" >/dev/null
     docker run --rm -e BASE_URL="http://host.docker.internal:$PORT" -e DURATION="$DURATION" -e TOTAL=$TOTAL \
