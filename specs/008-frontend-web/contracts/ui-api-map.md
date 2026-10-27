@@ -38,7 +38,8 @@
 | 403 | `ORGANIZER_NOT_ALLOWED` | "개설자는 직접 참여할 수 없어요. 수량은 공구 수정에서 바꿔요." |
 | 403 | `ORGANIZER_ONLY` | "개설자만 쓸 수 있어요." 상세로 |
 | 404 | (공구·참여 없음/취소) | "찾을 수 없는 공구예요." + 목록으로 (FR-023) |
-| 404 | `PARTICIPATION_NOT_FOUND` | "참여 내역이 없어요." 상세 새로고침 |
+| 404 | `PARTICIPATION_NOT_FOUND` | "참여 내역이 없어요." 상세 새로고침 (체크 PUT에서도 같다) |
+| 400 | `INVALID_TARGET` | "개설자는 체크 대상이 아니에요." (체크표는 개설자 행을 보여주지 않으므로 정상 흐름에서는 나오지 않음) |
 | 409 | `NOT_JOINABLE` / `DEADLINE_PASSED` | "마감 시간이 지나서 참여할 수 없어요." + 최신 상세 다시 불러옴 |
 | 409 | `NOT_JOINABLE` / `COMPLETED` | "이미 모집이 끝난 공구예요." + 최신 상세 |
 | 409 | `NOT_JOINABLE` / `FAILED` | "모집에 실패한 공구예요." + 최신 상세 |

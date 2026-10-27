@@ -91,6 +91,7 @@ com.camgong
 | 401 | `INVALID_CREDENTIALS` | 002 | 이메일/비밀번호 불일치(계정 존재 여부를 숨김) |
 | 403 | `ORGANIZER_NOT_ALLOWED` | 004 | 개설자는 직접 참여 불가(수정·취소를 쓸 것) |
 | 403 | `ORGANIZER_ONLY` | 006 | 개설자만 가능 |
+| 400 | `INVALID_TARGET` | 006 | 체크 대상이 개설자 본인 |
 | 404 | `PARTICIPATION_NOT_FOUND` | 004·006 | 참여 없음. 취소된 공구는 어떤 API에서도 404 |
 | 409 | `NOT_MODIFIABLE` | 001 | 수정·취소 불가. `reason`: `COMPLETED` / `FAILED` / `DEADLINE_PASSED` |
 | 409 | `NOT_JOINABLE` | 004 | 참여·변경·취소 불가. `reason`: `DEADLINE_PASSED` / `COMPLETED` / `FAILED` |
