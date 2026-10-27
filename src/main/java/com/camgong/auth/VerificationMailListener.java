@@ -20,7 +20,7 @@ class VerificationMailListener {
         this.props = props;
     }
 
-    @Async
+    @Async("mailExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void on(VerificationMailRequested event) {
         try {

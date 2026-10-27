@@ -26,6 +26,9 @@ class NotificationWriter {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationWriter.class);
 
+    /** 연달아 이만큼 행을 포기하면 이 사건의 나머지를 포기한다. 한 행만 계속 실패하는 경우(독 행)는 격리되어 나머지가 계속 처리된다. */
+    private static final int GIVE_UPS_BEFORE_ABORT = 2;
+
     private static final String INSERT = """
             INSERT INTO notification (event_id, recipient_id, type, group_buy_id, group_buy_title, changed_fields, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -43,6 +46,7 @@ class NotificationWriter {
 
     void write(List<NotificationRow> rows) {
         int chunk = props.insertChunkSize();
+        int giveUpsInARow = 0;
         for (int from = 0; from < rows.size(); from += chunk) {
             List<NotificationRow> part = rows.subList(from, Math.min(rows.size(), from + chunk));
             try {
@@ -50,7 +54,14 @@ class NotificationWriter {
             } catch (RuntimeException e) {
                 // 청크 하나의 실패가 다른 청크나 같은 청크의 다른 수신자를 막지 않는다: 이 청크만 행마다 따로 넣는다.
                 for (NotificationRow row : part) {
-                    insertWithRetry(row);
+                    giveUpsInARow = insertWithRetry(row) ? 0 : giveUpsInARow + 1;
+                    if (giveUpsInARow >= GIVE_UPS_BEFORE_ABORT) {
+                        // 연달아 포기했다면 그 행만의 문제가 아니라 DB 장애 같은 전체 문제일 가능성이 크다. 행마다 21초씩 자며 실행기 스레드를
+                        // 몇 시간 붙잡지 않도록 이 사건의 나머지는 포기한다(유실로 취급, 허용된 한계).
+                        log.warn("notification-aborted eventId={} recipients={} reason=consecutive-failures", part.get(0).eventId(),
+                                rows.size());
+                        return;
+                    }
                 }
             }
         }
@@ -76,7 +87,8 @@ class NotificationWriter {
         tx.executeWithoutResult(s -> jdbc.update(INSERT, ps -> bind(ps, row)));
     }
 
-    private void insertWithRetry(NotificationRow row) {
+    /** @return 넣었으면 true, 재시도를 모두 소진해 포기했으면 false */
+    private boolean insertWithRetry(NotificationRow row) {
         RuntimeException last = null;
         Duration delay = props.retryBaseDelay();
         for (int attempt = 0; attempt <= props.retryAttempts(); attempt++) {
@@ -86,7 +98,7 @@ class NotificationWriter {
             }
             try {
                 insertOne(row);
-                return;
+                return true;
             } catch (RuntimeException e) {
                 last = e;
             }
@@ -94,6 +106,7 @@ class NotificationWriter {
         // 회원 이름·이메일은 남기지 않는다(id 만).
         log.warn("notification-failed eventId={} recipientId={} reason={}", row.eventId(), row.recipientId(),
                 last == null ? "unknown" : last.getClass().getSimpleName());
+        return false;
     }
 
     private static void sleep(Duration d) {

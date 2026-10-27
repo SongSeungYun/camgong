@@ -101,4 +101,43 @@ class NotificationResilienceIT extends NotificationTestBase {
         assertThat(batchCalls.get()).isEqualTo(2);                 // 500 + 500
         assertThat(singleInserts.get()).isEqualTo(500);            // 실패한 청크의 500건만 단건으로
     }
+
+    @Test
+    void consecutiveGiveUpsAbortTheRestOfTheEventInsteadOfSleepingRowByRow(CapturedOutput output) {
+        seedMembers(100, 1099);
+        doAnswer(inv -> { throw new IllegalStateException("청크 실패"); }).when(writer).batchChunk(any());
+        AtomicInteger attempts = new AtomicInteger();
+        doAnswer(inv -> {
+            attempts.incrementAndGet();
+            throw new IllegalStateException("DB 장애");
+        }).when(writer).insertOne(any());
+        List<Long> everyone = new java.util.ArrayList<>();
+        for (long m = 100; m < 1100; m++) {
+            everyone.add(m);
+        }
+        String eventId = UUID.randomUUID().toString();
+
+        publish(new GroupBuyCompleted(eventId, 1L, "t", everyone));
+
+        // 행마다 처음 1번 + 재시도 3번씩 두 행을 포기하면 나머지는 시도하지 않는다(DB 장애에 실행기 스레드를 몇 시간 붙잡지 않는다)
+        assertThat(attempts.get()).isEqualTo(2 * (1 + 3));
+        assertThat(output.getAll()).contains("notification-aborted eventId=" + eventId);
+        assertThat(notificationCount()).isZero();
+    }
+
+    @Test
+    void aSinglePoisonRowIsStillIsolatedAndTheLaterRowsAreProcessed() {
+        doAnswer(inv -> { throw new IllegalStateException("청크 실패"); }).when(writer).batchChunk(any());
+        doAnswer(inv -> {
+            NotificationRow row = inv.getArgument(0);
+            if (row.recipientId() == 2L || row.recipientId() == 4L) {                    // 연달아가 아닌 두 개의 독 행
+                throw new IllegalStateException("독 행");
+            }
+            return inv.callRealMethod();
+        }).when(writer).insertOne(any());
+
+        publish(new GroupBuyCompleted(UUID.randomUUID().toString(), 1L, "t", List.of(1L, 2L, 3L, 4L, 5L)));
+
+        assertThat(recipientsOf("GROUPBUY_COMPLETED")).containsExactly(1L, 3L, 5L);
+    }
 }
