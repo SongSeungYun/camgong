@@ -1,5 +1,5 @@
 // 사용: k6 run load/k6/browse.js -e DATASET=100 [-e BASE_URL=http://localhost:8080]
-// 목록 첫 페이지 세 가지(일반, 흔한 검색어, 드문 검색어)의 응답 시간을 잰다. SC-001(1만 건 p95 1초 이내).
+// 목록 첫 페이지 세 가지(일반, 흔한 검색어, 드문 검색어)의 응답 시간을 잰다. SC-001(1만 건 p95 1초 이내), SC-007(사용자 결정 B, 2026-10-28: 절대 기준 p95 50ms).
 import http from 'k6/http';
 import { check } from 'k6';
 
@@ -10,10 +10,10 @@ export const options = {
   duration: '20s',
   summaryTrendStats: ['avg', 'med', 'p(95)', 'max'],
   thresholds: {
-    'http_req_duration{name:list}': ['p(95)<1000'],
-    'http_req_duration{name:search_common}': ['p(95)<1000'],
-    'http_req_duration{name:search_rare}': ['p(95)<1000'],
-    'http_req_duration{name:list_deadline}': ['p(95)<1000'],
+    'http_req_duration{name:list}': ['p(95)<50'],
+    'http_req_duration{name:search_common}': ['p(95)<50'],
+    'http_req_duration{name:search_rare}': ['p(95)<50'],
+    'http_req_duration{name:list_deadline}': ['p(95)<50'],
   },
 };
 

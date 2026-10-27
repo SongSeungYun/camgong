@@ -136,6 +136,40 @@ class ListGroupBuyIT extends IntegrationTestBase {
     }
 
     @Test
+    void ideographicAndNoBreakSpacesSeparateWordsAndAWhitespaceOnlyQueryMeansNoSearch() throws Exception {
+        long rice = open("햇반 24개 공구", "즉석밥");
+        open("라면 공구", "신라면");
+
+        mockMvc.perform(get("/api/groupbuys").param("q", "햇반\u300024")).andExpect(jsonPath("$.items[*].id", contains((int) rice)));
+        mockMvc.perform(get("/api/groupbuys").param("q", "햇반\u00A024")).andExpect(jsonPath("$.items[*].id", contains((int) rice)));
+        mockMvc.perform(get("/api/groupbuys").param("q", "\u3000")).andExpect(jsonPath("$.items", hasSize(2)));
+        mockMvc.perform(get("/api/groupbuys").param("q", "\u3000\u00A0 ")).andExpect(jsonPath("$.items", hasSize(2)));
+    }
+
+    @Test
+    void onlyTheFirstFiveSearchWordsAreUsed() throws Exception {
+        long hit = open("a b c d e", "x");                   // 여섯 번째 단어 f 는 어디에도 없다
+        open("a b c d", "x");
+
+        mockMvc.perform(get("/api/groupbuys").param("q", "a b c d e f"))
+                .andExpect(jsonPath("$.items[*].id", contains((int) hit)));
+        // 다섯 단어를 모두 요구하므로 네 단어만 가진 공구는 걸리지 않는다
+        mockMvc.perform(get("/api/groupbuys").param("q", "a b c d e"))
+                .andExpect(jsonPath("$.items[*].id", contains((int) hit)));
+    }
+
+    @Test
+    void completedAndFailedFiltersIgnoreTheDeadline() throws Exception {
+        long doneLate = groupBuy().title("지난 완료").status("COMPLETED").deadline(START.minusSeconds(3600)).insert(jdbc);
+        long doneFuture = groupBuy().title("미래 완료").status("COMPLETED").deadline(SOON).insert(jdbc);
+        long failedFuture = groupBuy().title("미래 실패").status("FAILED").deadline(SOON).insert(jdbc);
+        long failedLate = groupBuy().title("지난 실패").status("FAILED").deadline(START.minusSeconds(3600)).insert(jdbc);
+
+        list("?status=COMPLETED").andExpect(jsonPath("$.items[*].id", contains((int) doneFuture, (int) doneLate)));
+        list("?status=FAILED").andExpect(jsonPath("$.items[*].id", contains((int) failedLate, (int) failedFuture)));
+    }
+
+    @Test
     void searchIsCaseInsensitiveForLatin() throws Exception {
         long id = open("Instant Rice", "x");
         list("?q=instant").andExpect(jsonPath("$.items[*].id", contains((int) id)));

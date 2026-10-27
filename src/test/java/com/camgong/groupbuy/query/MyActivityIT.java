@@ -175,4 +175,29 @@ class MyActivityIT extends IntegrationTestBase {
         assertThat(pages).isEqualTo(2);
         assertThat(seen).containsExactlyElementsOf(joined.reversed());
     }
+
+    @Test
+    void exactlyPageSizeItemsHaveNoNextCursor() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            opened(PARTICIPANT, "딱 세 건 " + i);
+        }
+        for (String role : new String[] { "organizer", "participant" }) {
+            mine(PARTICIPANT, "?role=" + role + "&size=3").andExpect(jsonPath("$.items.length()").value(3))
+                    .andExpect(jsonPath("$.nextCursor").value((Object) null));
+            mine(PARTICIPANT, "?role=" + role + "&size=2").andExpect(jsonPath("$.items.length()").value(2))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.nextCursor").isNotEmpty());
+        }
+    }
+
+    @Test
+    void aDeadlineSortCursorFromTheListIsRejected() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            groupBuy().title("t" + i).deadline(START.plusSeconds(3600L * (i + 1))).insert(jdbc);
+        }
+        String cursor = JsonPath.read(mockMvc.perform(get("/api/groupbuys?size=1&sort=deadline")).andReturn()
+                .getResponse().getContentAsString(), "$.nextCursor");
+        mine(PARTICIPANT, "?role=organizer&cursor=" + cursor).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("cursor")));
+        mine(PARTICIPANT, "?role=participant&cursor=" + cursor).andExpect(status().isBadRequest());
+    }
 }

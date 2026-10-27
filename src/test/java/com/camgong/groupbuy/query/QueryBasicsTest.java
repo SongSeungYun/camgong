@@ -69,7 +69,14 @@ class QueryBasicsTest {
         assertThat(q.words()).isEmpty();
         assertThat(GroupBuyListQuery.of(null, null, "  24   햇반 ", null, null, null).words()).containsExactly("24", "햇반");
         assertThat(GroupBuyListQuery.of(null, null, "   ", null, null, null).words()).isEmpty();
-        assertThat(GroupBuyListQuery.of(null, null, "a b c d e f g", null, null, null).words()).hasSize(5);
+        assertThat(GroupBuyListQuery.of(null, null, "a b c d e f g", null, null, null).words())
+                .containsExactly("a", "b", "c", "d", "e");
+        // 전각 공백(U+3000)·NBSP(U+00A0)도 단어 경계다. 공백뿐이면 검색 안 함
+        assertThat(GroupBuyListQuery.of(null, null, "햇반\u3000\u300024", null, null, null).words()).containsExactly("햇반", "24");
+        assertThat(GroupBuyListQuery.of(null, null, "햇반\u00A024", null, null, null).words()).containsExactly("햇반", "24");
+        assertThat(GroupBuyListQuery.of(null, null, "\u3000", null, null, null).words()).isEmpty();
+        assertThat(GroupBuyListQuery.of(null, null, "\u3000 \u00A0 ", null, null, null).words()).isEmpty();
+        assertThat(GroupBuyListQuery.of(null, null, "\u3000햇반\u3000", null, null, null).words()).containsExactly("햇반");
     }
 
     @Test
@@ -79,6 +86,9 @@ class QueryBasicsTest {
                         .containsExactlyInAnyOrder("status", "category", "q", "sort", "size"));
         assertThatThrownBy(() -> GroupBuyListQuery.of(null, null, null, null, null, "0")).isInstanceOf(ApiException.class);
         assertThat(GroupBuyListQuery.of(null, null, "가".repeat(50), null, null, "50").size()).isEqualTo(50);
+        // 50자 제한은 UTF-16 길이가 아니라 코드포인트 기준이다(이모지 50개는 허용, 51개는 거부)
+        assertThat(GroupBuyListQuery.of(null, null, "😀".repeat(50), null, null, null).words()).hasSize(1);
+        assertThatThrownBy(() -> GroupBuyListQuery.of(null, null, "😀".repeat(51), null, null, null)).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> GroupBuyListQuery.of(null, null, null, "deadline", PageCursor.latest(1).encode(), null))
                 .isInstanceOf(ApiException.class);
     }

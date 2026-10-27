@@ -57,11 +57,13 @@ public record GroupBuyListQuery(DisplayStatus status, GroupBuyCategory category,
         }
         List<String> words = List.of();
         if (q != null) {
-            String trimmed = q.trim();
-            if (trimmed.length() > MAX_QUERY_LENGTH) {
+            // 전각 공백(U+3000)·NBSP(U+00A0)도 공백으로 본다(한글 입력기가 만든다). trim()/\\s 는 이 둘을 공백으로 보지 않는다.
+            String trimmed = q.replaceAll("[\\s\\u00A0\\u3000]+", " ").strip();
+            // 50자 제한은 UTF-16 길이가 아니라 코드포인트 기준이다(이모지 하나가 두 글자로 세어지지 않게).
+            if (trimmed.codePointCount(0, trimmed.length()) > MAX_QUERY_LENGTH) {
                 errors.add(new ApiException.Field("q", "검색어는 50자 이하여야 합니다."));
             } else if (!trimmed.isEmpty()) {
-                words = Arrays.stream(trimmed.split("\\s+")).limit(MAX_WORDS).toList();
+                words = Arrays.stream(trimmed.split(" ")).limit(MAX_WORDS).toList();
             }
         }
         Sort parsedSort = Sort.LATEST;

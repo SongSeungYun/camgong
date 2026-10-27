@@ -103,4 +103,17 @@ class PaginationConsistencyIT extends IntegrationTestBase {
         assertThat(rest).doesNotContainAnyElementsOf(seen).doesNotContain(fresh, seeded.get(1));
         assertThat(rest).containsExactly(seeded.get(0));
     }
+
+    @Test
+    void microsecondDeadlinesAreWalkedWithoutDuplicatesOrGaps() throws Exception {
+        List<Long> seeded = new ArrayList<>();
+        Instant base = START.plus(Duration.ofDays(2));
+        for (int i = 0; i < 12; i++) {
+            // 마이크로초 단위로만 다른 마감과 완전히 같은 마감이 섞여 있다
+            Instant deadline = base.plus(Duration.ofNanos(1000L * (i / 3) + 123_000));
+            seeded.add(groupBuy().title("마이크로 " + i).deadline(deadline).insert(jdbc));
+        }
+        assertThat(walk("?size=5&sort=deadline", 3)).isEqualTo(seeded);
+        assertThat(walk("?size=1&sort=deadline", 12)).isEqualTo(seeded);
+    }
 }
