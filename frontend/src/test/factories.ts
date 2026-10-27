@@ -2,8 +2,8 @@ import type { SeedGroupBuy } from '../mocks/data/seed'
 import { mockState } from '../mocks/state'
 
 /** 테스트용 공구 하나를 목 서버에 넣는다. 개설자=1(개설자), 참여자=2, 비참여자=3. */
-export function seedGroupBuy(over: Partial<SeedGroupBuy> = {}): SeedGroupBuy {
-  const g: SeedGroupBuy = {
+export function makeGroupBuy(over: Partial<SeedGroupBuy> = {}): SeedGroupBuy {
+  return {
     id: 1,
     title: '햇반 24개 공구',
     description: '같이 사요',
@@ -23,6 +23,10 @@ export function seedGroupBuy(over: Partial<SeedGroupBuy> = {}): SeedGroupBuy {
     ],
     ...over,
   }
+}
+
+export function seedGroupBuy(over: Partial<SeedGroupBuy> = {}): SeedGroupBuy {
+  const g = makeGroupBuy(over)
   mockState.groupBuys = [g]
   return g
 }

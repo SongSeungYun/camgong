@@ -18,6 +18,7 @@ export function GroupBuyCard({ item, nowMs }: { item: Card; nowMs: number }) {
       <p className={s.meta}>{formatWon(item.unitPrice)} / 개</p>
       <ProgressBar value={item.securedQuantity} max={item.totalQuantity} />
       <p className={s.meta}>{item.securedQuantity}/{item.totalQuantity}</p>
+      {item.myQuantity !== undefined && <p className={s.meta}>{`내 수량 ${item.myQuantity}개`}</p>}
       <p className={s.meta}>
         <span>{formatKst(item.deadline)}</span> · <span>{remainingText(item.deadline, nowMs)}</span>
       </p>

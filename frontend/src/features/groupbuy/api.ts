@@ -14,3 +14,11 @@ export function fetchGroupBuys(p: ListParams, cursor?: string): Promise<Page<Gro
 export const createGroupBuy = (b: GroupBuyRequest) => post<{ id: number }>('/api/groupbuys', b)
 export const updateGroupBuy = (id: number, b: GroupBuyRequest) => put<{ id: number }>(`/api/groupbuys/${id}`, b)
 export const cancelGroupBuy = (id: number) => post(`/api/groupbuys/${id}/cancel`)
+
+export type MyRole = 'organizer' | 'participant'
+
+export function fetchMyGroupBuys(role: MyRole, cursor?: string): Promise<Page<GroupBuyCard>> {
+  const sp = new URLSearchParams({ role })
+  if (cursor) sp.set('cursor', cursor)
+  return get(`/api/me/groupbuys?${sp}`)
+}
