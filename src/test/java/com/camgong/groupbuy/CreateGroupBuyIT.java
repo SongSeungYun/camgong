@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -57,5 +58,22 @@ class CreateGroupBuyIT extends IntegrationTestBase {
                 .andExpect(status().isUnauthorized());
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM group_buy", Integer.class)).isZero();
+    }
+
+    /** 401 은 본문 검증(400)·존재 확인(404)보다 먼저다. 인증 안 된 호출자에게 검증 규칙을 흘리지 않는다. */
+    @Test
+    void unauthenticatedWinsOverInvalidBody() throws Exception {
+        String invalid = "{}";
+        mockMvc.perform(post("/api/groupbuys").contentType(MediaType.APPLICATION_JSON).content(invalid))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/groupbuys").with(as(99)).contentType(MediaType.APPLICATION_JSON).content(invalid))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/groupbuys").header("X-Member-Id", "abc")
+                        .contentType(MediaType.APPLICATION_JSON).content(invalid))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(put("/api/groupbuys/1").contentType(MediaType.APPLICATION_JSON).content(invalid))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(put("/api/groupbuys/1").with(as(99)).contentType(MediaType.APPLICATION_JSON).content(invalid))
+                .andExpect(status().isUnauthorized());
     }
 }
