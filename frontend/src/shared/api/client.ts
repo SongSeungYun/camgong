@@ -44,7 +44,12 @@ async function toApiError(res: Response): Promise<ApiError> {
   )
 }
 
-export async function api<T = void>(method: string, path: string, body?: unknown): Promise<T> {
+interface Options {
+  /** 시작 시 me 조회처럼 401이 '정상 응답'인 호출은 세션 만료 처리(캐시 비우기)를 하지 않는다 */
+  expect401?: boolean
+}
+
+export async function api<T = void>(method: string, path: string, body?: unknown, { expect401 = false }: Options = {}): Promise<T> {
   let res: Response
   try {
     res = await fetch(new URL(path, location.href), {
@@ -59,14 +64,14 @@ export async function api<T = void>(method: string, path: string, body?: unknown
   if (!res.ok) {
     const err = await toApiError(res)
     // 로그인 실패(INVALID_CREDENTIALS)는 세션 만료가 아니므로 제외한다.
-    if (err.status === 401 && err.code !== 'INVALID_CREDENTIALS') onUnauthenticated()
+    if (err.status === 401 && err.code !== 'INVALID_CREDENTIALS' && !expect401) onUnauthenticated()
     throw err
   }
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
 
-export const get = <T>(path: string) => api<T>('GET', path)
+export const get = <T>(path: string, opts?: Options) => api<T>('GET', path, undefined, opts)
 export const post = <T = void>(path: string, body?: unknown) => api<T>('POST', path, body)
 export const put = <T = void>(path: string, body?: unknown) => api<T>('PUT', path, body)
 export const del = <T = void>(path: string) => api<T>('DELETE', path)
