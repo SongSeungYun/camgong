@@ -26,6 +26,10 @@ spring:
       mail.smtp.connectiontimeout: 5000
       mail.smtp.timeout: 10000
       mail.smtp.writetimeout: 10000
+      # 465 SMTPS(spring.mail.protocol=smtps)로 쓰면 JavaMail 이 smtps 키를 읽는다
+      mail.smtps.connectiontimeout: 5000
+      mail.smtps.timeout: 10000
+      mail.smtps.writetimeout: 10000
   jackson:
     deserialization:
       # 1.5 같은 소수가 정수 필드에 조용히 잘려 들어가지 않게 한다(수량·가격은 정수만, 계약의 400).

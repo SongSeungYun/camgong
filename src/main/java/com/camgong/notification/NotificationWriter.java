@@ -45,7 +45,7 @@ class NotificationWriter {
     }
 
     void write(List<NotificationRow> rows) {
-        int chunk = props.insertChunkSize();
+        int chunk = props.insertChunkSize();                // 최소 2(NotificationProperties): 1 이면 청크 안 연속 포기를 셀 수 없다
         int written = 0;
         for (int from = 0; from < rows.size(); from += chunk) {
             List<NotificationRow> part = rows.subList(from, Math.min(rows.size(), from + chunk));
