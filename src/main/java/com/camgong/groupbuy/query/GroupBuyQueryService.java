@@ -10,7 +10,6 @@ import java.util.List;
 import com.camgong.common.ApiException;
 import com.camgong.groupbuy.GroupBuy;
 import com.camgong.groupbuy.GroupBuyRepository;
-import com.camgong.groupbuy.GroupBuyStatus;
 import com.camgong.groupbuy.Participation;
 import com.camgong.groupbuy.ParticipationRepository;
 

@@ -1,5 +1,7 @@
 package com.camgong.groupbuy.query;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
@@ -9,8 +11,8 @@ import com.camgong.support.IntegrationTestBase;
 import com.camgong.support.QueryCountInspector;
 
 /**
- * N+1 쿼리 수 측정(헌법 II). 시나리오 B: 상세의 개설자용 명단, A: 내가 참여한 공구 한 페이지.
- * 순진한 구현 시점에는 측정값만 출력하고, 개선을 마친 뒤 상한 단언을 건다(T030).
+ * N+1 회귀 테스트(헌법 II). 시나리오 B: 상세의 개설자용 명단, A: 내가 참여한 공구 한 페이지.
+ * 쿼리 수가 데이터 양(N)과 무관해야 한다. 단계별 측정값은 docs/benchmarks/browse-n-plus-one.md.
  */
 class QueryCountIT extends IntegrationTestBase {
 
@@ -44,6 +46,11 @@ class QueryCountIT extends IntegrationTestBase {
             QueryCountInspector.reset();
             service.detail(ORGANIZER, id);
             System.out.println("[N+1 B] participants=" + n + " queries=" + QueryCountInspector.count());
+            assertThat(QueryCountInspector.count()).as("개설자 상세, 참여자 %d명", n).isLessThanOrEqualTo(4);
+
+            QueryCountInspector.reset();
+            service.detail(PARTICIPANT, id);
+            assertThat(QueryCountInspector.count()).as("참여자 상세, 참여자 %d명", n).isLessThanOrEqualTo(3);
         }
     }
 
@@ -60,6 +67,7 @@ class QueryCountIT extends IntegrationTestBase {
             QueryCountInspector.reset();
             service.mine(ORGANIZER, "participant", null, "50");
             System.out.println("[N+1 A] items=" + n + " queries=" + QueryCountInspector.count());
+            assertThat(QueryCountInspector.count()).as("내가 참여한 공구 %d건", n).isLessThanOrEqualTo(2);
         }
     }
 }
