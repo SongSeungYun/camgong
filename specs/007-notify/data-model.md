@@ -8,7 +8,7 @@
 |------|------|------|------|
 | `id` | `BIGINT AUTO_INCREMENT PRIMARY KEY` | | |
 | `event_id` | `CHAR(36)` | 필수. 이벤트의 UUID | 결정 2, FR-005 |
-| `recipient_id` | `BIGINT` | 필수. 받는 회원 (`member` FK) | FR-002 |
+| `recipient_id` | `BIGINT` | 필수. 받는 회원 id (의도적으로 FK 없음: 대량 삽입 비용과 회원 삭제 기능이 없음. 구현은 FK를 두지 않는다) | FR-002 |
 | `type` | `VARCHAR(30)` | 필수. `GROUPBUY_COMPLETED`, `GROUPBUY_FAILED`, `GROUPBUY_CHANGED`, `GROUPBUY_CANCELLED` | FR-001 |
 | `group_buy_id` | `BIGINT` | 필수. FK는 두지 않는다(취소된 공구도 알림이 남는다) | |
 | `group_buy_title` | `VARCHAR(100)` | 필수. 사건 시점의 제목 스냅샷 | FR-003, 결정 7 |
