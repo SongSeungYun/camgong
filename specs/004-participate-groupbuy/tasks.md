@@ -28,7 +28,7 @@ description: "공구 참여·수량 변경·참여 취소 구현 태스크"
 - [ ] T003 [P] `main/groupbuy/join/GateResult.java`: 성공(갱신 후 `securedQuantity`, `completed`)과 거부 사유(`NOT_FOUND`, `NOT_JOINABLE`, `PRICE_CHANGED`(+`currentUnitPrice`), `INSUFFICIENT_QUANTITY`(+`remainingQuantity`), `BUSY`)를 표현한다.
 - [ ] T004 `main/groupbuy/join/QuantityGate.java`: 인터페이스 `GateResult reserve(long groupBuyId, int delta, Integer expectedUnitPrice, Instant now)`. 취소는 `expectedUnitPrice = null`. 게이트는 `group_buy` 행(상태·마감·가격·수량)만 책임지고 참여 행과 이벤트는 건드리지 않는다.
 - [ ] T005 [P] `test/support/IntegrationTestBase.java`에 시드 헬퍼 추가: 회원 2~101(참여자 100명), 총 24·개설자 수량 9·개당 1,200원·마감 +7일 공구를 만드는 메서드, `participation` 행을 직접 삽입하며 `secured_quantity`를 맞추는 메서드. 동시 실행에 쓸 스레드 풀 도우미.
-- [ ] T006 [P] `main/groupbuy/ParticipationRepository.java`에 메서드 추가: (공구, 회원)으로 참여 1건, 공구의 모든 참여자 회원 id(개설자 포함), (공구, 회원) 삭제.
+- [ ] T006 [P] `main/groupbuy/ParticipationRepository.java`에 메서드 추가: (공구, 회원)으로 참여 1건, 공구의 모든 참여자 회원 id(개설자 포함), (공구, 회원) 삭제. **공구 행 락을 잡은 뒤 읽는 참여 행은 001의 `findLockedByGroupBuyId`·`findLockedByGroupBuyIdAndMemberId`(잠금 읽기)처럼 `PESSIMISTIC_WRITE`로 읽는다.** 일반 SELECT는 REPEATABLE READ에서 락 대기 전 스냅샷을 봐서 다른 요청이 바꾼 값을 못 본다(001 `ModifyConcurrencyIT`가 잡은 버그).
 
 ---
 
