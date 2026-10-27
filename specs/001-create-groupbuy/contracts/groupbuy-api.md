@@ -44,7 +44,7 @@
 | 401 | 회원 식별 실패 |
 | 403 | 개설자가 아님 |
 | 404 | 공구가 없거나 취소됨 |
-| 409 `NOT_MODIFIABLE` | `OPEN`이 아니거나(COMPLETED) 마감이 지남. 본문 `reason`: `COMPLETED` / `DEADLINE_PASSED` |
+| 409 `NOT_MODIFIABLE` | `OPEN`이 아니거나(COMPLETED, FAILED) 마감이 지남. 본문 `reason`: `COMPLETED` / `FAILED` / `DEADLINE_PASSED` (`FAILED`는 005에서 모집 실패로 확정된 공구, 004 참여 거부와 같은 값. 2026-10-28 결정) |
 
 부수 효과: 오픈채팅 링크 외 필드(구매처 링크 포함)가 바뀌었고 개설자 외 참여자가 있으면 `GroupBuyChanged` 이벤트 발행(알림 기능이 소비). 수정으로 확보 수량이 총 수량과 같아져 모집 완료가 되면 개설자 포함 전원 대상 `GroupBuyCompleted`도 발행한다.
 

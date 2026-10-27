@@ -42,7 +42,7 @@
 | 409 | `NOT_JOINABLE` / `DEADLINE_PASSED` | "마감 시간이 지나서 참여할 수 없어요." + 최신 상세 다시 불러옴 |
 | 409 | `NOT_JOINABLE` / `COMPLETED` | "이미 모집이 끝난 공구예요." + 최신 상세 |
 | 409 | `NOT_JOINABLE` / `FAILED` | "모집에 실패한 공구예요." + 최신 상세 |
-| 409 | `NOT_MODIFIABLE` / `COMPLETED`·`DEADLINE_PASSED` | "이미 모집이 끝났거나 마감이 지나서 수정·취소할 수 없어요." + 최신 상세 |
+| 409 | `NOT_MODIFIABLE` / `COMPLETED`·`FAILED`·`DEADLINE_PASSED` | "이미 모집이 끝났거나 마감이 지나서 수정·취소할 수 없어요." + 최신 상세 (알 수 없는 `reason`도 같은 문구) |
 | 409 | `INSUFFICIENT_QUANTITY` (+`remainingQuantity`) | "남은 수량이 부족해요. 지금 남은 수량은 N개예요." + 최신 상세 |
 | 409 | `PRICE_CHANGED` (+`currentUnitPrice`) | "개당 가격이 바뀌었어요(N원). 금액을 다시 확인해 주세요." 새 가격으로 갱신, 재확인해야 제출 가능 |
 | 409 | `ALREADY_JOINED` | "이미 참여했어요. 수량은 '수량 변경'을 써요." |
