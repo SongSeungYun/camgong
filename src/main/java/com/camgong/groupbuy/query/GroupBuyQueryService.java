@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.camgong.common.ApiException;
@@ -13,6 +14,7 @@ import com.camgong.groupbuy.GroupBuyStatus;
 import com.camgong.groupbuy.Participation;
 import com.camgong.groupbuy.ParticipationRepository;
 
+import org.springframework.data.domain.Limit;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,45 @@ public class GroupBuyQueryService {
         this.groupBuys = groupBuys;
         this.participations = participations;
         this.clock = clock;
+    }
+
+    /**
+     * 내 활동. role 은 organizer(내가 연 공구) / participant(내가 참여한 공구, 내가 연 공구 포함).
+     * 두 탭 모두 공구 id 역순 키셋이고 CANCELLED 는 제외한다.
+     */
+    public Page<MyActivityItem> mine(Long memberId, String role, String cursor, String size) {
+        List<ApiException.Field> errors = new ArrayList<>();
+        if (!"organizer".equals(role) && !"participant".equals(role)) {
+            errors.add(new ApiException.Field("role", "role 은 organizer 또는 participant 여야 합니다."));
+        }
+        int pageSize = GroupBuyListQuery.parseSize(size, errors);
+        if (!errors.isEmpty()) {
+            throw GroupBuyListQuery.badRequest(errors);
+        }
+        Long cursorId = cursor == null || cursor.isBlank() ? null
+                : PageCursor.decode(cursor, GroupBuyListQuery.Sort.LATEST).id();
+        Instant now = Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+
+        List<MyActivityItem> items = new ArrayList<>();
+        if ("organizer".equals(role)) {
+            for (GroupBuy g : groupBuys.findMine(memberId, cursorId, Limit.of(pageSize + 1))) {
+                items.add(activityItem(g, now, null));
+            }
+        } else {
+            for (Participation p : participations.findMine(memberId, cursorId, Limit.of(pageSize + 1))) {
+                items.add(activityItem(p.getGroupBuy(), now, p.getQuantity()));
+            }
+        }
+        boolean hasNext = items.size() > pageSize;
+        List<MyActivityItem> page = hasNext ? items.subList(0, pageSize) : items;
+        String nextCursor = hasNext ? PageCursor.latest(page.get(page.size() - 1).id()).encode() : null;
+        return new Page<>(page, nextCursor);
+    }
+
+    private static MyActivityItem activityItem(GroupBuy g, Instant now, Integer myQuantity) {
+        return new MyActivityItem(g.getId(), g.getTitle(), g.getItemName(), g.getCategory(), g.getUnitPrice(),
+                g.getSecuredQuantity(), g.getTotalQuantity(), toOffset(g.getDeadline()),
+                DisplayStatus.derive(g.getStatus(), g.getDeadline(), now), myQuantity);
     }
 
     /**

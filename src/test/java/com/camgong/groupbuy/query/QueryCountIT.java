@@ -46,4 +46,20 @@ class QueryCountIT extends IntegrationTestBase {
             System.out.println("[N+1 B] participants=" + n + " queries=" + QueryCountInspector.count());
         }
     }
+
+    @Test
+    void scenarioA_myParticipatedGroupBuysOnePage() throws Exception {
+        for (int n : new int[] { 1, 20, 50 }) {
+            jdbc.update("DELETE FROM participation");
+            jdbc.update("DELETE FROM group_buy");
+            for (int i = 0; i < n; i++) {
+                long id = com.camgong.support.GroupBuySeed.groupBuy().organizer(PARTICIPANT).quantities(1000, 1).insert(jdbc);
+                jdbc.update("INSERT INTO participation (group_buy_id, member_id, quantity, created_at) VALUES (?, ?, 1, ?)",
+                        id, ORGANIZER, LocalDateTime.ofInstant(START, ZoneOffset.UTC));
+            }
+            QueryCountInspector.reset();
+            service.mine(ORGANIZER, "participant", null, "50");
+            System.out.println("[N+1 A] items=" + n + " queries=" + QueryCountInspector.count());
+        }
+    }
 }
