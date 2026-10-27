@@ -1,4 +1,17 @@
-import { SEED_MEMBERS, makeSeedGroupBuys, type SeedGroupBuy, type SeedMember } from './data/seed'
+import { SEED_MEMBERS, makeSeedGroupBuys, makeSeedNotifications, type SeedGroupBuy, type SeedMember } from './data/seed'
+
+export interface MockNotification {
+  id: number
+  /** 받는 회원. 응답에는 내려가지 않는다 */
+  memberId: number
+  type: string
+  groupBuyId: number
+  groupBuyTitle: string
+  changedFields: string[] | null
+  createdAt: string
+  read: boolean
+  linkable: boolean
+}
 
 interface Pending {
   email: string
@@ -13,6 +26,7 @@ export const mockState = {
   members: [] as SeedMember[],
   groupBuys: [] as SeedGroupBuy[],
   pending: [] as Pending[],
+  notifications: [] as MockNotification[],
   /** 개설 중복 감지(10초) */
   recentCreates: [] as { key: string; at: number }[],
   sessionMemberId: null as number | null,
@@ -31,6 +45,7 @@ export const mockState = {
     this.members = SEED_MEMBERS.map((m) => ({ ...m }))
     this.groupBuys = makeSeedGroupBuys(Date.now())
     this.pending = []
+    this.notifications = makeSeedNotifications(Date.now())
     this.recentCreates = []
     this.sessionMemberId = null
     this.loginFailures = 0

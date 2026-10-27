@@ -1,0 +1,7 @@
+.list { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-2); }
+.item { width: 100%; min-height: var(--touch); text-align: left; display: grid; gap: var(--space-1); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.item[data-unread='true'] { border-color: var(--color-primary); }
+.item[data-unread='true'] .msg { font-weight: 700; }
+.meta { font-size: 0.875rem; }
+.bell { position: relative; display: inline-flex; align-items: center; min-height: var(--touch); }
+.badge { margin-left: var(--space-1); min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--color-primary); color: var(--color-primary-text); font-size: 0.75rem; text-align: center; line-height: 20px; }
