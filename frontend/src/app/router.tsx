@@ -44,9 +44,9 @@ export const routes: RouteObject[] = [
       {
         element: <RequireAuth />,
         children: [
-          { path: '/groupbuys/new', lazy: stub('공구 개설') },
+          { path: '/groupbuys/new', lazy: page(() => import('../pages/CreatePage')) },
           { path: '/groupbuys/:id', lazy: page(() => import('../pages/DetailPage')) },
-          { path: '/groupbuys/:id/edit', lazy: stub('공구 수정') },
+          { path: '/groupbuys/:id/edit', lazy: page(() => import('../pages/EditPage')) },
           { path: '/groupbuys/:id/check', lazy: stub('체크표') },
           { path: '/me', lazy: stub('내 활동') },
           { path: '/notifications', lazy: stub('알림함') },

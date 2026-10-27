@@ -97,12 +97,13 @@ interface ConfirmDialogProps {
   title: string
   message?: string
   confirmLabel?: string
+  cancelLabel?: string
   pending?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
 
-export function ConfirmDialog({ open, title, message, confirmLabel = '확인', pending, onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, message, confirmLabel = '확인', cancelLabel = '취소', pending, onConfirm, onCancel }: ConfirmDialogProps) {
   if (!open) return null
   return (
     <div className={s.backdrop}>
@@ -110,7 +111,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '확인', p
         <h2>{title}</h2>
         {message && <p>{message}</p>}
         <div className={s.actions}>
-          <Button variant="secondary" onClick={onCancel} disabled={pending}>취소</Button>
+          <Button variant="secondary" onClick={onCancel} disabled={pending}>{cancelLabel}</Button>
           <Button onClick={onConfirm} pending={pending}>{confirmLabel}</Button>
         </div>
       </div>

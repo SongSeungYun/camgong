@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router'
 import { GroupBuyCard } from '../features/groupbuy/list/GroupBuyCard'
 import s from '../features/groupbuy/list/GroupBuyCard.module.css'
 import { ListFilters } from '../features/groupbuy/list/ListFilters'
@@ -8,6 +9,7 @@ import { Button, Layout, StateView } from '../shared/ui'
 export default function ListPage() {
   const { params, qInput, setQInput, setParams } = useListParams()
   const q = useGroupBuyList(params)
+  const notice = (useLocation().state as { notice?: string } | null)?.notice
   const items = q.data?.pages.flatMap((p) => p.items) ?? []
   // FR-014: 정렬을 뺀 조건(검색어·카테고리·기본이 아닌 상태)이 하나라도 걸려 있으면 '결과 없음'
   const filtered = !!params.q || params.category !== null || params.status !== 'OPEN'
@@ -16,6 +18,7 @@ export default function ListPage() {
   return (
     <Layout>
       <h1>공구 목록</h1>
+      {notice && <p role="status">{notice}</p>}
       <ListFilters params={params} qInput={qInput} onQ={setQInput} onChange={setParams} />
       <StateView
         state={state}

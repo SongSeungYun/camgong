@@ -5,6 +5,7 @@ import { externalLinkProps, safeHttpsUrl } from '../../../shared/lib/safeLink'
 import { formatKst, remainingText } from '../../../shared/lib/time'
 import { Badge, Button, ProgressBar } from '../../../shared/ui'
 import s from './GroupBuyDetail.module.css'
+import { OrganizerActions } from './OrganizerActions'
 import { visibleActions } from './visibleActions'
 
 /** 서버 텍스트는 JSX 텍스트로만 렌더링한다(FR-010). nowMs는 불러온 시점. */
@@ -41,9 +42,8 @@ export function GroupBuyDetail({ d, nowMs }: { d: Detail; nowMs: number }) {
       </div>
 
       <div className={s.actions}>
-        {v.edit && <Link className={s.linkButton} to={`/groupbuys/${d.id}/edit`}>수정</Link>}
-        {/* ponytail: 아래 변경 버튼은 US3·US4·US6에서 동작을 붙인다. 그 전까지 비활성. */}
-        {v.edit && <Button variant="secondary" disabled>공구 취소</Button>}
+        {v.edit && <OrganizerActions d={d} />}
+        {/* ponytail: 아래 변경 버튼은 US4에서 동작을 붙인다. 그 전까지 비활성. */}
         {v.join && <Button disabled>참여하기</Button>}
         {v.changeParticipation && <Button variant="secondary" disabled>수량 변경</Button>}
         {v.changeParticipation && <Button variant="secondary" disabled>참여 취소</Button>}

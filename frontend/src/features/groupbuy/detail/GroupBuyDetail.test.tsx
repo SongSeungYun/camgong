@@ -99,8 +99,9 @@ describe('상세 화면 (US2-5·6)', () => {
     expect(chat.getAttribute('rel')).toBe('noopener noreferrer')
     screen.getByRole('link', { name: '체크표' })
     a.unmount()
-    // 모집 중이면 서버가 오픈채팅을 주지 않는다 → 화면에도 없다
-    seedGroupBuy()
+    // 모집 중이면 참여자에게 서버가 오픈채팅을 주지 않는다 → 화면에도 없다
+    seedGroupBuy({ openChatUrl: 'https://open.kakao.com/o/abc' })
+    mockState.sessionMemberId = 2
     renderApp('/groupbuys/1')
     await screen.findByRole('heading', { name: '햇반 24개 공구' })
     expect(screen.queryByRole('link', { name: /오픈채팅/ })).toBeNull()
