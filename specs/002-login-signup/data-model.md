@@ -103,9 +103,13 @@ WHERE email_key = :k AND last_sent_at <= :now - INTERVAL 1 MINUTE
 INSERT INTO login_attempt (email_key, failed_count, locked_until, updated_at) VALUES (:k, 1, NULL, :now)
 ON DUPLICATE KEY UPDATE
   failed_count = IF(locked_until IS NOT NULL AND locked_until <= :now, 1, failed_count + 1),
-  locked_until = IF(failed_count >= 5, :now + INTERVAL 15 MINUTE, locked_until),
+  locked_until = IF(failed_count >= 5,
+                    IF(locked_until IS NULL OR locked_until <= :now, :now + INTERVAL 15 MINUTE, locked_until),
+                    IF(locked_until IS NOT NULL AND locked_until <= :now, NULL, locked_until)),
   updated_at = :now
 ```
+
+위 수식은 구현(T034)이 바로잡은 것이다. 처음 문서의 `IF(failed_count >= 5, now+15분, locked_until)`은 잠금이 풀린 뒤에도 이전 `locked_until`이 남아 다음 실패마다 횟수가 1로 돌아가 영영 5에 닿지 못했다. 이미 잠긴 상태에서 늦게 도착한 실패가 잠금을 연장하지 않는 것도 이 식이 보장한다. `SET` 평가 순서(왼쪽→오른쪽)는 MySQL 8.4에서 확인됐다.
 
 (잠금 중에는 로그인 자체를 시도하지 않고 거부한다. `ON DUPLICATE KEY UPDATE`의 별칭 문법과 평가 순서는 구현 때 검증한다.)
 
