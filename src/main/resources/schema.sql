@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS group_buy (
     created_at        DATETIME(6)   NOT NULL,
     updated_at        DATETIME(6)   NOT NULL,
     KEY idx_group_buy_organizer_id (organizer_id, id),
+    KEY idx_group_buy_status_deadline (status, deadline),
     CONSTRAINT fk_group_buy_organizer FOREIGN KEY (organizer_id) REFERENCES member (id),
     CONSTRAINT chk_group_buy_secured CHECK (secured_quantity BETWEEN 1 AND total_quantity)
 );

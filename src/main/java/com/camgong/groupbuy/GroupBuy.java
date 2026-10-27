@@ -121,6 +121,21 @@ public class GroupBuy {
         this.updatedAt = now;
     }
 
+    /**
+     * 마감 확정: OPEN 이고 아직 덜 찼을 때만 FAILED 로 간다(불변식 I7, I10). FAILED 는 종료 상태다.
+     * 마감 시각 판정은 선점 쿼리의 몫이고(락을 잡은 뒤 다시 확인), 여기서는 상태 전이의 가드만 둔다.
+     */
+    public void fail(Instant now) {
+        if (status != GroupBuyStatus.OPEN) {
+            throw new IllegalStateException("OPEN 이 아닌 공구는 모집 실패로 확정할 수 없다: " + status);
+        }
+        if (securedQuantity >= totalQuantity) {
+            throw new IllegalStateException("가득 찬 공구는 모집 실패가 될 수 없다");
+        }
+        status = GroupBuyStatus.FAILED;
+        updatedAt = now;
+    }
+
     /** OPEN 에서만 CANCELLED 로 간다. 행은 지우지 않는다. */
     public void cancel(Instant now) {
         if (status != GroupBuyStatus.OPEN) {

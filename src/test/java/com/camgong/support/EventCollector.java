@@ -9,6 +9,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCancelled;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyChanged;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCompleted;
+import com.camgong.groupbuy.GroupBuyEvents.GroupBuyFailed;
 
 /** 커밋 후에 실제로 전달된 이벤트만 모은다(롤백된 트랜잭션의 이벤트는 들어오지 않는다). */
 public class EventCollector {
@@ -16,6 +17,7 @@ public class EventCollector {
     private final List<GroupBuyChanged> changed = new CopyOnWriteArrayList<>();
     private final List<GroupBuyCancelled> cancelled = new CopyOnWriteArrayList<>();
     private final List<GroupBuyCompleted> completed = new CopyOnWriteArrayList<>();
+    private final List<GroupBuyFailed> failed = new CopyOnWriteArrayList<>();
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void on(GroupBuyChanged e) {
@@ -30,6 +32,15 @@ public class EventCollector {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void on(GroupBuyCompleted e) {
         completed.add(e);
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    void on(GroupBuyFailed e) {
+        failed.add(e);
+    }
+
+    public List<GroupBuyFailed> failed() {
+        return failed;
     }
 
     public List<GroupBuyChanged> changed() {
@@ -48,5 +59,6 @@ public class EventCollector {
         changed.clear();
         cancelled.clear();
         completed.clear();
+        failed.clear();
     }
 }

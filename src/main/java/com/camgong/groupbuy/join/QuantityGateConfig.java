@@ -40,8 +40,8 @@ class QuantityGateConfig implements InitializingBean {
 
     @Bean
     @ConditionalOnProperty(name = "camgong.quantity-gate", havingValue = "pessimistic", matchIfMissing = true)
-    QuantityGate pessimisticQuantityGate(GroupBuyRepository groupBuys) {
-        return new PessimisticQuantityGate(groupBuys);
+    QuantityGate pessimisticQuantityGate(GroupBuyRepository groupBuys, java.time.Clock clock) {
+        return new PessimisticQuantityGate(groupBuys, clock);
     }
 
     @Bean

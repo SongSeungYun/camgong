@@ -66,8 +66,8 @@ public class GroupBuyService {
      */
     @Transactional
     public GroupBuyResponse update(Long memberId, Long id, GroupBuyRequest r) {
-        Instant now = Instant.now(clock);
-        GroupBuy g = lockModifiable(memberId, id, now);
+        GroupBuy g = lockModifiable(memberId, id);
+        Instant now = Instant.now(clock);              // 락을 받은 뒤의 시각(락 대기 중에 마감이 지났을 수 있다)
 
         Participation organizerRow = participations.findLockedByGroupBuyIdAndMemberId(id, g.getOrganizerId())
                 .orElseThrow(() -> new IllegalStateException("개설자 참여 행이 없다: groupBuyId=" + id));
@@ -124,8 +124,8 @@ public class GroupBuyService {
 
     @Transactional
     public void cancel(Long memberId, Long id) {
+        GroupBuy g = lockModifiable(memberId, id);
         Instant now = Instant.now(clock);
-        GroupBuy g = lockModifiable(memberId, id, now);
 
         g.cancel(now);
 
@@ -136,16 +136,22 @@ public class GroupBuyService {
         }
     }
 
-    /** 행 락을 잡고 404(없음·취소됨) → 403(개설자 아님) → 409(OPEN·마감 전 아님) 순으로 거른다. */
-    private GroupBuy lockModifiable(Long memberId, Long id, Instant now) {
+    /**
+     * 행 락을 잡고 404(없음·취소됨) → 403(개설자 아님) → 409(OPEN·마감 전 아님) 순으로 거른다.
+     * 마감 판정에 쓰는 시각은 **락을 받은 뒤에** 읽는다(spec FR-009, 처리하는 순간의 시각): 다른 트랜잭션이 쥔 락을 기다리는 동안
+     * 마감이 지났다면 요청이 도착한 시각이 아니라 지금 기준으로 거부해야 마감 연장 같은 변경이 확정 대상 공구를 되살리지 못한다.
+     */
+    private GroupBuy lockModifiable(Long memberId, Long id) {
         GroupBuy g = groupBuys.findByIdForUpdate(id)
                 .filter(found -> found.getStatus() != GroupBuyStatus.CANCELLED)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Not Found", "공구를 찾을 수 없습니다."));
         if (!g.getOrganizerId().equals(memberId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Forbidden", "개설자만 할 수 있습니다.");
         }
+        Instant now = Instant.now(clock);
         if (!g.isModifiable(now)) {
-            String reason = g.getStatus() == GroupBuyStatus.OPEN ? "DEADLINE_PASSED" : "COMPLETED";
+            // 비-OPEN 은 상태 이름이 곧 사유다(COMPLETED / FAILED). 004 참여의 NOT_JOINABLE reason 과 같은 값이다.
+            String reason = g.getStatus() == GroupBuyStatus.OPEN ? "DEADLINE_PASSED" : g.getStatus().name();
             throw ApiException.withReason(HttpStatus.CONFLICT, "NOT_MODIFIABLE",
                     "모집이 끝났거나 마감이 지나 수정·취소할 수 없습니다.", reason);
         }

@@ -13,14 +13,22 @@ import com.camgong.groupbuy.GroupBuyStatus;
 class PessimisticQuantityGate implements QuantityGate {
 
     private final GroupBuyRepository groupBuys;
+    private final java.time.Clock clock;
 
-    PessimisticQuantityGate(GroupBuyRepository groupBuys) {
+    PessimisticQuantityGate(GroupBuyRepository groupBuys, java.time.Clock clock) {
         this.groupBuys = groupBuys;
+        this.clock = clock;
     }
 
     @Override
-    public GateResult reserve(long groupBuyId, int delta, Integer expectedUnitPrice, Instant now) {
+    public GateResult reserve(long groupBuyId, int delta, Integer expectedUnitPrice, Instant requestedAt) {
         GroupBuy g = groupBuys.findByIdForUpdate(groupBuyId).orElse(null);
+        // 마감 판정은 락을 받은 뒤의 시각으로 한다(spec FR-009). 락을 기다리는 동안 마감이 지났다면 도착 시각(requestedAt)이 아니라
+        // 지금 기준으로 거부한다. 도착 시각 이후에 시계가 거꾸로 가는 일은 없으므로 더 늦은 쪽을 쓴다.
+        Instant now = Instant.now(clock);
+        if (now.isBefore(requestedAt)) {
+            now = requestedAt;
+        }
         if (g == null || g.getStatus() == GroupBuyStatus.CANCELLED) {
             return GateResult.notFound();
         }

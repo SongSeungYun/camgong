@@ -9,8 +9,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCancelled;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyChanged;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCompleted;
+import com.camgong.groupbuy.GroupBuyEvents.GroupBuyFailed;
 
 // ponytail: 커밋 후 유실 가능, 알림 기능에서 전달 수단 연결·신뢰성 필요하면 아웃박스로
+// ponytail: 커밋 직후 서버가 멈추면 모집 실패 이벤트가 유실될 수 있음, 알림 기능이 소비
 @Component
 class GroupBuyEventLogger {
 
@@ -30,5 +32,10 @@ class GroupBuyEventLogger {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void on(GroupBuyCompleted e) {
         log.info("GroupBuyCompleted groupBuyId={} recipients={}", e.groupBuyId(), e.recipientIds());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    void on(GroupBuyFailed e) {
+        log.info("GroupBuyFailed groupBuyId={} recipients={}", e.groupBuyId(), e.recipientIds());
     }
 }

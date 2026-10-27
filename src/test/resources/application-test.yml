@@ -4,3 +4,7 @@ spring:
       hibernate:
         session_factory:
           statement_inspector: com.camgong.support.QueryCountInspector
+camgong:
+  scheduler:
+    close:
+      enabled: false      # 테스트는 서비스를 직접 호출한다. 스케줄러 연결은 CloseSchedulerWiringTest 가 켠다
