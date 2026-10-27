@@ -25,17 +25,19 @@ export default function MyPage() {
         {TABS.map((t) => (
           <button
             key={t.role}
+            id={`tab-${t.role}`}
             role="tab"
             type="button"
             className={s.chip}
             aria-selected={t === tab}
-            aria-pressed={t === tab}
+            aria-controls="my-panel"
             onClick={() => setSp(t.param ? { tab: t.param } : {}, { replace: true })}
           >
             {t.label}
           </button>
         ))}
       </div>
+      <div role="tabpanel" id="my-panel" aria-labelledby={`tab-${tab.role}`}>
       <StateView state={state} emptyText={tab.empty} onRetry={() => void q.refetch()}>
         <ul className={s.list}>
           {items.map((it) => (
@@ -51,6 +53,7 @@ export default function MyPage() {
           </Button>
         )}
       </StateView>
+      </div>
     </Layout>
   )
 }

@@ -28,7 +28,7 @@ export default function SignupPage() {
     },
   })
 
-  if (accepted) return <Sent accepted={accepted} onAccepted={setAccepted} />
+  if (accepted) return <Sent accepted={accepted} onAccepted={setAccepted} onBack={() => setAccepted(null)} />
 
   return (
     <Layout>
@@ -46,7 +46,7 @@ export default function SignupPage() {
   )
 }
 
-function Sent({ accepted, onAccepted }: { accepted: Accepted; onAccepted: (a: Accepted) => void }) {
+function Sent({ accepted, onAccepted, onBack }: { accepted: Accepted; onAccepted: (a: Accepted) => void; onBack: () => void }) {
   const [now, setNow] = useState(Date.now())
   const waiting = Date.parse(accepted.resendAvailableAt) > now
   useEffect(() => {
@@ -62,6 +62,7 @@ function Sent({ accepted, onAccepted }: { accepted: Accepted; onAccepted: (a: Ac
       <Button variant="secondary" pending={m.isPending} disabled={waiting} onClick={() => m.mutate()}>인증 메일 다시 보내기</Button>
       {waiting && <p>{remainingText(accepted.resendAvailableAt, now)}이라 아직 다시 보낼 수 없어요. 조금 뒤에 다시 보낼 수 있어요.</p>}
       {m.error instanceof ApiError && <p role="alert">{errorMessage(m.error, { nowMs: now })}</p>}
+      <p>이메일을 잘못 썼나요? <Button variant="secondary" onClick={onBack}>다른 이메일로 다시</Button></p>
     </Layout>
   )
 }

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { expect, test, vi } from 'vitest'
+import { useState } from 'react'
+import { describe, expect, test, vi } from 'vitest'
 import { Badge, Button, ConfirmDialog, StateView, TextField } from '.'
 
 test('Button은 pending 동안 비활성화된다', () => {
@@ -44,4 +45,44 @@ test('ConfirmDialog는 열렸을 때만 보이고 확인/취소를 부른다', a
   await userEvent.click(screen.getByRole('button', { name: '취소' }))
   expect(ok).toHaveBeenCalledTimes(1)
   expect(cancel).toHaveBeenCalledTimes(1)
+})
+
+describe('ConfirmDialog 키보드·포커스 (검수 5)', () => {
+  function Host({ onCancel = () => {} }: { onCancel?: () => void }) {
+    const [open, setOpen] = useState(false)
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>열기</button>
+        <ConfirmDialog open={open} title="정말요?" confirmLabel="네" cancelLabel="아니요" onConfirm={() => {}} onCancel={() => { onCancel(); setOpen(false) }} />
+      </>
+    )
+  }
+  test('열리면 포커스가 대화상자 안으로 가고, 닫으면 열었던 버튼으로 돌아온다', async () => {
+    render(<Host />)
+    const opener = screen.getByRole('button', { name: '열기' })
+    await userEvent.click(opener)
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(opener)
+  })
+  test('Esc는 취소와 같다', async () => {
+    let cancelled = 0
+    render(<Host onCancel={() => cancelled++} />)
+    await userEvent.click(screen.getByRole('button', { name: '열기' }))
+    await userEvent.keyboard('{Escape}')
+    expect(cancelled).toBe(1)
+  })
+  test('Tab은 대화상자 안에서만 돈다', async () => {
+    render(<Host />)
+    await userEvent.click(screen.getByRole('button', { name: '열기' }))
+    const dialog = screen.getByRole('dialog')
+    for (let i = 0; i < 5; i++) {
+      await userEvent.tab()
+      expect(dialog.contains(document.activeElement)).toBe(true)
+    }
+    await userEvent.tab({ shift: true })
+    expect(dialog.contains(document.activeElement)).toBe(true)
+  })
 })

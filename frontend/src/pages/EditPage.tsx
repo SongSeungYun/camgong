@@ -42,6 +42,7 @@ export default function EditPage() {
             key={q.data.id}
             submitLabel="수정 저장"
             defaultValues={valuesOf(q.data)}
+            originalDeadline={q.data.deadline}
             notes={
               <>
                 {q.data.myParticipation === null && <p role="status">내 수량을 불러오지 못했어요. 직접 입력해 주세요.</p>}

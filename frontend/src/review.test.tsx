@@ -213,3 +213,73 @@ describe('개설자 myParticipation이 null (검수 13)', () => {
   })
 })
 
+
+describe('수정 폼이 마감 초를 버리지 않는다 (검수 6)', () => {
+  test('마감을 건드리지 않고 저장하면 원래 ISO를 그대로 보낸다', async () => {
+    const original = new Date(Math.floor((Date.now() + 5 * 86_400_000) / 60_000) * 60_000 + 30_000).toISOString() // 30초 포함
+    seedGroupBuy({ deadline: original })
+    mockState.sessionMemberId = 1
+    let body: Record<string, unknown> = {}
+    server.use(
+      http.put('/api/groupbuys/:id', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>
+        return HttpResponse.json({ id: 1 })
+      }),
+    )
+    renderApp('/groupbuys/1/edit')
+    await screen.findByLabelText('제목')
+    await userEvent.clear(screen.getByLabelText('설명'))
+    await userEvent.type(screen.getByLabelText('설명'), '바뀐 설명')
+    await userEvent.click(screen.getByRole('button', { name: '수정 저장' }))
+    await waitFor(() => expect(body.description).toBe('바뀐 설명'))
+    expect(body.deadline).toBe(original)
+  })
+  test('마감을 바꾸면 새 값(분 단위, +09:00)을 보낸다', async () => {
+    seedGroupBuy()
+    mockState.sessionMemberId = 1
+    let body: Record<string, unknown> = {}
+    server.use(
+      http.put('/api/groupbuys/:id', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>
+        return HttpResponse.json({ id: 1 })
+      }),
+    )
+    renderApp('/groupbuys/1/edit')
+    await screen.findByLabelText('제목')
+    fireEvent.change(screen.getByLabelText('마감 (한국 시각)'), { target: { value: '2099-11-01T18:00' } })
+    await userEvent.click(screen.getByRole('button', { name: '수정 저장' }))
+    await waitFor(() => expect(body.deadline).toBe('2099-11-01T18:00:00+09:00'))
+  })
+})
+
+describe('가입 접수 뒤 다른 이메일로 다시 (검수 7)', () => {
+  test('접수 안내에서 이메일 입력으로 돌아갈 수 있다', async () => {
+    renderApp('/signup')
+    await userEvent.type(await screen.findByLabelText('이메일'), 'typo@school.ac.kr')
+    await userEvent.click(screen.getByRole('button', { name: '가입하기' }))
+    await screen.findByRole('heading', { name: '인증 메일을 보냈어요' })
+    await userEvent.click(screen.getByRole('button', { name: '다른 이메일로 다시' }))
+    await screen.findByRole('heading', { name: '가입' })
+    expect((screen.getByLabelText('이메일') as HTMLInputElement).value).toBe('typo@school.ac.kr') // 고쳐 쓰기 쉽게 남긴다
+  })
+})
+
+describe('접근성 보강 (검수 5)', () => {
+  test('진행률 막대에 이름이 있다', async () => {
+    seedGroupBuy()
+    mockState.sessionMemberId = 2
+    renderApp('/groupbuys/1')
+    await screen.findByRole('progressbar', { name: '확보 9개 / 총 24개' })
+  })
+  test('내 활동 탭은 tab/tabpanel로 연결되고 aria-selected만 쓴다', async () => {
+    seedGroupBuy()
+    mockState.sessionMemberId = 1
+    renderApp('/me')
+    const tab = await screen.findByRole('tab', { name: '내가 연 공구' })
+    expect(tab.getAttribute('aria-selected')).toBe('true')
+    expect(tab.hasAttribute('aria-pressed')).toBe(false)
+    expect(screen.getByRole('tab', { name: '참여한 공구' }).getAttribute('aria-selected')).toBe('false')
+    const panel = await screen.findByRole('tabpanel')
+    expect(panel.getAttribute('aria-labelledby')).toBe(tab.id)
+  })
+})
