@@ -6,8 +6,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.camgong.common.ApiException;
+import com.camgong.member.Member;
 import com.camgong.member.MemberRepository;
 
 @Service
@@ -29,9 +32,11 @@ public class SignupService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final AuthProperties props;
+    private final SessionService sessions;
 
     public SignupService(JdbcClient jdbc, MemberRepository members, PasswordEncoder encoder,
-            ApplicationEventPublisher events, Clock clock, AuthProperties props) {
+            ApplicationEventPublisher events, Clock clock, AuthProperties props, SessionService sessions) {
+        this.sessions = sessions;
         this.jdbc = jdbc;
         this.members = members;
         this.encoder = encoder;
@@ -84,5 +89,80 @@ public class SignupService {
 
         events.publishEvent(new VerificationMailRequested(r.email(), token));
         return SignupResponse.of(r.email(), now.plus(props.mail().resendInterval()));
+    }
+
+    /** 인증 성공 결과: 응답 본문과 쿠키에 담을 세션 원문 토큰. */
+    public record Verified(AuthResponse response, String sessionToken) {}
+
+    /**
+     * 인증 링크 확인(research 결정 3·4). 토큰을 한 번만 쓰게 하는 것이 핵심이라 used_at 조건부 UPDATE 를
+     * 회원 INSERT 보다 먼저 실행한다. 이어지는 INSERT 가 실패하면 예외로 같은 트랜잭션이 롤백되어
+     * used_at 도 되돌아가므로 토큰은 유효한 채로 남는다(이름 충돌 뒤 새 이름으로 다시 시도할 수 있다).
+     */
+    // ponytail: 인증 링크는 화면이 POST로 확인(메일 스캐너의 GET 미리 열기 방지)
+    @Transactional
+    public Verified verify(VerifyRequest r) {
+        Instant now = Instant.now(clock);
+        PendingSignup p = findByToken(Tokens.sha256Hex(r.token()))
+                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TOKEN", "알 수 없는 인증 링크입니다."));
+        if (p.usedAt() != null) {
+            throw tokenUsed();
+        }
+        if (!p.tokenExpiresAt().isAfter(now)) {
+            throw new ApiException(HttpStatus.GONE, "TOKEN_EXPIRED", "인증 링크가 만료되었습니다. 인증 메일을 다시 받아 주세요.");
+        }
+
+        // 동시에 같은 토큰이 와도 영향 행이 1인 쪽만 통과한다(useAffectedRows=true 전제).
+        int claimed = jdbc.sql("UPDATE pending_signup SET used_at = :now WHERE id = :id AND used_at IS NULL")
+                .param("now", LocalDateTime.ofInstant(now, ZoneOffset.UTC))
+                .param("id", p.id())
+                .update();
+        if (claimed == 0) {
+            throw tokenUsed();
+        }
+
+        String displayName = r.displayName() != null ? r.displayName() : p.displayName();
+        Member member;
+        try {
+            member = members.saveAndFlush(new Member(displayName, p.email(), p.passwordHash(),
+                    p.consentAt(), p.consentVersion(), now));
+        } catch (DataIntegrityViolationException e) {
+            // 어느 UNIQUE 가 걸렸는지는 MySQL 오류 메시지의 키 이름으로 가른다. 던지면 used_at 도 롤백된다.
+            // 메시지 앞쪽의 'Duplicate entry <값>' 에는 사용자 입력이 섞이므로 "for key" 뒤쪽만 본다.
+            String message = String.valueOf(e.getMostSpecificCause().getMessage());
+            String cause = message.substring(Math.max(0, message.lastIndexOf("for key")));
+            if (cause.contains("display_name_key")) {
+                throw new ApiException(HttpStatus.CONFLICT, "DISPLAY_NAME_TAKEN",
+                        "이미 사용 중인 이름입니다. 다른 이름으로 다시 확인해 주세요.");
+            }
+            if (cause.contains("email_key")) {
+                throw new ApiException(HttpStatus.CONFLICT, "ALREADY_REGISTERED", "이미 가입된 이메일입니다.");
+            }
+            throw e;
+        }
+        String sessionToken = sessions.issue(member.getId());
+        return new Verified(new AuthResponse(new MemberView(member.getId(), member.getName())), sessionToken);
+    }
+
+    private Optional<PendingSignup> findByToken(String tokenHash) {
+        return jdbc.sql("SELECT * FROM pending_signup WHERE token_hash = :hash")
+                .param("hash", tokenHash)
+                .query((rs, i) -> new PendingSignup(rs.getLong("id"), rs.getString("email_key"), rs.getString("email"),
+                        rs.getString("display_name"), rs.getString("password_hash"),
+                        utc(rs.getObject("consent_at", LocalDateTime.class)), rs.getString("consent_version"),
+                        rs.getString("token_hash"), utc(rs.getObject("token_expires_at", LocalDateTime.class)),
+                        utc(rs.getObject("last_sent_at", LocalDateTime.class)),
+                        utc(rs.getObject("window_started_at", LocalDateTime.class)), rs.getInt("sent_count"),
+                        utc(rs.getObject("used_at", LocalDateTime.class)),
+                        utc(rs.getObject("created_at", LocalDateTime.class))))
+                .optional();
+    }
+
+    private static Instant utc(LocalDateTime t) {
+        return t == null ? null : t.toInstant(ZoneOffset.UTC);
+    }
+
+    private static ApiException tokenUsed() {
+        return new ApiException(HttpStatus.CONFLICT, "TOKEN_USED", "이미 사용된 인증 링크입니다.");
     }
 }
