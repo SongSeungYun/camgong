@@ -115,6 +115,12 @@ public class GroupBuy {
         return false;
     }
 
+    /** 게이트가 락 안에서 검증한 뒤 확보 수량을 바꾼다(참여 +, 취소 −). 검증은 호출자 몫. */
+    public void reserve(int delta, Instant now) {
+        this.securedQuantity += delta;
+        this.updatedAt = now;
+    }
+
     /** OPEN 에서만 CANCELLED 로 간다. 행은 지우지 않는다. */
     public void cancel(Instant now) {
         if (status != GroupBuyStatus.OPEN) {

@@ -98,6 +98,13 @@ public abstract class IntegrationTestBase {
         seedMember(3, "외부인");
     }
 
+    /** 회원 id from..to 를 한꺼번에 시드한다(동시성 시험용 참여자). */
+    protected void seedMembers(long from, long to) {
+        for (long id = from; id <= to; id++) {
+            seedMember(id, "회원" + id);
+        }
+    }
+
     /** 시드 회원: 이메일 m{id}@school.ac.kr, 비밀번호 해시는 로그인할 수 없는 더미. */
     protected void seedMember(long id, String name) {
         jdbc.update("INSERT INTO member (id, name, display_name_key, email, email_key, password_hash, "

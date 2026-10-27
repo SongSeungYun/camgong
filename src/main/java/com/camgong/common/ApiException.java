@@ -3,7 +3,9 @@ package com.camgong.common;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 
@@ -17,6 +19,7 @@ public class ApiException extends RuntimeException {
     private final String title;
     private final List<Field> errors;
     private final String reason;
+    private final Map<String, Object> properties = new LinkedHashMap<>();
     private OffsetDateTime retryAt;
     private Long retryAfterSeconds;
 
@@ -48,6 +51,16 @@ public class ApiException extends RuntimeException {
         long millis = Math.max(0, retryAt.toEpochMilli() - now.toEpochMilli());
         this.retryAfterSeconds = (millis + 999) / 1000;
         return this;
+    }
+
+    /** 본문에 더 싣는 속성(예: PRICE_CHANGED 의 currentUnitPrice). */
+    public ApiException property(String name, Object value) {
+        properties.put(name, value);
+        return this;
+    }
+
+    public Map<String, Object> getProperties() {
+        return properties;
     }
 
     public OffsetDateTime getRetryAt() {

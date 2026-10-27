@@ -17,6 +17,10 @@ spring:
   sql:
     init:
       mode: always
+  jackson:
+    deserialization:
+      # 1.5 같은 소수가 정수 필드에 조용히 잘려 들어가지 않게 한다(수량·가격은 정수만, 계약의 400).
+      accept-float-as-int: false
   mvc:
     problemdetails:
       enabled: true
