@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
         manifest: {
           name: '캠공',
           short_name: '캠공',
+          lang: 'ko',
           display: 'standalone',
           start_url: '/',
           theme_color: '#2563eb',
