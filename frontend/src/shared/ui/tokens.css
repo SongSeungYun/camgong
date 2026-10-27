@@ -23,6 +23,7 @@ body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
+  overflow-wrap: anywhere; /* 공백 없는 긴 제목·이름도 줄바꿈 */
   font: var(--font-base) / 1.5 system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
 }
 a { color: var(--color-primary); }
