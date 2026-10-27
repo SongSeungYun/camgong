@@ -170,6 +170,7 @@ public class ParticipationService {
             List<Long> everyone = participations.findLockedByGroupBuyId(groupBuyId).stream()
                     .map(Participation::getMemberId).toList();
             events.publishEvent(new GroupBuyCompleted(groupBuyId, everyone));
+            BenchCounters.COMPLETED_EVENTS.increment();
         }
     }
 
@@ -193,8 +194,10 @@ public class ParticipationService {
                 return tx.execute(status -> work.get());
             } catch (RetryableConflict | ConcurrencyFailureException e) {
                 if (attempt >= MAX_ATTEMPTS) {
+                    BenchCounters.BUSY.increment();
                     throw busy();
                 }
+                BenchCounters.RETRIES.increment();
                 sleepBriefly();
             }
         }
