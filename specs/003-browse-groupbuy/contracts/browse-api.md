@@ -70,14 +70,14 @@
   "organizerName": "홍길동",
   "isOrganizer": false,
   "participantCount": 2,
-  "myParticipation": { "quantity": 6, "amount": 7200 },
+  "myParticipation": { "quantity": 6, "amount": 7200, "paidConfirmedAt": null, "receivedConfirmedAt": null },
   "openChatUrl": null,
   "participants": null,
   "createdAt": "2026-10-25T07:30:00+09:00"
 }
 ```
 
-- `myParticipation`: 참여하지 않았으면 `null`(화면은 '참여 안 함'). `amount = unitPrice × quantity`.
+- `myParticipation`: 참여하지 않았으면 `null`(화면은 '참여 안 함'). `amount = unitPrice × quantity`. `paidConfirmedAt`, `receivedConfirmedAt`(nullable, 006)은 개설자가 입금·수령을 확인한 시각이고 값이 없으면 확인 전이다. 개설자 본인의 `myParticipation`에는 이 두 필드가 없다. 다른 참여자의 값은 내려가지 않는다.
 - `participantCount`: 개설자를 포함한 참여자 수.
 - `openChatUrl`: data-model.md 공개 규칙. 숨기면 `null`.
 - `participants`: 개설자에게만 `[{ "memberId": 1, "name": "홍길동", "quantity": 9 }, ...]`, 그 외에는 `null`.
