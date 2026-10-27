@@ -82,14 +82,14 @@ class LoginThrottleIT extends IntegrationTestBase {
     LoginService loginService;
 
     @Test
-    void aFailureRacingIntoAnAlreadyLockedRowCountsButDoesNotMoveTheLockTime() throws Exception {
+    void anAttemptArrivingAtAnAlreadyLockedRowIsNeitherCountedNorExtendsTheLock() throws Exception {
         fail(EMAIL, 5);
         clock.advance(Duration.ofMinutes(5));
 
-        // 잠금 검사를 통과한 뒤 도착한 늦은 실패를 흉내 낸다(잠금 중 시도는 HTTP 로는 여기까지 오지 못한다).
-        loginService.recordFailure("lock.user@school.ac.kr", clock.instant());
+        boolean counted = loginService.countAttempt("lock.user@school.ac.kr", clock.instant());
 
-        assertThat(failedCount(EMAIL)).isEqualTo(6);
+        assertThat(counted).isFalse();
+        assertThat(failedCount(EMAIL)).isEqualTo(5);
         assertThat(jdbc.queryForObject("SELECT locked_until FROM login_attempt WHERE email_key = ?",
                 java.time.LocalDateTime.class, EMAIL)).isEqualTo(java.time.LocalDateTime.of(2026, 10, 27, 0, 15));
     }
@@ -148,28 +148,66 @@ class LoginThrottleIT extends IntegrationTestBase {
     }
 
     @Test
-    void concurrentFailuresAreCountedWithoutLossAndLockOnce() throws Exception {
-        int n = 10;
+    void fiftyConcurrentWrongPasswordsOnlyFiveReachThePasswordCheck() throws Exception {
+        int n = 50;
         ExecutorService pool = Executors.newFixedThreadPool(n);
         List<Future<Integer>> results = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             results.add(pool.submit(() -> attempt(EMAIL, "wrong-password").andReturn().getResponse().getStatus()));
         }
         int unauthorized = 0;
+        int locked = 0;
         for (Future<Integer> f : results) {
             int s = f.get();
             assertThat(s).isIn(401, 429);
             if (s == 401) {
                 unauthorized++;
+            } else {
+                locked++;
             }
         }
         pool.shutdown();
 
-        // 401 을 받은 요청은 모두 횟수에 들어갔고, 잠긴 뒤에 도착한 요청(429)은 세지 않았다.
-        assertThat(unauthorized).isGreaterThanOrEqualTo(5);
-        assertThat(failedCount(EMAIL)).isEqualTo(unauthorized);
+        // 시도를 비밀번호 비교 전에 센다: 5번째까지만 비교(401)하고 나머지 45건은 BCrypt 없이 잠금(429)으로 돌아간다.
+        assertThat(unauthorized).isEqualTo(5);
+        assertThat(locked).isEqualTo(45);
+        assertThat(failedCount(EMAIL)).isEqualTo(5);
         assertThat(jdbc.queryForObject("SELECT locked_until FROM login_attempt WHERE email_key = ?",
                 java.time.LocalDateTime.class, EMAIL)).isEqualTo(java.time.LocalDateTime.of(2026, 10, 27, 0, 15));
         attempt(EMAIL, "password1").andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void correctAndWrongPasswordsTogetherAreComparedAtMostFiveTimesPerLockWindow() throws Exception {
+        for (int round = 0; round < 10; round++) {
+            jdbc.update("DELETE FROM login_attempt");
+            jdbc.update("DELETE FROM login_session");
+            int n = 30;
+            ExecutorService pool = Executors.newFixedThreadPool(n);
+            List<Future<Integer>> results = new ArrayList<>();
+            for (int i = 0; i < n; i++) {
+                String password = i % 6 == 0 ? "password1" : "wrong-password";   // 5개는 맞는 비밀번호
+                results.add(pool.submit(() -> attempt(EMAIL, password).andReturn().getResponse().getStatus()));
+            }
+            int compared = 0;
+            int ok = 0;
+            for (Future<Integer> f : results) {
+                int s = f.get();
+                assertThat(s).isIn(200, 401, 429);
+                if (s != 429) {
+                    compared++;
+                }
+                if (s == 200) {
+                    ok++;
+                }
+            }
+            pool.shutdown();
+            // 비밀번호 비교(BCrypt)까지 간 요청은 잠금 창마다 최대 5건이다. 나머지는 비교 없이 잠금(429)으로 돌아간다.
+            // (맞는 시도가 성공하면 횟수가 지워져 창이 다시 열리므로 5건을 넘을 수 있는 경우는 성공이 끼었을 때뿐이다.)
+            if (ok == 0) {
+                assertThat(compared).as("round %d", round).isEqualTo(5);
+            }
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM login_session", Integer.class)).isEqualTo(ok);
+        }
     }
 }
