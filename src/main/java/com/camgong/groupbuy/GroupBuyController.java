@@ -33,13 +33,6 @@ public class GroupBuyController {
         return ResponseEntity.created(URI.create("/api/groupbuys/" + created.id())).body(created);
     }
 
-    @GetMapping("/{id}")
-    GroupBuyResponse get(
-            CurrentMember me,
-            @PathVariable Long id) {
-        return service.get(me.id(), id);
-    }
-
     @PutMapping("/{id}")
     GroupBuyResponse update(
             CurrentMember me,

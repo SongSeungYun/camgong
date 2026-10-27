@@ -6,6 +6,14 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
+import com.camgong.common.ApiException;
+import com.camgong.groupbuy.GroupBuy;
+import com.camgong.groupbuy.GroupBuyRepository;
+import com.camgong.groupbuy.GroupBuyStatus;
+import com.camgong.groupbuy.Participation;
+import com.camgong.groupbuy.ParticipationRepository;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,11 +29,54 @@ public class GroupBuyQueryService {
     }
 
     private final GroupBuySearchRepository search;
+    private final GroupBuyRepository groupBuys;
+    private final ParticipationRepository participations;
     private final Clock clock;
 
-    public GroupBuyQueryService(GroupBuySearchRepository search, Clock clock) {
+    public GroupBuyQueryService(GroupBuySearchRepository search, GroupBuyRepository groupBuys,
+            ParticipationRepository participations, Clock clock) {
         this.search = search;
+        this.groupBuys = groupBuys;
+        this.participations = participations;
         this.clock = clock;
+    }
+
+    /**
+     * 상세. 오픈채팅 링크와 명단은 공개 규칙(data-model 공개 규칙 표, I8·I9)대로 서비스가 가린다.
+     * 명단은 쿼리 자체를 개설자일 때만 실행한다.
+     */
+    public GroupBuyDetail detail(Long memberId, Long id) {
+        Instant now = Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        GroupBuy g = groupBuys.findDetailById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Not Found", "공구를 찾을 수 없습니다."));
+        DisplayStatus status = DisplayStatus.derive(g.getStatus(), g.getDeadline(), now);
+        boolean isOrganizer = memberId.equals(g.getOrganizerId());
+
+        Participation mine = participations.findByGroupBuyIdAndMemberId(id, memberId).orElse(null);
+        MyParticipationView myParticipation = null;
+        if (mine != null) {
+            int amount = g.getUnitPrice() * mine.getQuantity();
+            myParticipation = isOrganizer
+                    ? new MyParticipationView.Organizer(mine.getQuantity(), amount)
+                    : new MyParticipationView.Participant(mine.getQuantity(), amount, null, null);
+        }
+        int participantCount = (int) participations.countByGroupBuyId(id);
+
+        List<ParticipantView> roster = null;
+        if (isOrganizer) {
+            roster = participations.findByGroupBuyIdOrderByIdAsc(id).stream()
+                    .map(p -> new ParticipantView(p.getMemberId(), p.getMember().getName(), p.getQuantity())).toList();
+        }
+        return GroupBuyDetail.of(g, status, g.getOrganizer().getName(), isOrganizer, participantCount,
+                myParticipation, visibleOpenChatUrl(g, status, isOrganizer, mine != null), roster);
+    }
+
+    /** 개설자: OPEN·PENDING_CLOSE·COMPLETED 에서 항상. 참여자: COMPLETED 에서만. 그 외는 숨긴다. */
+    private static String visibleOpenChatUrl(GroupBuy g, DisplayStatus status, boolean isOrganizer, boolean participant) {
+        if (isOrganizer) {
+            return status == DisplayStatus.FAILED ? null : g.getOpenChatUrl();
+        }
+        return participant && status == DisplayStatus.COMPLETED ? g.getOpenChatUrl() : null;
     }
 
     public Page<GroupBuySummary> list(GroupBuyListQuery q) {

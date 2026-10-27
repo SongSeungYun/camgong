@@ -59,18 +59,6 @@ public class GroupBuyService {
         return GroupBuyResponse.from(groupBuy, r.organizerQuantity(), groupBuy.getOpenChatUrl());
     }
 
-    @Transactional(readOnly = true)
-    public GroupBuyResponse get(Long memberId, Long id) {
-        GroupBuy groupBuy = groupBuys.findById(id)
-                .filter(g -> g.getStatus() != GroupBuyStatus.CANCELLED)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Not Found", "공구를 찾을 수 없습니다."));
-
-        int organizerQuantity = participations
-                .findByGroupBuyIdAndMemberId(id, groupBuy.getOrganizerId())
-                .map(Participation::getQuantity).orElse(0);
-        return GroupBuyResponse.from(groupBuy, organizerQuantity, visibleOpenChatUrl(memberId, groupBuy));
-    }
-
     /**
      * 락을 잡은 뒤 최신 값으로 검증한다. 순서는 data-model.md "수정 시 검증 순서":
      * 존재·취소(404) → 개설자(403) → OPEN·마감 전(409) → 마감 → 수량 → 반영 후 모집 완료 판정.
@@ -184,14 +172,5 @@ public class GroupBuyService {
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.", errors);
         }
-    }
-
-    /** 개설자는 OPEN·COMPLETED 에서, 참여자는 COMPLETED 에서만 링크를 본다. 그 외는 null. */
-    private String visibleOpenChatUrl(Long memberId, GroupBuy g) {
-        if (memberId.equals(g.getOrganizerId())) {
-            return g.getOpenChatUrl();
-        }
-        boolean participant = participations.findByGroupBuyIdAndMemberId(g.getId(), memberId).isPresent();
-        return participant && g.getStatus() == GroupBuyStatus.COMPLETED ? g.getOpenChatUrl() : null;
     }
 }

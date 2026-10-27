@@ -24,4 +24,11 @@ public interface ParticipationRepository extends JpaRepository<Participation, Lo
     Optional<Participation> findLockedByGroupBuyIdAndMemberId(Long groupBuyId, Long memberId);
 
     Optional<Participation> findByGroupBuyIdAndMemberId(Long groupBuyId, Long memberId);
+
+    // --- 조회(003) ---
+
+    long countByGroupBuyId(Long groupBuyId);
+
+    /** 개설자용 명단. 순진한 구현: 이름은 호출 쪽이 participation.getMember() 지연 로딩으로 읽는다(N+1 기준선). */
+    List<Participation> findByGroupBuyIdOrderByIdAsc(Long groupBuyId);
 }

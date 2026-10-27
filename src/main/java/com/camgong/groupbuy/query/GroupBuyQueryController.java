@@ -1,9 +1,12 @@
 package com.camgong.groupbuy.query;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.camgong.auth.CurrentMember;
 
 @RestController
 @RequestMapping("/api/groupbuys")
@@ -25,5 +28,11 @@ class GroupBuyQueryController {
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) String size) {
         return service.list(GroupBuyListQuery.of(status, category, q, sort, cursor, size));
+    }
+
+    /** 로그인 필수(보안 설정이 막는다). 001 의 최소 상세 GET 을 대체한다. */
+    @GetMapping("/{id}")
+    GroupBuyDetail detail(CurrentMember me, @PathVariable Long id) {
+        return service.detail(me.id(), id);
     }
 }
