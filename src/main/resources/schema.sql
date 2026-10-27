@@ -2,8 +2,51 @@
 -- 모든 테이블은 CREATE TABLE IF NOT EXISTS 라 앱 재시작에 안전하다.
 
 CREATE TABLE IF NOT EXISTS member (
-    id   BIGINT       NOT NULL PRIMARY KEY,
-    name VARCHAR(50)  NOT NULL
+    id                BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name              VARCHAR(20)  NOT NULL,
+    display_name_key  VARCHAR(20)  NOT NULL UNIQUE,
+    email             VARCHAR(254) NOT NULL,
+    email_key         VARCHAR(254) NOT NULL UNIQUE,
+    password_hash     VARCHAR(100) NOT NULL,
+    consent_at        DATETIME(6)  NOT NULL,
+    consent_version   VARCHAR(20)  NOT NULL,
+    created_at        DATETIME(6)  NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pending_signup (
+    id                BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    email_key         VARCHAR(254) NOT NULL UNIQUE,
+    email             VARCHAR(254) NOT NULL,
+    display_name      VARCHAR(20)  NOT NULL,
+    password_hash     VARCHAR(100) NOT NULL,
+    consent_at        DATETIME(6)  NOT NULL,
+    consent_version   VARCHAR(20)  NOT NULL,
+    token_hash        CHAR(64)     NOT NULL,
+    token_expires_at  DATETIME(6)  NOT NULL,
+    last_sent_at      DATETIME(6)  NOT NULL,
+    window_started_at DATETIME(6)  NOT NULL,
+    sent_count        INT          NOT NULL,
+    used_at           DATETIME(6)  NULL,
+    created_at        DATETIME(6)  NOT NULL,
+    KEY idx_pending_signup_token (token_hash)
+);
+
+CREATE TABLE IF NOT EXISTS login_session (
+    id            BIGINT      NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    token_hash    CHAR(64)    NOT NULL UNIQUE,
+    member_id     BIGINT      NOT NULL,
+    created_at    DATETIME(6) NOT NULL,
+    last_used_at  DATETIME(6) NOT NULL,
+    KEY idx_login_session_member (member_id),
+    KEY idx_login_session_last_used (last_used_at),
+    CONSTRAINT fk_login_session_member FOREIGN KEY (member_id) REFERENCES member (id)
+);
+
+CREATE TABLE IF NOT EXISTS login_attempt (
+    email_key     VARCHAR(254) NOT NULL PRIMARY KEY,
+    failed_count  INT          NOT NULL,
+    locked_until  DATETIME(6)  NULL,
+    updated_at    DATETIME(6)  NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS group_buy (

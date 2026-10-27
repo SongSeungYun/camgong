@@ -25,6 +25,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.mysql.MySQLContainer;
+
+import com.camgong.auth.LoggingMailSender;
 import org.testcontainers.utility.DockerImageName;
 
 /** 모든 통합 테스트의 기반. 실제 MySQL 8.4 컨테이너(헌법 IV)와 조작 가능한 시계를 쓴다. */
@@ -52,6 +54,7 @@ public abstract class IntegrationTestBase {
         registry.add("spring.datasource.url", () -> MYSQL.getJdbcUrl() + "?useAffectedRows=true");
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
+        registry.add("camgong.auth.bcrypt-cost", () -> 4); // 테스트 속도
     }
 
     @Autowired
@@ -66,15 +69,33 @@ public abstract class IntegrationTestBase {
     @Autowired
     protected EventCollector events;
 
+    @Autowired
+    protected LoggingMailSender mail;
+
     @BeforeEach
     void resetState() {
         clock.set(START);
         events.clear();
+        mail.clear();
+        jdbc.update("DELETE FROM login_session");
+        jdbc.update("DELETE FROM pending_signup");
+        jdbc.update("DELETE FROM login_attempt");
         jdbc.update("DELETE FROM participation");
         jdbc.update("DELETE FROM group_buy");
         jdbc.update("DELETE FROM create_guard");
         jdbc.update("DELETE FROM member");
-        jdbc.update("INSERT INTO member (id, name) VALUES (1, '개설자'), (2, '참여자'), (3, '외부인')");
+        seedMember(1, "개설자");
+        seedMember(2, "참여자");
+        seedMember(3, "외부인");
+    }
+
+    /** 시드 회원: 이메일 m{id}@school.ac.kr, 비밀번호 해시는 로그인할 수 없는 더미. */
+    protected void seedMember(long id, String name) {
+        jdbc.update("INSERT INTO member (id, name, display_name_key, email, email_key, password_hash, "
+                + "consent_at, consent_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, name, name.toLowerCase(), "m" + id + "@school.ac.kr", "m" + id + "@school.ac.kr",
+                "$2a$04$dummydummydummydummydummydummydummydummydummydummydummy", LocalDateTime.ofInstant(START, ZoneOffset.UTC),
+                "v1", LocalDateTime.ofInstant(START, ZoneOffset.UTC));
     }
 
     /** 개설자(1)가 기본 본문으로 공구를 열고 id 를 돌려준다. 같은 본문은 10초 가드에 걸리므로 테스트당 한 번만 쓴다. */
