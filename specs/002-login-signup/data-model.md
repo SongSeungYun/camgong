@@ -46,6 +46,7 @@
 | `last_sent_at` | `DATETIME(6)` | 필수. 마지막 발송 시각 | FR-005 |
 | `window_started_at` | `DATETIME(6)` | 필수. 24시간 창의 시작 | FR-005 |
 | `sent_count` | `INT` | 필수. 현재 창의 발송 횟수 (최대 5) | FR-005 |
+| `used_at` | `DATETIME(6)` | NULL. 인증에 성공한 시각. 행을 지우지 않고 채워서 `TOKEN_USED`와 `INVALID_TOKEN`을 구분한다 | FR-004 |
 | `created_at` | `DATETIME(6)` | 필수 | |
 
 ## login_session
@@ -74,7 +75,7 @@
 | # | 불변식 | 지키는 곳 |
 |---|--------|-----------|
 | (002) | 이메일과 표시 이름은 인증을 마친 회원 사이에서만 유일하다 | `member`의 `UNIQUE (email_key)`, `UNIQUE (display_name_key)` |
-| (002) | 인증 링크는 24시간, 한 번만 유효하며 재발송하면 이전 것은 무효 | `pending_signup.token_hash` 교체, 사용 시 행 삭제 |
+| (002) | 인증 링크는 24시간, 한 번만 유효하며 재발송하면 이전 것은 무효 | `pending_signup.token_hash` 교체, 사용 시 `used_at` 기록(행은 정리 작업이 지운다) |
 | (002) | 인증 메일은 같은 이메일에 1분 간격, 24시간 5회 이하 | `pending_signup`의 조건부 `UPDATE` |
 | (002) | 비밀번호·토큰·세션 id는 원문으로 저장되지 않는다 | 해시 컬럼만 둔다 |
 | (002) | 연속 5회 실패하면 15분간 잠긴다 (없는 계정도 동일) | `login_attempt`의 조건부 `UPDATE` |
