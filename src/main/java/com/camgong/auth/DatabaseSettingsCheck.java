@@ -28,6 +28,7 @@ class DatabaseSettingsCheck implements InitializingBean {
         try (Connection c = dataSource.getConnection(); Statement st = c.createStatement()) {
             st.execute("CREATE TEMPORARY TABLE IF NOT EXISTS camgong_affected_rows_check (id INT PRIMARY KEY, v INT)");
             checkNoLegacySchema(st);
+            checkParticipationHasCheckColumns(st);
             try {
                 st.executeUpdate("INSERT INTO camgong_affected_rows_check VALUES (1, 1)");
                 int rows = st.executeUpdate(
@@ -52,6 +53,17 @@ class DatabaseSettingsCheck implements InitializingBean {
             if (rs.next()) {
                 throw new IllegalStateException("pending_signup 이 변경 B2 이전 스키마(" + rs.getString(1)
                         + " 컬럼)다. 로컬 DB 를 새로 만들어야 한다(예: docker rm -f 후 새 MySQL 컨테이너).");
+            }
+        }
+    }
+
+    /** 006 이전 스키마(participation 에 paid_at 이 없는 DB): CREATE TABLE IF NOT EXISTS 가 컬럼을 더해 주지 않아 체크 요청이 500 이 난다. */
+    static void checkParticipationHasCheckColumns(Statement st) throws SQLException {
+        try (var rs = st.executeQuery("SELECT (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() "
+                + "AND table_name = 'participation'), (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() "
+                + "AND table_name = 'participation' AND column_name IN ('paid_at', 'received_at'))")) {
+            if (rs.next() && rs.getInt(1) == 1 && rs.getInt(2) != 2) {
+                throw new IllegalStateException("participation 에 paid_at/received_at 컬럼이 없다(006 이전 스키마). 로컬 DB 를 새로 만들어야 한다.");
             }
         }
     }

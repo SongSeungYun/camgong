@@ -74,6 +74,8 @@ CREATE TABLE IF NOT EXISTS participation (
     member_id     BIGINT      NOT NULL,
     quantity      INT         NOT NULL CHECK (quantity > 0),
     created_at    DATETIME(6) NOT NULL,
+    paid_at       DATETIME(6) NULL,
+    received_at   DATETIME(6) NULL,
     KEY idx_participation_member_group_buy (member_id, group_buy_id),
     CONSTRAINT fk_participation_group_buy FOREIGN KEY (group_buy_id) REFERENCES group_buy (id),
     CONSTRAINT fk_participation_member FOREIGN KEY (member_id) REFERENCES member (id),

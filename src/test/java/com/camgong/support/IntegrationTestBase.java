@@ -98,6 +98,45 @@ public abstract class IntegrationTestBase {
         seedMember(3, "외부인");
     }
 
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.url}")
+    private String datasourceUrl;
+
+    private org.springframework.jdbc.core.JdbcTemplate rootJdbc() {
+        // information_schema.processlist 는 PROCESS 권한이 필요해 Testcontainers MySQL 의 root(비밀번호 test)로 읽는다.
+        return new org.springframework.jdbc.core.JdbcTemplate(
+                new org.springframework.jdbc.datasource.DriverManagerDataSource(datasourceUrl, "root", "test"));
+    }
+
+    /**
+     * 지금 FOR UPDATE 잠금 읽기를 **실행 중**인 연결 id(없으면 null). 이 쿼리는 락이 비어 있으면 몇 ms 안에 끝나므로, 실행 중으로 계속
+     * 보인다면 다른 트랜잭션이 쥔 락을 기다리는 것이다(innodb_trx 의 LOCK WAIT 는 이 단계의 대기를 보여 주지 않아 processlist 를 본다).
+     */
+    private Long connectionRunningALockingRead(org.springframework.jdbc.core.JdbcTemplate root) {
+        java.util.List<Long> ids = root.queryForList("SELECT id FROM information_schema.processlist WHERE command = 'Query' "
+                + "AND id <> CONNECTION_ID() AND LOWER(info) LIKE '%for update%' AND LOWER(info) LIKE '%group_buy%'", Long.class);
+        return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    /**
+     * 요청이 다른 트랜잭션이 쥔 공구 행 락에서 **실제로 막혔다**는 것을 DB 상태로 확인한다(시간 추측 sleep 이 아니다): 잠금 읽기를 실행 중인
+     * 연결을 찾고, 같은 연결이 200ms 뒤에도 그 쿼리를 계속 실행 중이면 막힌 것이다. 못 찾으면 테스트를 실패시킨다.
+     */
+    protected void awaitLockWait(long timeoutMillis) throws InterruptedException {
+        var root = rootJdbc();
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        while (System.currentTimeMillis() < deadline) {
+            Long first = connectionRunningALockingRead(root);
+            if (first != null) {
+                Thread.sleep(200);
+                if (first.equals(connectionRunningALockingRead(root))) {
+                    return;
+                }
+            }
+            Thread.sleep(20);
+        }
+        throw new IllegalStateException("요청이 공구 행 락에서 막히지 않았다(잠금 읽기를 계속 실행 중인 연결 없음)");
+    }
+
     /** 회원 id from..to 를 한꺼번에 시드한다(동시성 시험용 참여자). */
     protected void seedMembers(long from, long to) {
         for (long id = from; id <= to; id++) {

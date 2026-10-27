@@ -94,7 +94,8 @@ public class GroupBuyQueryService {
             int amount = g.getUnitPrice() * mine.getQuantity();
             myParticipation = isOrganizer
                     ? new MyParticipationView.Organizer(mine.getQuantity(), amount)
-                    : new MyParticipationView.Participant(mine.getQuantity(), amount, null, null);
+                    : new MyParticipationView.Participant(mine.getQuantity(), amount, confirmedAt(mine.getPaidAt()),
+                            confirmedAt(mine.getReceivedAt()));
         }
         int participantCount = (int) participations.countByGroupBuyId(id);
 
@@ -104,6 +105,11 @@ public class GroupBuyQueryService {
         }
         return GroupBuyDetail.of(g, status, g.getOrganizer().getName(), isOrganizer, participantCount,
                 myParticipation, visibleOpenChatUrl(g, status, isOrganizer, mine != null), roster);
+    }
+
+    /** 006: 본인 참여 행의 입금·수령 확인 시각(없으면 null). 개설자의 myParticipation 에는 이 필드 자체가 없다. */
+    private static OffsetDateTime confirmedAt(Instant t) {
+        return t == null ? null : toOffset(t);
     }
 
     /** 개설자: OPEN·PENDING_CLOSE·COMPLETED 에서 항상. 참여자: COMPLETED 에서만. 그 외는 숨긴다. */
