@@ -35,3 +35,9 @@ export function remainingText(deadlineIso: string, nowMs: number): string {
   if (hour < 24) return `${hour}시간 남음`
   return `${Math.floor(hour / 24)}일 남음`
 }
+
+/** ISO 시각을 KST `datetime-local` 입력값(`2026-11-01T18:00`)으로. 수정 폼의 현재 값 채움용. */
+export function toKstLocalInput(iso: string): string {
+  const t = formatKst(iso)
+  return t ? t.replace(' ', 'T') : ''
+}

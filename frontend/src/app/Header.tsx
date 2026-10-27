@@ -11,6 +11,7 @@ export function Header() {
       <Link to="/" style={{ fontWeight: 700, marginRight: 'auto' }}>캠공</Link>
       {status === 'authenticated' ? (
         <>
+          <Link to="/groupbuys/new">공구 열기</Link>
           <Link to="/me">내 활동</Link>
           <Button variant="secondary" onClick={() => logout().then(() => navigate('/login'))}>로그아웃</Button>
         </>

@@ -36,3 +36,12 @@ describe('time (테스트는 TZ=UTC로 실행: npm test)', () => {
     expect(remainingText(at(2 * 86_400_000 + 1), now)).toBe('2일 남음')
   })
 })
+
+describe('toKstLocalInput', () => {
+  test('ISO를 KST datetime-local 값으로(기기 시간대 무관)', async () => {
+    const { toKstLocalInput } = await import('./time')
+    expect(toKstLocalInput('2026-11-01T09:00:00Z')).toBe('2026-11-01T18:00')
+    expect(toKstLocalInput('2026-11-01T18:00:00+09:00')).toBe('2026-11-01T18:00')
+    expect(toKstLocalInput('nope')).toBe('')
+  })
+})
