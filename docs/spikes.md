@@ -49,6 +49,10 @@
 | — | 낙관적 `@Version`과 직접 `UPDATE`가 같은 버전 규칙으로 맞물린다 (004) | **확인됨** | 직접 `UPDATE`가 `version=version+1`을 하면 낡은 엔티티 저장이 `ObjectOptimisticLockingFailureException`. **버전을 올리지 않는 직접 `UPDATE`는 충돌을 못 잡고 덮어씀(갱신 손실)**. 영향: 004의 직접 `UPDATE` 쿼리는 항상 `version = version + 1`을 포함해야 함 |
 | — | 같은 컬럼의 읽기 전용 `@ManyToOne(insertable=false, updatable=false)`를 `Long` id와 병행해도 쓰기에 문제 없다 (003) | **확인됨** | `memberId`로 저장 후 트랜잭션 안에서 `member.getName()` 조회 성공, 수정 저장도 정상. 트랜잭션 밖에서 지연 로딩 접근은 `LazyInitializationException`(open-in-view 끔) — 서비스 계층 밖으로 엔티티를 내보내면 안 됨. 프록시의 public 필드는 `null`로 보이므로 접근자로 읽어야 함(스파이크에서 겪음) |
 | — | 행 락을 기다린 뒤 읽는 일반 SELECT가 최신 값을 본다 (001, 004) | **아니오 — 잠금 읽기 필요** (001 구현 중 발견) | `findByIdForUpdate`로 공구 행 락을 기다린 뒤 `participation`을 일반 SELECT로 읽으면, REPEATABLE READ 스냅샷이 락 대기 전 시점이라 다른 요청이 커밋한 변경을 못 본다. `PESSIMISTIC_WRITE` 잠금 읽기로 읽으면 최신 값을 본다. 001 `ModifyConcurrencyIT`가 잡았고 `ParticipationRepository.findLocked*`로 해결. 004·005도 같은 규칙을 적용한다(스파이크가 아니라 구현에서 확인) |
+| — | Hibernate 쿼리 수를 테스트에서 셀 수 있다 (003) | **확인됨** (2026-10-28, 백엔드 003 보고) | `spring.jpa.properties.hibernate.session_factory.statement_inspector`로 `StatementInspector`가 동작(`QueryCountInspectorIT`) | 003 `QueryCountIT`가 상한(개설자 상세 ≤4, 개설자 외 ≤3, 내 활동 ≤2)을 회귀로 지킨다 |
+| — | `LIKE ... ESCAPE '\\'`가 Hibernate Criteria에서 MySQL로 그대로 전달된다 (003) | **확인됨** (2026-10-28) | `%`, `_`, `\` 이스케이프 테스트 통과 | 검색어 이스케이프 + `ESCAPE` 사용 |
+| — | `default_batch_fetch_size`가 N+1을 `IN` 한 번으로 묶는다 (003) | **확인됨** (2026-10-28) | 시나리오 B ③ 측정에서 `IN` 한 번(N>100이면 `ceil(N/100)`). 최종 선택은 ④ DTO 프로젝션 | `docs/benchmarks/browse-n-plus-one.md` |
+| — | 드문 검색어(`LIKE '%단어%'`)는 인덱스 없이 전체를 훑는다 (003) | **확인됨** (2026-10-28, 같은 맥, 앱·MySQL·k6 동거) | 1만 건에서 p95 최대 9ms(SC-001 충족). 일치 0건이면 끝까지 스캔. 마감 임박순은 `(status, deadline)` 인덱스가 없어 filesort(005가 추가 예정) | 수만 건 이상이거나 드문 검색어 p95가 느려지면 FULLTEXT(ngram) |
 
 **Java 21 재검증 (2026-10-27)**: 같은 스파이크를 Temurin이 아닌 BellSoft Liberica JDK 21.0.12(`-Djava.version=21`)로 다시 돌렸다. 테스트 15개(5c 추가분 포함) 모두 통과, 결과는 JDK 25와 동일하다(범위 선점은 REPEATABLE READ에서 락 대기 시간 초과, id 지정 선점은 통과 등). 스파이크 판정은 **JDK 21에서도 유효**하다.
 

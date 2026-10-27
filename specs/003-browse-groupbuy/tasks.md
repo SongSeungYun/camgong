@@ -74,7 +74,7 @@ description: "공구 목록·상세 조회 구현 태스크"
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T014 [P] [US2] `test/groupbuy/query/GroupBuyDetailIT.java`: 시나리오 12(일반 회원: 개설자 이름·구매처 링크·수량·마감·상태·`participantCount`, `participants=null`, `myParticipation=null`, `openChatUrl=null`), 13(내 수량 6·개당 1,200 → `myParticipation={quantity:6, amount:7200}`), 14(개설자 상세: `participants`에 개설자 포함 이름·수량, `isOrganizer=true`), 15(`openChatUrl` 공개 표: 개설자는 `OPEN`·`COMPLETED`에서 값, 참여자는 `COMPLETED`에서만, 외부인·`FAILED`·`PENDING_CLOSE`의 참여자는 `null`), 16(헤더 없음 401), 17(없는 id·취소된 id 404)
+- [ ] T014 [P] [US2] `test/groupbuy/query/GroupBuyDetailIT.java`: 시나리오 12(일반 회원: 개설자 이름·구매처 링크·수량·마감·상태·`participantCount`, `participants=null`, `myParticipation=null`, `openChatUrl=null`), 13(내 수량 6·개당 1,200 → `myParticipation={quantity:6, amount:7200}`), 14(개설자 상세: `participants`에 개설자 포함 이름·수량, `isOrganizer=true`), 15(`openChatUrl` 공개 표: 개설자는 `OPEN`·`PENDING_CLOSE`·`COMPLETED`에서 값(data-model 우선, FAILED 제외), 참여자는 `COMPLETED`에서만, 외부인·`FAILED`·`PENDING_CLOSE`의 참여자는 `null`), 16(헤더 없음 401), 17(없는 id·취소된 id 404)
 - [ ] T015 [P] [US2] `test/groupbuy/query/QueryCountIT.java`의 시나리오 B(상세의 개설자용 명단): 참여자 N = 1, 20, 50명으로 상세를 불러 `QueryCountInspector`로 쿼리 수를 기록하는 테스트를 먼저 작성한다. 이 시점에는 상한 단언 없이 **측정값만 출력**한다(순진한 구현의 기준선을 남기기 위해).
 
 ### Implementation for User Story 2
