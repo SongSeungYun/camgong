@@ -83,7 +83,13 @@ src/main/java/com/camgong/auth/                    # 새 최상위 패키지 (ar
 ├── LoggingMailSender.java     # 개발·테스트용: 발송 대신 기록
 ├── PendingSignup.java, LoginSession.java, LoginAttempt.java   # JdbcClient 결과 record (엔티티 아님, tasks T006)
 ├── AuthProperties.java        # 허용 도메인, 유지 기간, 잠금 기준, 메일 한도 등 설정
-└── SessionCleanup.java        # 만료 세션·인증 요청 정리 (@Scheduled, 005 패턴)
+├── SessionCleanup.java        # 만료 세션·인증 요청 정리 (@Scheduled, 005 패턴)
+│  ── 구현에서 추가된 파일 (T040 대조, 2026-10-28) ──
+├── AuthConfig.java, Keys.java, Tokens.java            # 설정, 이메일·이름 정규화, 토큰 생성·SHA-256
+├── SignupRequest/SignupResponse/ResendRequest/VerifyRequest/LoginRequest.java, AuthResponse.java, MemberView.java, Authenticated.java
+├── VerificationMailRequested.java, VerificationMailListener.java   # AFTER_COMMIT + @Async 발송
+├── SecurityConfig.java, OriginCheckFilter.java, ProblemResponses.java, AuthWebConfig.java
+└── (삭제) common/MemberHeaderInterceptor.java — 001의 임시 헤더 인증 제거
 src/main/java/com/camgong/member/                  # (수정) Member에 email, passwordHash, consent 컬럼
 src/main/resources/
 ├── schema.sql                 # (수정) 새 테이블, member 확장
@@ -96,6 +102,7 @@ src/test/java/com/camgong/
     ├── LoginLogoutIT.java     # 로그인·실패 안내·로그아웃·다기기
     ├── LoginThrottleIT.java   # 5회 실패 잠금, 풀림, 없는 계정도 동일
     ├── SessionIT.java         # 14일 슬라이딩·만료
+    ├── SignupDomainIT / ResendIT / OriginCheckIT / OriginCheckFilterTest / SessionServiceIT / SessionCleanupIT / AuthConfigIT / KeysTest   # 구현에서 추가
     ├── AuthGuardIT.java       # 보호 엔드포인트 전부 401, 헤더 위조 거부
     └── PrivacyIT.java         # 이메일·비밀번호가 응답·로그에 없음
 ```
