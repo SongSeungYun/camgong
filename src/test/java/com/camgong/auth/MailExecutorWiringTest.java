@@ -2,7 +2,6 @@ package com.camgong.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.lang.reflect.Method;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,7 +10,6 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import com.camgong.support.IntegrationTestBase;
@@ -27,41 +25,37 @@ class MailExecutorWiringTest extends IntegrationTestBase {
     ApplicationContext context;
 
     @Test
-    void theVerificationListenerNamesItsExecutor() throws Exception {
-        Method on = VerificationMailListener.class.getDeclaredMethod("on", VerificationMailRequested.class);
-        assertThat(on.getAnnotation(Async.class).value()).isEqualTo("mailExecutor");
-    }
-
-    @Test
     void testsRunMailSendingSynchronouslyOnTheNamedExecutorAndTheNotificationPoolIsASeparateBean() {
         assertThat(context.getBean("mailExecutor")).isInstanceOf(SyncTaskExecutor.class);
         assertThat(context.getBean("notificationExecutor")).isNotSameAs(context.getBean("mailExecutor"));
     }
 
     @Test
-    void theProductionMailExecutorNeverThrowsWhenItsQueueIsFull(CapturedOutput output) throws Exception {
+    void theListenerSwallowsAQueueRejectionAndLogsOnlyTheMaskedRecipient(CapturedOutput output) {
         var executor = AuthConfig.mailPool(1, 1);                                       // 스레드 1 + 큐 1
         executor.initialize();
         var release = new java.util.concurrent.CountDownLatch(1);
-        var ran = new java.util.concurrent.atomic.AtomicInteger();
+        var sender = new MailSender() {
+            @Override
+            public void sendVerification(String to, String link) {
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        };
+        var props = org.mockito.Mockito.mock(AuthProperties.class);
+        org.mockito.Mockito.when(props.verifyLinkBaseUrl()).thenReturn("http://x/verify?token=");
+        var listener = new VerificationMailListener(sender, props, executor);
         try {
             for (int i = 0; i < 5; i++) {
-                executor.execute(() -> {                                                // 가득 찬 뒤의 제출도 예외 없이 지나가야 한다
-                    try {
-                        release.await();
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                    ran.incrementAndGet();
-                });
+                listener.on(new VerificationMailRequested("student" + i + "@school.ac.kr", "tok" + i));    // 가득 찬 뒤에도 예외가 나오지 않는다
             }
+            assertThat(output.getAll()).contains("verification mail dropped to=s***@school.ac.kr").doesNotContain("student1@school.ac.kr");
+        } finally {
             release.countDown();
             executor.getThreadPoolExecutor().shutdown();
-            assertThat(executor.getThreadPoolExecutor().awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-            assertThat(ran.get()).isEqualTo(2);                                         // 실행 1 + 큐 1, 나머지 3건은 버려짐
-            assertThat(output.getAll()).contains("verification mail dropped");
-        } finally {
-            executor.shutdown();
         }
     }
 

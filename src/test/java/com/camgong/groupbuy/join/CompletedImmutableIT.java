@@ -2,6 +2,7 @@ package com.camgong.groupbuy.join;
 
 import static com.camgong.support.GroupBuySeed.groupBuy;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDateTime;
@@ -36,12 +37,18 @@ class CompletedImmutableIT extends JoinTestBase {
         seedMembers(4, 4);
         List<Map<String, Object>> before = snapshot();
 
-        updateAs(1, id, GroupBuyBodies.with(GroupBuyBodies.valid(), "unitPrice", 1500)).andExpect(status().isConflict());
-        cancelAs(1, id).andExpect(status().isConflict());
-        joinAs(4, id, 1).andExpect(status().isConflict());                              // 새 참여
-        changeAs(2, id, 5).andExpect(status().isConflict());                            // 수량 변경
-        leaveAs(2, id).andExpect(status().isConflict());                                // 참여 취소
-        leaveAs(3, id).andExpect(status().isConflict());
+        updateAs(1, id, GroupBuyBodies.with(GroupBuyBodies.valid(), "unitPrice", 1500)).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("NOT_MODIFIABLE")).andExpect(jsonPath("$.reason").value("COMPLETED"));
+        cancelAs(1, id).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("NOT_MODIFIABLE")).andExpect(jsonPath("$.reason").value("COMPLETED"));
+        joinAs(4, id, 1).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("NOT_JOINABLE")).andExpect(jsonPath("$.reason").value("COMPLETED"));                              // 새 참여
+        changeAs(2, id, 5).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("NOT_JOINABLE")).andExpect(jsonPath("$.reason").value("COMPLETED"));                            // 수량 변경
+        leaveAs(2, id).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("NOT_JOINABLE")).andExpect(jsonPath("$.reason").value("COMPLETED"));                                // 참여 취소
+        leaveAs(3, id).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("NOT_JOINABLE")).andExpect(jsonPath("$.reason").value("COMPLETED"));
 
         assertThat(snapshot()).isEqualTo(before);
     }
