@@ -32,14 +32,14 @@ export interface SeedGroupBuy {
 }
 
 const CATEGORIES = ['FOOD', 'DAILY', 'KITCHEN', 'HEALTH_BEAUTY', 'STATIONERY', 'ETC']
-const STATUSES = ['OPEN', 'OPEN', 'PENDING_CLOSE', 'COMPLETED', 'FAILED']
+const STATUSES = ['OPEN', 'OPEN', 'OPEN', 'PENDING_CLOSE', 'COMPLETED', 'FAILED']
 const NAMES = ['햇반', '물티슈', '텀블러', '비타민', '노트', '라면', '세제', '프라이팬']
 const HOUR = 3_600_000
 
-/** 29개: 상태 4종·카테고리 6종·마감 임박(24시간 이내) 포함. 기준 시각 now에서 상대적으로 만든다. */
+/** 50개(모집 중 25개 이상): 상태 4종·카테고리 6종·마감 임박(24시간 이내) 포함. 기준 시각 now에서 상대적으로 만든다. */
 export function makeSeedGroupBuys(now: number): SeedGroupBuy[] {
   const iso = (ms: number) => new Date(ms).toISOString()
-  return Array.from({ length: 29 }, (_, k) => {
+  return Array.from({ length: 50 }, (_, k) => {
     const id = k + 1
     const status = STATUSES[id % STATUSES.length]!
     const total = 10 + (id % 5) * 5
@@ -57,7 +57,7 @@ export function makeSeedGroupBuys(now: number): SeedGroupBuy[] {
       title: `${name} ${total}개 공구`,
       description: id % 4 === 0 ? null : `${name} 같이 사요. 기숙사 로비에서 나눠요.`,
       itemName: `${name} 세트`,
-      category: CATEGORIES[id % CATEGORIES.length]!,
+      category: CATEGORIES[(id + Math.floor(id / 6)) % CATEGORIES.length]!,
       itemUrl: id % 5 === 0 ? 'http://insecure.example.com/item' : `https://example.com/item/${id}`,
       unitPrice: 1000 + id * 100,
       totalQuantity: total,
@@ -65,7 +65,7 @@ export function makeSeedGroupBuys(now: number): SeedGroupBuy[] {
       deadline: iso(now + (open ? (id <= 2 ? 5 * HOUR : id * 24 * HOUR) : -id * HOUR)),
       status,
       organizerId,
-      createdAt: iso(now - (30 - id) * HOUR),
+      createdAt: iso(now - (51 - id) * HOUR),
       openChatUrl: status === 'COMPLETED' ? 'https://open.kakao.com/o/mock' + id : null,
       participations,
     }
