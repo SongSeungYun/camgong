@@ -28,7 +28,7 @@ export interface SeedGroupBuy {
   createdAt: string
   openChatUrl: string | null
   /** 개설자 본인 몫 포함 */
-  participations: { memberId: number; quantity: number }[]
+  participations: { memberId: number; quantity: number; paidConfirmedAt?: string | null; receivedConfirmedAt?: string | null }[]
 }
 
 const CATEGORIES = ['FOOD', 'DAILY', 'KITCHEN', 'HEALTH_BEAUTY', 'STATIONERY', 'ETC']

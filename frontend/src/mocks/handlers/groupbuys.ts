@@ -179,7 +179,7 @@ export const groupBuyHandlers = [
             quantity: mine.quantity,
             amount: g.unitPrice * mine.quantity,
             // 006 확장: 개설자의 myParticipation에는 확인 필드가 없다
-            ...(isOrganizer ? {} : { paidConfirmedAt: null, receivedConfirmedAt: null }),
+            ...(isOrganizer ? {} : { paidConfirmedAt: mine.paidConfirmedAt ?? null, receivedConfirmedAt: mine.receivedConfirmedAt ?? null }),
           }
         : null,
       // 공개 규칙(003 data-model): 개설자는 OPEN·PENDING_CLOSE·COMPLETED에서 항상, 참여자는 COMPLETED일 때만
