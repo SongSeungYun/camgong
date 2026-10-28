@@ -106,7 +106,7 @@ function guardOrganizer(id: string) {
   if (!g) return { res: problem(404, 'Not Found') }
   if (g.organizerId !== me.id) return { res: problem(403, 'ORGANIZER_ONLY') }
   if (g.status !== 'OPEN' || Date.parse(g.deadline) <= Date.now()) {
-    return { res: problem(409, 'NOT_MODIFIABLE', { reason: g.status === 'COMPLETED' ? 'COMPLETED' : 'DEADLINE_PASSED' }) }
+    return { res: problem(409, 'NOT_MODIFIABLE', { reason: g.status === 'COMPLETED' || g.status === 'FAILED' ? g.status : 'DEADLINE_PASSED' }) }
   }
   return { g }
 }
