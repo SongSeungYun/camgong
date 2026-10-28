@@ -28,6 +28,14 @@ const asOrganizer = () => {
 }
 
 describe('개설 폼 (US3)', () => {
+  test('구매처·오픈채팅 링크는 필수임을 안내한다(001 계약: 필수)', async () => {
+    asOrganizer()
+    renderApp('/groupbuys/new')
+    await screen.findByRole('heading', { name: '공구 열기' })
+    screen.getByText('필수예요. https 주소만 쓸 수 있어요.')
+    screen.getByText('필수예요. https 주소만 쓸 수 있어요. 모집이 끝나면 참여자에게만 보여요.')
+  })
+
   test('14. 내 부담 금액을 미리 보여준다(1,200 × 9 = 10,800원)', async () => {
     asOrganizer()
     renderApp('/groupbuys/new')

@@ -114,6 +114,10 @@ describe('001 목 핸들러', () => {
     const done = mockState.groupBuys.find((g) => g.status === 'COMPLETED')!
     mockState.sessionMemberId = done.organizerId
     expect(await rejects(post(`/api/groupbuys/${done.id}/cancel`))).toMatchObject({ status: 409, reason: 'COMPLETED' })
+    const failed = mockState.groupBuys.find((g) => g.status === 'FAILED')!
+    mockState.sessionMemberId = failed.organizerId
+    expect(await rejects(post(`/api/groupbuys/${failed.id}/cancel`))).toMatchObject({ status: 409, reason: 'FAILED' }) // 001 계약(2026-10-28)
+    mockState.sessionMemberId = done.organizerId
     expect(await rejects(post('/api/groupbuys/9999/cancel'))).toMatchObject({ status: 404 })
   })
 

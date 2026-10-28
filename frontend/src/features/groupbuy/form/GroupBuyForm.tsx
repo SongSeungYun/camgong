@@ -54,7 +54,7 @@ export function GroupBuyForm({ submitLabel, defaultValues = EMPTY_VALUES, notes,
       </SelectField>
       <TextField label="상품명" error={errors.itemName?.message} {...register('itemName')} />
       <TextField label="구매처 링크" type="url" inputMode="url" error={errors.itemUrl?.message} {...register('itemUrl')} />
-      <p>https 주소만 쓸 수 있어요.</p>
+      <p>필수예요. https 주소만 쓸 수 있어요.</p>
       <TextField label="개당 가격" type="number" inputMode="numeric" error={errors.unitPrice?.message} {...register('unitPrice')} />
       <p>1~1,000,000원</p>
       <TextField label="총 수량" type="number" inputMode="numeric" error={errors.totalQuantity?.message} {...register('totalQuantity')} />
@@ -64,7 +64,7 @@ export function GroupBuyForm({ submitLabel, defaultValues = EMPTY_VALUES, notes,
       <TextField label="마감 (한국 시각)" type="datetime-local" error={errors.deadline?.message} {...register('deadline')} />
       <p>지금부터 30일 이내</p>
       <TextField label="오픈채팅 링크" type="url" inputMode="url" error={errors.openChatUrl?.message} {...register('openChatUrl')} />
-      <p>https 주소만 쓸 수 있어요. 모집이 끝나면 참여자에게만 보여요.</p>
+      <p>필수예요. https 주소만 쓸 수 있어요. 모집이 끝나면 참여자에게만 보여요.</p>
       {notes}
       {topErrors.map((t) => <p key={t} role="alert">{t}</p>)}
       <Button type="submit" pending={isSubmitting}>{submitLabel}</Button>
