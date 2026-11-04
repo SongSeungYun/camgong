@@ -15,7 +15,18 @@
 - 체크는 **필드별 `PUT`**(입금, 수령 각각)으로 **목표 상태를 지정**한다. 같은 요청을 반복해도 결과가 같다.
 - 쓰기는 `participation` 한 행에 대한 **조건부 `UPDATE` 한 문장**이다. 공구 행 락은 필요 없다(`COMPLETED`는 종료 상태라 바뀌지 않는다).
 - 입금·수령 확인 시각은 `participation`의 두 컬럼(`paid_at`, `received_at`)이다. 값이 없으면 확인 전이다.
-- 체크표 조회는 003의 명단 쿼리를 재사용한다(N+1 점검 대상을 하나로).
+- 체크표 조회는 003의 명단 쿼리를 재사용한다(N+1 점검 대상을 하나로). → 구현에서는 같은 방식의 전용 쿼리로 바뀌었다(아래 "구현 반영").
+
+## 구현 반영 (2026-11-05, 코드 대조)
+
+main의 구현(`src/main/java/com/camgong/groupbuy/check/`)과 이 plan이 다른 점. 계약·동작은 바뀌지 않았고 구현 방식만 다르다.
+
+- **체크표 조회는 003 명단 쿼리를 재사용하지 않았다.** `CheckQueryRepository`를 새로 두고 003과 같은 방식(필요한 컬럼만 조인하는 DTO 프로젝션, 지연 로딩 없음)으로 쿼리 4개(`findAll`·`findUnpaid`·`findUnreceived`·`findOne`)를 따로 썼다. 필터를 서버 쿼리 조건으로 처리하려고 나눴다. 요약은 필터와 무관하게 `participation` 집계 SQL 한 문장(개설자 제외)으로 구한다. 쿼리 수가 참여자 수와 무관함은 `CheckSheetQueryCountIT`(JDBC 수준 계수)로 확인한다.
+- **쓰기는 조건부 `UPDATE` 한 문장 그대로**이고, 개설자 제외 조건(`member_id <> (SELECT organizer_id …)`)이 문장 안에 있다. 입금·수령 × 지정·해제를 SQL 4개로 따로 뒀다(컬럼명을 인자로 조립하지 않음).
+- **응답 행은 `UPDATE` 뒤 `FOR SHARE`로 다시 읽는다.** 동시 요청이 먼저 같은 상태로 바꿔 내 `UPDATE`가 아무것도 바꾸지 못하면 일반 `SELECT`는 트랜잭션 스냅샷의 낡은 값을 돌려주기 때문이다(`CheckStaleResponseIT`).
+- **참여 행 존재 확인을 `UPDATE` 앞에서 따로 한다.** `useAffectedRows=true`에서 값이 안 바뀐 `UPDATE`는 영향 행 0이라 "없음"과 "이미 그 상태"를 영향 행 수로 구분할 수 없다(미검증 가정 1의 결론). 없으면 404 `PARTICIPATION_NOT_FOUND`.
+- 접근 검사는 004의 `JoinQueryRepository.findHead`를 재사용한다.
+- 테스트 파일이 위 구조보다 많다: `CheckSheetQueryCountIT`, `CheckStaleResponseIT`, `MyConfirmStatusIT`(참여자 본인 확인 상태), 006·007 후속에서 `CompletedImmutableIT`가 더해졌다.
 
 ## Technical Context
 
