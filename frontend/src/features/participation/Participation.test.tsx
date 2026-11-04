@@ -28,11 +28,11 @@ describe('참여 (US4)', () => {
     renderApp('/groupbuys/1')
     await openJoin()
     await typeQty('16')
-    expect(submit().disabled).toBe(true)
+    expect(submit().getAttribute('aria-disabled')).toBe('true')
     screen.getByText('남은 수량(15개) 이하로 입력해 주세요.')
     await typeQty('4')
     screen.getByText('내 부담 금액 4,800원')
-    expect(submit().disabled).toBe(false)
+    expect(submit().hasAttribute('aria-disabled')).toBe(false)
     await userEvent.click(submit())
     await screen.findByText('내 참여: 4개 · 4,800원')
     screen.getByRole('button', { name: '수량 변경' })
@@ -49,11 +49,11 @@ describe('참여 (US4)', () => {
     await typeQty('4')
     await userEvent.click(submit())
     await screen.findByText('개당 가격이 바뀌었어요(1,500원). 금액을 다시 확인해 주세요.')
-    expect(submit().disabled).toBe(true) // 재확인 전에는 제출 불가
+    expect(submit().getAttribute('aria-disabled')).toBe('true') // 재확인 전에는 제출 불가
     screen.getByText('내 부담 금액 6,000원') // 새 가격 기준
     await waitFor(() => expect(screen.getAllByText(/개당 1,500원/)).toHaveLength(2)) // 폼과 상세 모두 새 가격으로 갱신
     await userEvent.click(screen.getByRole('button', { name: '바뀐 가격 확인했어요' }))
-    expect(submit().disabled).toBe(false)
+    expect(submit().hasAttribute('aria-disabled')).toBe(false)
     await userEvent.click(submit())
     await screen.findByText('내 참여: 4개 · 6,000원')
   })

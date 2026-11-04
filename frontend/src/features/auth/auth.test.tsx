@@ -118,7 +118,7 @@ describe('가입·인증 (변경 B2: 가입은 이메일만, 이름·비밀번�
     await signupAs()
     await screen.findByRole('heading', { name: /인증 메일을 보냈어요/ })
     const resend = screen.getByRole('button', { name: /인증 메일 다시 보내기/ }) as HTMLButtonElement
-    expect(resend.disabled).toBe(true)
+    expect(resend.getAttribute('aria-disabled')).toBe('true') // Button은 포커스 유지를 위해 네이티브 disabled 대신 aria-disabled
     screen.getByText(/다시 보낼 수 있어요/)
   })
 

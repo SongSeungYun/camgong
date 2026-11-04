@@ -79,3 +79,39 @@ test('서버 필드 오류 뒤 포커스는 화면 순서상 첫 오류 필드�
   await expect(page.getByLabel('구매처 링크')).toHaveAttribute('aria-invalid', 'true')
   await expect(page.getByLabel('구매처 링크')).toBeFocused() // 처리 중 비활성화된 제출 버튼에서 body로 날아가지 않는다
 })
+
+// 처리 중 버튼은 aria-disabled라 포커스를 잃지 않는다(네이티브 disabled면 body로 튕김)
+test('참여: 가격 변경(PRICE_CHANGED) 거부 뒤에도 키보드 포커스가 폼 안에 남고, 재확인 뒤 제출 버튼으로 간다', async ({ page }) => {
+  await login(page, 'outsider@school.ac.kr')
+  await clientNavigate(page, '/groupbuys/6')
+  await page.evaluate(() => void ((window as unknown as { __mock: { priceChangeTo: number | null } }).__mock.priceChangeTo = 9900))
+  await page.getByRole('button', { name: '참여하기' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByLabel('수량')).toBeFocused() // 폼을 열면 수량 입력으로
+  await page.keyboard.type('1')
+  await page.keyboard.press('Enter') // 입력칸에서 Enter로 제출
+  await expect(page.getByText(/개당 가격이 바뀌었어요\(9,900원\)/)).toBeVisible()
+  const submit = page.getByRole('button', { name: '참여 신청' })
+  await expect(submit).toBeDisabled() // aria-disabled
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false)
+  await page.getByRole('button', { name: '바뀐 가격 확인했어요' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('button', { name: '바뀐 가격 확인했어요' })).toHaveCount(0)
+  await expect(submit).toBeFocused() // 사라진 재확인 버튼 대신 제출 버튼으로
+  await page.keyboard.press('Enter')
+  await expect(page.getByText('내 참여: 1개 · 9,900원')).toBeVisible()
+})
+
+// 시드 4번: 모집 완료, 개설자 2(participant@), 참여자 3(구경꾼)
+test('체크표: 키보드로 입금 확인을 토글해도 포커스가 그 행 버튼에 남는다', async ({ page }) => {
+  await login(page, 'participant@school.ac.kr')
+  await clientNavigate(page, '/groupbuys/4/check')
+  const row = page.getByRole('listitem', { name: '구경꾼' })
+  await row.getByRole('button', { name: '입금 확인' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(row.getByText(/입금 확인됨/)).toBeVisible()
+  await expect(row.getByRole('button', { name: '입금 확인 취소' })).toBeFocused()
+  await page.keyboard.press('Enter') // 같은 자리에서 되돌리기
+  await expect(row.getByText('입금 확인 전')).toBeVisible()
+  await expect(row.getByRole('button', { name: '입금 확인', exact: true })).toBeFocused()
+})

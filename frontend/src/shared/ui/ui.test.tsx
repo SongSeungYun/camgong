@@ -4,9 +4,30 @@ import { useState } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { Badge, Button, ConfirmDialog, StateView, TextField } from '.'
 
-test('Button은 pending 동안 비활성화된다', () => {
-  render(<Button pending>저장</Button>)
-  expect((screen.getByRole('button', { name: '저장' }) as HTMLButtonElement).disabled).toBe(true)
+// 네이티브 disabled는 포커스를 잃게 해(키보드 사용자가 body로 튕김) aria-disabled + 클릭 무시로 막는다
+test('Button은 pending·disabled 동안 aria-disabled이고 포커스를 유지하며 클릭(제출 포함)을 무시한다', async () => {
+  const onClick = vi.fn()
+  const onSubmit = vi.fn((e: { preventDefault: () => void }) => e.preventDefault())
+  const { rerender } = render(<form onSubmit={onSubmit}><Button type="submit" onClick={onClick}>저장</Button></form>)
+  const btn = screen.getByRole('button', { name: '저장' }) as HTMLButtonElement
+  btn.focus()
+  rerender(<form onSubmit={onSubmit}><Button type="submit" pending onClick={onClick}>저장</Button></form>)
+  expect(btn.disabled).toBe(false)
+  expect(btn.getAttribute('aria-disabled')).toBe('true')
+  expect(btn.getAttribute('aria-busy')).toBe('true')
+  expect(document.activeElement).toBe(btn)
+  await userEvent.click(btn)
+  await userEvent.keyboard('{Enter}')
+  rerender(<form onSubmit={onSubmit}><Button type="submit" disabled onClick={onClick}>저장</Button></form>)
+  expect(btn.getAttribute('aria-disabled')).toBe('true')
+  await userEvent.click(btn)
+  expect(onClick).not.toHaveBeenCalled()
+  expect(onSubmit).not.toHaveBeenCalled()
+  rerender(<form onSubmit={onSubmit}><Button type="submit" onClick={onClick}>저장</Button></form>)
+  expect(btn.hasAttribute('aria-disabled')).toBe(false)
+  await userEvent.click(btn)
+  expect(onClick).toHaveBeenCalledTimes(1)
+  expect(onSubmit).toHaveBeenCalledTimes(1)
 })
 
 test('TextField는 레이블과 오류를 필드에 연결한다', () => {

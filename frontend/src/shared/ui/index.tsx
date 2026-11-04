@@ -8,10 +8,26 @@ export function Layout({ children }: { children: ReactNode }) {
 
 type ButtonProps = ComponentProps<'button'> & { variant?: 'primary' | 'secondary'; pending?: boolean }
 
-/** pending 동안 비활성화해 중복 제출을 막는다(FR-007). */
-export function Button({ variant = 'primary', pending = false, disabled, className, ...rest }: ButtonProps) {
+/**
+ * pending·disabled 동안 클릭(제출 포함)을 무시해 중복 제출을 막는다(FR-007).
+ * 네이티브 disabled는 포커스를 잃게 해(키보드 사용자가 body로 튕김) aria-disabled로 표시한다.
+ */
+export function Button({ variant = 'primary', pending = false, disabled, className, onClick, ...rest }: ButtonProps) {
   const cls = [s.button, variant === 'secondary' && s.secondary, className].filter(Boolean).join(' ')
-  return <button type="button" {...rest} className={cls} disabled={disabled || pending} aria-busy={pending || undefined} />
+  const off = disabled || pending
+  return (
+    <button
+      type="button"
+      {...rest}
+      className={cls}
+      aria-disabled={off || undefined}
+      aria-busy={pending || undefined}
+      onClick={(e) => {
+        if (off) return e.preventDefault() // type=submit의 제출(Enter 암묵 제출 포함)도 막힌다
+        onClick?.(e)
+      }}
+    />
+  )
 }
 
 interface FieldProps {
