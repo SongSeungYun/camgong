@@ -6,16 +6,25 @@ import { readFileSync } from 'node:fs'
 const LOG = process.env.BACKEND_LOG!
 const SHOTS = process.env.SHOTS_DIR ?? '/tmp'
 const tag = Date.now().toString().slice(-6)
-const token = () => /token=([^\s&]+)/.exec(readFileSync(LOG, 'utf8').split('\n').filter((l) => l.includes('verification link=')).pop()!)![1]!
+const links = () => readFileSync(LOG, 'utf8').split('\n').filter((l) => l.includes('verification link='))
+// 가입 직전 링크 줄 수를 기억했다가 새 줄이 생길 때까지 기다린다(고정 대기는 이전 토큰을 집을 수 있다)
+async function newToken(before: number): Promise<string> {
+  for (let i = 0; i < 50; i++) {
+    const all = links()
+    if (all.length > before) return /token=([^\s&]+)/.exec(all[all.length - 1]!)![1]!
+    await new Promise((r) => setTimeout(r, 200))
+  }
+  throw new Error('인증 링크가 로그에 나오지 않았다')
+}
 const noHScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
 
 async function register(page: Page, email: string, name: string) {
   await page.goto('/signup')
   await page.getByLabel('이메일', { exact: true }).fill(email)
+  const before = links().length
   await page.getByRole('button', { name: '가입하기' }).click()
   await expect(page.getByRole('heading', { name: '인증 메일을 보냈어요' })).toBeVisible()
-  await page.waitForTimeout(1500)
-  await page.goto(`/verify?token=${token()}`)
+  await page.goto(`/verify?token=${await newToken(before)}`)
   await page.getByLabel('표시 이름', { exact: true }).fill(name)
   await page.getByLabel('비밀번호').fill('password1234')
   await page.getByRole('checkbox').check()
@@ -151,9 +160,9 @@ test('실서버: 가입 → 개설 → 참여 → 체크표 → 알림, 취소·
 
 // API로 가입(화면 확인이 목적이 아닌 준비용)
 async function apiRegister(api: APIRequestContext, email: string, name: string) {
+  const before = links().length
   await api.post('/api/auth/signup', { data: { email } })
-  await new Promise((r) => setTimeout(r, 1500))
-  const res = await api.post('/api/auth/verify', { data: { token: token(), displayName: name, password: 'password1234', consent: true, consentVersion: 'v1' } })
+  const res = await api.post('/api/auth/verify', { data: { token: await newToken(before), displayName: name, password: 'password1234', consent: true, consentVersion: 'v1' } })
   expect(res.status()).toBe(200)
 }
 const newUser = async (browser: import('@playwright/test').Browser, vp: { width: number; height: number } | null | undefined, who: string, n: string) => {
