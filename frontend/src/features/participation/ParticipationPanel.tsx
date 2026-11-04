@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ApiError } from '../../shared/api/client'
 import type { GroupBuyDetail } from '../../shared/api/types'
 import { errorMessage } from '../../shared/lib/errorMessage'
@@ -54,6 +54,7 @@ function QuantityForm({ mode, d, onDone, onMessage }: { mode: Mode; d: GroupBuyD
   // 사용자가 화면에서 확인한 개당 가격. PRICE_CHANGED면 새 가격으로 바꾸고 다시 확인받는다.
   const [price, setPrice] = useState(d.unitPrice)
   const [needsReconfirm, setNeedsReconfirm] = useState(false)
+  const submitRef = useRef<HTMLButtonElement>(null)
   const join = useJoin(d.id)
   const change = useChangeQuantity(d.id)
   const m = mode === 'join' ? join : change
@@ -83,12 +84,13 @@ function QuantityForm({ mode, d, onDone, onMessage }: { mode: Mode; d: GroupBuyD
 
   return (
     <form noValidate style={{ flexBasis: '100%' }} onSubmit={(e) => { e.preventDefault(); if (valid && !needsReconfirm && !m.isPending) submit() }}>
-      <TextField label="수량" type="number" inputMode="numeric" min={1} max={max} value={text} onChange={(e) => setText(e.target.value)} />
+      <TextField label="수량" autoFocus type="number" inputMode="numeric" min={1} max={max} value={text} onChange={(e) => setText(e.target.value)} />
       {text.trim() !== '' && !valid && <p>{mode === 'join' ? `남은 수량(${max}개) 이하로 입력해 주세요.` : `최대 ${max}개까지 입력할 수 있어요.`}</p>}
       <p>개당 {formatWon(price)}</p>
       <p>{`내 부담 금액 ${valid ? formatWon(amount(price, q)) : '-'}`}</p>
-      {needsReconfirm && <Button variant="secondary" onClick={() => setNeedsReconfirm(false)}>바뀐 가격 확인했어요</Button>}
-      <Button type="submit" pending={m.isPending} disabled={!valid || needsReconfirm}>{submitLabel}</Button>
+      {/* 재확인 버튼은 누르면 사라지므로 포커스를 제출 버튼으로 옮긴다 */}
+      {needsReconfirm && <Button variant="secondary" onClick={() => { setNeedsReconfirm(false); submitRef.current?.focus() }}>바뀐 가격 확인했어요</Button>}
+      <Button ref={submitRef} type="submit" pending={m.isPending} disabled={!valid || needsReconfirm}>{submitLabel}</Button>
       <Button variant="secondary" disabled={m.isPending} onClick={onDone}>닫기</Button>
     </form>
   )

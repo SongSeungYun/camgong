@@ -119,7 +119,7 @@ describe('체크표 (US6)', () => {
     await screen.findByRole('listitem', { name: '참여자' })
     const btn = within(row('참여자')).getByRole('button', { name: '입금 확인' }) as HTMLButtonElement
     await userEvent.dblClick(btn)
-    expect(btn.disabled).toBe(true)
+    expect(btn.getAttribute('aria-disabled')).toBe('true') // Button은 포커스 유지를 위해 네이티브 disabled 대신 aria-disabled
     await within(row('참여자')).findByText(/입금 확인됨/)
     expect(puts).toBe(1)
   })

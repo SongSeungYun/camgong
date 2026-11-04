@@ -5,7 +5,7 @@
   font: inherit; cursor: pointer;
 }
 .button.secondary { background: var(--color-bg); color: var(--color-primary); }
-.button:disabled { opacity: 0.5; cursor: not-allowed; }
+.button[aria-disabled='true'] { opacity: 0.5; cursor: not-allowed; }
 .field { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-3); }
 .field label { font-size: var(--font-small); color: var(--color-muted); }
 .field input, .field select, .field textarea {

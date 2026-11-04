@@ -127,7 +127,7 @@ describe('개설 폼 (US3)', () => {
     const btn = screen.getByRole('button', { name: '공구 열기' }) as HTMLButtonElement
     await userEvent.click(btn)
     await userEvent.click(btn)
-    expect(btn.disabled).toBe(true)
+    expect(btn.getAttribute('aria-disabled')).toBe('true') // Button은 포커스 유지를 위해 네이티브 disabled 대신 aria-disabled
     await waitFor(() => expect(calls).toBe(1))
   })
 
