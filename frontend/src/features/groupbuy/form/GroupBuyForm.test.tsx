@@ -81,6 +81,8 @@ describe('개설 폼 (US3)', () => {
     expect(err('제목')).toBeUndefined() // 맞는 필드에는 오류가 없다
     expect((screen.getByLabelText('개당 가격') as HTMLInputElement).value).toBe('2000000') // 입력값 유지
     expect((screen.getByLabelText('제목') as HTMLInputElement).value).toBe('햇반 24개 공구')
+    // 처리 중 비활성화된 제출 버튼에서 포커스가 사라지지 않게, 화면 순서상 첫 오류 필드로 옮긴다
+    expect(document.activeElement).toBe(screen.getByLabelText('구매처 링크'))
   })
 
   test('16b. 폼에 없는 필드 오류는 폼 상단에 모인다', async () => {
