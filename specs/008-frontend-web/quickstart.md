@@ -55,3 +55,11 @@
 ## 실제 백엔드 재확인
 
 백엔드 기능이 끝날 때마다 해당 시나리오(001: 14~20, 003: 1~6·11~12·28, 002: 7~10·13·31, 004: 21~27, 006: 29, 007: 30)를 목 없이 다시 돌린다. 어긋나면 목과 `ui-api-map.md`를 고치거나 계약 변경 요청을 관제탑에 올린다.
+
+### 실제 백엔드로 돌리는 방법 (2026-10-28 통합에서 확인)
+
+- 백엔드: local 프로필로 8080 기동. 가입 확인 링크(토큰)는 `LoggingMailSender`의 DEBUG 로그에 나온다(local 프로필에서 켜져 있음).
+- 프론트: `VITE_USE_MOCK=false`로 dev 서버 5173. Vite 프록시는 `changeOrigin:false`라 백엔드의 Origin 검사(Origin = 요청 Host)를 통과한다. 5173 외 포트로 띄우면 백엔드 `ALLOWED_ORIGINS`에 그 출처를 넣어야 한다(아니면 쓰기가 403 `FORBIDDEN_ORIGIN`).
+- 자동 확인: `frontend/`에서 `BACKEND_LOG=<백엔드 로그 경로> npm run e2e:real`(Playwright, 360·430px).
+- 마감 경과 화면(마감됨·확정 대기 → 모집 실패, 실패 알림)은 [005 quickstart의 수동 재현](../005-close-groupbuy/quickstart.md#마감-경과-수동-재현-local-2026-11-05-기록)으로 만든다.
+- 브라우저는 Origin 헤더를 바꿀 수 없어 `FORBIDDEN_ORIGIN`은 UI에서 실서버로 재현하지 못한다. 실서버 403 본문은 HTTP 수준에서 확인했다.

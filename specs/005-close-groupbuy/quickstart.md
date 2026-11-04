@@ -47,6 +47,18 @@ SC-001·SC-007 수치를 문서로 남긴다. `docs/benchmarks/close-batch.md`�
 k6 run load/k6/list-during-close.js
 ```
 
+## 마감 경과 수동 재현 (local, 2026-11-05 기록)
+
+2026-10-28 통합에서 백엔드·프론트 세션이 실제로 돌려 확인한 방법이다. local 프로필 기본값(스케줄러 30초 `fixedDelay`)에서 동작했다.
+
+1. 마감이 미래인 공구를 개설하고 다른 회원으로 참여한다(수량 미충족 상태로 둔다).
+2. local DB 컨테이너에서 마감을 과거로 당긴다. 시각은 UTC로 저장된다:
+   `UPDATE group_buy SET deadline = UTC_TIMESTAMP(6) - INTERVAL 1 MINUTE WHERE id = <공구 id>;`
+3. 상세가 곧바로 `PENDING_CLOSE`(화면: 마감됨·확정 대기)로 보인다.
+4. 약 30초 안에 스케줄러가 `FAILED`로 확정하고, 개설자·참여자에게 `GROUPBUY_FAILED` 알림이 생긴다(실측 약 31초).
+
+운영 DB에서는 쓰지 않는다. 이 재현은 시험 데이터가 local 컨테이너에만 있을 때만 한다.
+
 ## 헌법 IV 필수 테스트와의 대응
 
 | 필수 대상 | 시나리오 |
