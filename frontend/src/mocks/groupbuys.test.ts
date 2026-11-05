@@ -184,3 +184,11 @@ test('목록 검색어 50자 제한은 글자 수: 이모지 50개는 통과, 51
   await list(`?q=${encodeURIComponent('😀'.repeat(50))}`)
   expect(await rejects(list(`?q=${encodeURIComponent('😀'.repeat(51))}`))).toMatchObject({ status: 400, fieldErrors: [{ field: 'q' }] })
 })
+
+test('개설 검증: 제목·상품명이 제어 문자뿐이어도 400(서버 isBlank와 같다)', async () => {
+  mockState.reset()
+  mockState.sessionMemberId = 1
+  const base = { category: 'FOOD', itemUrl: 'https://e.com/a', openChatUrl: 'https://open.kakao.com/o/x', unitPrice: 1000, totalQuantity: 10, organizerQuantity: 1, deadline: new Date(Date.now() + 86_400_000).toISOString() }
+  const e = await rejects(post('/api/groupbuys', { ...base, title: '\u0001', itemName: '\u0001\u007f' }))
+  expect(e.fieldErrors.map((f) => f.field)).toEqual(['title', 'itemName'])
+})

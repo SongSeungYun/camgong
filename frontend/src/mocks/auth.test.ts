@@ -88,3 +88,13 @@ test('인증 표시 이름: 앞뒤 유니코드 공백 제거, 보이지 않는 
   const t2 = await pend('a2@school.ac.kr')
   expect(await post('/api/auth/verify', { token: t2, displayName: '😀'.repeat(20), consent: true, ...v })).toMatchObject({ member: { displayName: '😀'.repeat(20) } })
 })
+
+test('인증 표시 이름: 가운데 제어 문자(탭·개행 포함)는 400, 앞뒤 탭·개행은 지운다', async () => {
+  const v = { password: 'password1234', consent: true, consentVersion: 'v1' }
+  await post('/api/auth/signup', { email: 'cc@school.ac.kr' })
+  const token = mockState.pending.find((p) => p.email === 'cc@school.ac.kr')!.token
+  for (const bad of ['가\t나', '가\n나', '가\u0000나', '가\u007f나']) {
+    expect(await err(post('/api/auth/verify', { token, displayName: bad, ...v }))).toMatchObject({ status: 400, fieldErrors: [{ field: 'displayName' }] })
+  }
+  expect(await post('/api/auth/verify', { token, displayName: '\t새내기\n', ...v })).toMatchObject({ member: { displayName: '새내기' } })
+})
