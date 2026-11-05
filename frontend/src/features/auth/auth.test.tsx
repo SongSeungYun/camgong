@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, test } from 'vitest'
@@ -144,6 +144,16 @@ describe('가입·인증 (변경 B2: 가입은 이메일만, 이름·비밀번�
     await userEvent.click(await screen.findByRole('button', { name: /인증 메일 다시 보내기/ }))
     await screen.findByText('신청 내역이 없거나 이미 인증을 마쳤어요. 로그인하거나 가입해 주세요.')
     expect(screen.queryByText('찾을 수 없는 공구예요.')).toBeNull()
+  })
+
+  test('로그인한 채 인증 링크를 열면 안내와 로그아웃 버튼, 로그아웃하면 인증 폼', async () => {
+    mockState.sessionMemberId = 1
+    const { router } = renderApp('/verify?token=abc')
+    await screen.findByText('이미 로그인돼 있어요. 다른 계정으로 가입을 마치려면 로그아웃해 주세요.')
+    expect(router.state.location.pathname).toBe('/verify')
+    await userEvent.click(within(screen.getByRole('main')).getByRole('button', { name: '로그아웃' }))
+    await screen.findByLabelText('표시 이름')
+    expect(router.state.location.pathname).toBe('/verify')
   })
 
   test('이미 가입된 이메일이면 안내와 로그인 링크', async () => {
