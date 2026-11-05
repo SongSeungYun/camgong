@@ -104,6 +104,11 @@ describe('GroupBuyList (US1)', () => {
     expect(router.state.location.search).toContain('category=FOOD')
   })
 
+  test('검색 입력칸은 UTF-16 maxLength로 막지 않는다(이모지 25개에서 막히지 않게, 자르기는 normalizeQ)', async () => {
+    renderApp('/')
+    expect((await screen.findByLabelText('검색')).hasAttribute('maxlength')).toBe(false)
+  })
+
   test('4. 빈 목록과 검색 결과 없음은 문구가 다르다', async () => {
     server.use(http.get('/api/groupbuys', () => page([])))
     const a = renderApp('/')

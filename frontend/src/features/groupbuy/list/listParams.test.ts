@@ -38,4 +38,8 @@ describe('listParams', () => {
     const p = { status: 'FAILED', category: 'ETC', q: '물 티슈', sort: 'deadline' as const }
     expect(parseListParams(serializeListParams(p))).toEqual(p)
   })
+  test('검색어 50자는 글자(code point) 수로 자른다: 이모지가 반쪽으로 잘리지 않는다', () => {
+    expect(normalizeQ('😀'.repeat(60))).toBe('😀'.repeat(50))
+    expect(normalizeQ('가'.repeat(49) + '😀😀')).toBe('가'.repeat(49) + '😀')
+  })
 })
