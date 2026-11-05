@@ -20,8 +20,8 @@
 | 컬럼 | 타입 | 규칙 | 근거 |
 |------|------|------|------|
 | `id` | `BIGINT AUTO_INCREMENT` | PK | |
-| `name` (표시 이름) | `VARCHAR(20)` | 필수, 2~20자, 공백만 불가 | FR-003 |
-| `display_name_key` | `VARCHAR(20)` | 필수, `UNIQUE`. 이름을 소문자·앞뒤 공백 제거로 정규화한 값 | FR-003 |
+| `name` (표시 이름) | `VARCHAR(20)` | 필수, 2~20자, 공백만 불가, 보이지 않는 글자 불가. 앞뒤 유니코드 공백을 지운 값으로 저장 | FR-003 |
+| `display_name_key` | `VARCHAR(20)` | 필수, `UNIQUE`. 이름을 소문자·앞뒤 공백(전각 공백 U+3000, 줄바꿈 없는 공백 U+00A0 등 유니코드 공백 포함) 제거로 정규화한 값 | FR-003 |
 | `email` | `VARCHAR(254)` | 필수, 인증을 마친 이메일 원문 | FR-002 |
 | `email_key` | `VARCHAR(254)` | 필수, `UNIQUE`. 소문자·trim | FR-002 |
 | `password_hash` | `VARCHAR(100)` | 필수. BCrypt 해시(인증 시 받은 비밀번호). 원문은 저장하지 않는다 | FR-002, SC-009 |
