@@ -57,6 +57,14 @@ describe('로그인·보호 라우트', () => {
     await screen.findByText(/잠시 뒤에 다시 시도해 주세요/)
   })
 
+  test('재발송 400의 이메일 필드 문구를 버리지 않고 보여준다', async () => {
+    server.use(http.post('/api/auth/signup/resend', () => HttpResponse.json({ title: 'Bad Request', status: 400, errors: [{ field: 'email', message: '이메일 형식이 아니에요' }] }, { status: 400 })))
+    renderApp('/login')
+    await userEvent.type(await screen.findByLabelText('인증 메일 받을 이메일'), 'x@y')
+    await userEvent.click(screen.getByRole('button', { name: '인증 메일 다시 받기' }))
+    await screen.findByText('이메일 형식이 아니에요')
+  })
+
   test('19. 비밀번호는 가려지고 어디에도 저장되지 않는다', async () => {
     const { router } = renderApp('/login')
     const pw = await screen.findByLabelText('비밀번호')
