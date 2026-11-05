@@ -30,14 +30,16 @@ function guard(id: string) {
 
 function setConfirmed(field: 'paidConfirmedAt' | 'receivedConfirmedAt') {
   return async ({ params, request }: { params: Record<string, unknown>; request: Request }) => {
+    if (!currentMember()) return problem(401, 'UNAUTHENTICATED')
+    // 계약: 본문 검증이 접근 검사(404/403)보다 먼저
+    const b = (await request.json().catch(() => ({}))) as { confirmed?: unknown }
+    if (typeof b.confirmed !== 'boolean') return problem(400, 'Bad Request', { errors: [{ field: 'confirmed', message: 'true 또는 false여야 해요' }] })
     const { g, res } = guard(params.id as string)
     if (!g) return res
-    const b = (await request.json().catch(() => ({}))) as { confirmed?: unknown }
     const memberId = Number(params.memberId)
-    if (typeof b.confirmed !== 'boolean') return problem(400, 'Bad Request', { errors: [{ field: 'confirmed', message: 'true 또는 false여야 해요' }] })
-    if (memberId === g.organizerId) return problem(400, 'Bad Request', { errors: [{ field: 'memberId', message: '개설자는 체크 대상이 아니에요' }] })
+    if (memberId === g.organizerId) return problem(400, 'INVALID_TARGET', { errors: [{ field: 'memberId', message: '개설자는 체크 대상이 아니에요' }] })
     const p = g.participations.find((x) => x.memberId === memberId)
-    if (!p) return problem(404, 'Not Found')
+    if (!p) return problem(404, 'PARTICIPATION_NOT_FOUND')
     // 멱등: 이미 확인된 것을 다시 true로 지정해도 시각을 바꾸지 않는다
     if (b.confirmed) p[field] ??= new Date().toISOString()
     else p[field] = null
