@@ -11,6 +11,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import tools.jackson.core.JacksonException;
 
@@ -58,6 +59,13 @@ public class ApiExceptionHandler {
                 ? List.of()
                 : List.of(new ApiException.Field(field, "값의 형식이 올바르지 않습니다."));
         return body(HttpStatus.BAD_REQUEST, "Bad Request", INVALID_INPUT, errors);
+    }
+
+    /** 경로 변수·쿼리 파라미터 형식 오류(예: /api/groupbuys/abc). field 는 파라미터 이름이다. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ProblemDetail> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        return body(HttpStatus.BAD_REQUEST, "Bad Request", INVALID_INPUT,
+                List.of(new ApiException.Field(e.getName(), "값의 형식이 올바르지 않습니다.")));
     }
 
     private static ResponseEntity<ProblemDetail> body(HttpStatus status, String title, String detail,

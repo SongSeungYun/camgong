@@ -27,4 +27,12 @@ class NotificationPropertiesTest {
         runner.withPropertyValues("camgong.notification.insert-chunk-size=1").run(ctx -> assertThat(ctx).hasFailed());
         runner.withPropertyValues("camgong.notification.insert-chunk-size=2").run(ctx -> assertThat(ctx).hasNotFailed());
     }
+
+    @Test
+    void nonPositiveDurationsAreRejected() {
+        for (String bad : new String[] {"retention=0s", "retention=-1d", "retry-base-delay=-1s", "cleanup.interval=0s", "cleanup.interval=-1h"}) {
+            runner.withPropertyValues("camgong.notification." + bad).run(ctx -> assertThat(ctx).as(bad).hasFailed());
+        }
+        runner.withPropertyValues("camgong.notification.retry-base-delay=0s").run(ctx -> assertThat(ctx).hasNotFailed());
+    }
 }
