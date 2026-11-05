@@ -2,7 +2,6 @@ package com.camgong.notification;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -131,6 +130,6 @@ class NotificationWriter {
         ps.setLong(4, r.groupBuyId());
         ps.setString(5, r.groupBuyTitle());
         ps.setString(6, r.changedFields());
-        ps.setTimestamp(7, Timestamp.valueOf(LocalDateTime.ofInstant(r.createdAt(), ZoneOffset.UTC)));
+        ps.setObject(7, LocalDateTime.ofInstant(r.createdAt(), ZoneOffset.UTC));   // Timestamp 는 JVM↔접속 시간대 변환을 타므로 쓰지 않는다
     }
 }

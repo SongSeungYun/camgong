@@ -96,9 +96,11 @@ class UpdateGroupBuyIT extends IntegrationTestBase {
         long id = openGroupBuy();
         seedParticipant(id, PARTICIPANT, 6); // secured 15, 개설자가 19 로 올리면 25 > 24
 
-        updateAs(ORGANIZER, id, with(valid(), "organizerQuantity", 19))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[?(@.field=='organizerQuantity')]").exists());
+        for (int q : new int[] {19, Integer.MAX_VALUE}) {          // MAX_VALUE: 확보 합 계산이 넘쳐 음수가 되면 500
+            updateAs(ORGANIZER, id, with(valid(), "organizerQuantity", q))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[?(@.field=='organizerQuantity')]").exists());
+        }
         assertThat(securedColumn(id)).isEqualTo(15);
         assertThat(quantityOf(id, ORGANIZER)).isEqualTo(9);
     }

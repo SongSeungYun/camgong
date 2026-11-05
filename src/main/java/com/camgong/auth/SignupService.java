@@ -114,7 +114,7 @@ public class SignupService {
             throw new ApiException(HttpStatus.GONE, "TOKEN_EXPIRED", "인증 링크가 만료되었습니다. 인증 메일을 다시 받아 주세요.");
         }
 
-        String displayName = r.displayName() == null ? null : r.displayName().trim();
+        String displayName = r.displayName() == null ? null : Keys.strip(r.displayName());
         validateSignupInput(r, displayName);
         String passwordHash = encoder.encode(r.password());
 
@@ -157,6 +157,8 @@ public class SignupService {
             errors.add(new ApiException.Field("displayName", "표시 이름을 입력해 주세요."));
         } else if (displayName.length() < 2 || displayName.length() > 20) {
             errors.add(new ApiException.Field("displayName", "표시 이름은 2~20자여야 합니다."));
+        } else if (Keys.hasInvisible(displayName)) {
+            errors.add(new ApiException.Field("displayName", "보이지 않는 글자는 이름에 쓸 수 없습니다."));
         } else if (Keys.normalize(displayName).length() > 20) {
             // 소문자 변환이 길이를 늘리는 글자(예: 'İ')는 이름 키 컬럼(20자)을 넘어 저장 오류가 되므로 미리 막는다.
             errors.add(new ApiException.Field("displayName", "사용할 수 없는 글자가 포함된 이름입니다."));
