@@ -39,7 +39,7 @@ public class Member {
 
     public Member(String displayName, String email, String passwordHash,
             Instant consentAt, String consentVersion, Instant createdAt) {
-        this.name = displayName.trim();
+        this.name = Keys.strip(displayName);
         this.displayNameKey = Keys.normalize(displayName);
         this.email = email.trim();
         this.emailKey = Keys.normalize(email);

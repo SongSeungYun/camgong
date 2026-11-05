@@ -140,6 +140,20 @@ class VerifyEmailIT extends IntegrationTestBase {
     }
 
     @Test
+    void namesDifferingOnlyByUnicodeSpacesAtTheEndsAreTheSameName() throws Exception {
+        jdbc.update("UPDATE member SET name = '홍길동', display_name_key = '홍길동' WHERE id = 1");
+        requestSignup("new@school.ac.kr");
+        String token = lastToken();
+        for (String padded : List.of("홍길동\u3000", "\u00A0홍길동", "\u2003홍길동\u3000")) {
+            verifyToken(verify(token, padded)).andExpect(status().isConflict())               // 이름 충돌은 토큰을 남긴다
+                    .andExpect(jsonPath("$.title").value("DISPLAY_NAME_TAKEN"));
+        }
+        verifyToken(verify(token, "\u3000새이름\u00A0")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.member.displayName").value("새이름"));
+        assertThat(jdbc.queryForObject("SELECT display_name_key FROM member WHERE name = '새이름'", String.class)).isEqualTo("새이름");
+    }
+
+    @Test
     void expiredAndUnknownTokens() throws Exception {
         requestSignup("new@school.ac.kr");
         String token = lastToken();
@@ -184,6 +198,12 @@ class VerifyEmailIT extends IntegrationTestBase {
                 new Case("displayName", verify(token, "가")),
                 new Case("displayName", verify(token, "가".repeat(21))),
                 new Case("displayName", verify(token, "   ")),
+                new Case("displayName", verify(token, "\u3000\u3000")),          // 전각 공백만
+                new Case("displayName", verify(token, "\u00A0\u00A0")),          // 줄바꿈 없는 공백만
+                new Case("displayName", verify(token, "\u200B\u200B")),          // 폭 없는 공백만
+                new Case("displayName", verify(token, "홍\u200B길동")),            // 보이지 않는 글자가 섞임
+                new Case("displayName", verify(token, "홍길동\u3164")),            // 한글 채움 문자(빈칸처럼 보임)
+                new Case("displayName", verify(token, "홍길동" + Character.toString(0xE0020))),   // BMP 밖 태그 문자
                 new Case("displayName", with(verify(token), "displayName", null)),
                 new Case("password", verify(token, "홍길동", "1234567")),
                 new Case("password", verify(token, "홍길동", "가".repeat(24) + "a")),         // 73바이트

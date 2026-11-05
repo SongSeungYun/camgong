@@ -74,7 +74,7 @@ public class GroupBuyService {
                 .orElseThrow(() -> new IllegalStateException("개설자 참여 행이 없다: groupBuyId=" + id));
         int oldOrganizerQuantity = organizerRow.getQuantity();
         int newOrganizerQuantity = r.organizerQuantity();
-        int newSecured = g.getSecuredQuantity() - oldOrganizerQuantity + newOrganizerQuantity;
+        int othersSecured = g.getSecuredQuantity() - oldOrganizerQuantity;
         Instant newDeadline = r.deadline().toInstant();
 
         List<ApiException.Field> errors = new ArrayList<>();
@@ -83,7 +83,7 @@ public class GroupBuyService {
         } else if (newDeadline.isAfter(g.getCreatedAt().plus(Duration.ofDays(MAX_DEADLINE_DAYS)))) {
             errors.add(new ApiException.Field("deadline", "마감 시각은 개설 시점으로부터 30일 이내여야 합니다."));
         }
-        if (newSecured > r.totalQuantity()) {
+        if (newOrganizerQuantity > r.totalQuantity() - othersSecured) {   // 뺄셈으로 비교: 더하면 큰 개설자 수량에서 int 가 넘친다
             // 총 수량을 현재 확보 수량 아래로 내렸으면 총 수량 탓, 아니면 개설자 수량을 올린 탓으로 본다.
             boolean totalTooLow = r.totalQuantity() < g.getSecuredQuantity();
             errors.add(new ApiException.Field(totalTooLow ? "totalQuantity" : "organizerQuantity",
@@ -93,6 +93,7 @@ public class GroupBuyService {
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.", errors);
         }
+        int newSecured = othersSecured + newOrganizerQuantity;
 
         // openChatUrl 은 알림 대상 변경에서 뺀다(모집 완료 전에는 참여자에게 공개하지 않는 값, FR-017).
         List<String> changed = new ArrayList<>();
