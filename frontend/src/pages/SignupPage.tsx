@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
 import { resend, signup, type Accepted } from '../features/auth/api'
+import { RESEND_NOT_FOUND } from '../features/auth/ResendBox'
 import { ApiError } from '../shared/api/client'
 import { applyServerErrors } from '../shared/lib/formErrors'
 import { errorMessage } from '../shared/lib/errorMessage'
@@ -61,7 +62,7 @@ function Sent({ accepted, onAccepted, onBack }: { accepted: Accepted; onAccepted
       <p>{accepted.email}로 인증 메일을 보냈어요. 메일의 링크를 열어 인증을 마쳐 주세요.</p>
       <Button variant="secondary" pending={m.isPending} disabled={waiting} onClick={() => m.mutate()}>인증 메일 다시 보내기</Button>
       {waiting && <p>{remainingText(accepted.resendAvailableAt, now)}이라 아직 다시 보낼 수 없어요. 조금 뒤에 다시 보낼 수 있어요.</p>}
-      {m.error instanceof ApiError && <p role="alert">{errorMessage(m.error, { nowMs: now })}</p>}
+      {m.error instanceof ApiError && <p role="alert">{m.error.status === 404 ? RESEND_NOT_FOUND : errorMessage(m.error, { nowMs: now })}</p>}
       <p>이메일을 잘못 썼나요? <Button variant="secondary" onClick={onBack}>다른 이메일로 다시</Button></p>
     </Layout>
   )
