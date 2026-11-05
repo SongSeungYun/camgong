@@ -205,6 +205,8 @@ class VerifyEmailIT extends IntegrationTestBase {
                 new Case("displayName", verify(token, "\uD83D\uDE00")),             // 이모지 한 글자(UTF-16 2단위)
                 new Case("displayName", verify(token, "\uD83D\uDE00".repeat(21))),
                 new Case("displayName", verify(token, "홍길동\u3164")),            // 한글 채움 문자(빈칸처럼 보임)
+                new Case("displayName", verify(token, "\u0001\u0002")),           // 제어 문자만
+                new Case("displayName", verify(token, "홍\u0007길동")),            // 제어 문자가 섞임
                 new Case("displayName", verify(token, "홍길동" + Character.toString(0xE0020))),   // BMP 밖 태그 문자
                 new Case("displayName", with(verify(token), "displayName", null)),
                 new Case("password", verify(token, "홍길동", "1234567")),

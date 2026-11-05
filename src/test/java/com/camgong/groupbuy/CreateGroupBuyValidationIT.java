@@ -112,6 +112,9 @@ class CreateGroupBuyValidationIT extends IntegrationTestBase {
         String emoji = "\uD83D\uDE00";                                       // 😀: 한 글자, UTF-16 으로는 2
         assertCreated(with(with(with(valid(), "title", emoji.repeat(100)), "itemName", emoji.repeat(100)), "description", emoji.repeat(2000)));
         assertRejected(with(valid(), "title", emoji.repeat(101)), "title");
+        String url = "https://e.com/" + emoji.repeat(486);                      // 500자(UTF-16 986단위)
+        assertCreated(with(with(with(valid(), "title", "링크 경계"), "itemUrl", url), "openChatUrl", url));
+        assertRejected(with(with(valid(), "itemUrl", url + "a"), "openChatUrl", url + "a"), "itemUrl", "openChatUrl");
     }
 
     @Test

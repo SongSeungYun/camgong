@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 
 import org.hibernate.validator.constraints.CodePointLength;
 
@@ -51,12 +50,12 @@ public record GroupBuyRequest(
         GroupBuyCategory category,
 
         @NotBlank(message = "구매처 링크는 필수입니다.")
-        @Size(max = 500, message = "구매처 링크는 500자 이하여야 합니다.")
+        @CodePointLength(max = 500, message = "구매처 링크는 500자 이하여야 합니다.")
         @Pattern(regexp = "^https://.+", message = "구매처 링크는 https:// 로 시작해야 합니다.")
         String itemUrl,
 
         @NotBlank(message = "오픈채팅 링크는 필수입니다.")
-        @Size(max = 500, message = "오픈채팅 링크는 500자 이하여야 합니다.")
+        @CodePointLength(max = 500, message = "오픈채팅 링크는 500자 이하여야 합니다.")
         @Pattern(regexp = "^https://.+", message = "오픈채팅 링크는 https:// 로 시작해야 합니다.")
         String openChatUrl) {
 

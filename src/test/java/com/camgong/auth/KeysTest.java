@@ -36,5 +36,6 @@ class KeysTest {
             assertThat(Keys.hasInvisible("홍길동" + Character.toString(filler))).as(Integer.toHexString(filler)).isTrue();
         }
         assertThat(Keys.hasInvisible("홍 길동")).isFalse();
+        assertThat(Keys.hasInvisible("홍\u0001길동")).isTrue();                               // 제어 문자
     }
 }
