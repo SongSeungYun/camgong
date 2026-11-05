@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ApiError } from '../../shared/api/client'
 import type { GroupBuyDetail } from '../../shared/api/types'
 import { errorMessage } from '../../shared/lib/errorMessage'
@@ -17,6 +17,11 @@ export function ParticipationPanel({ d }: { d: GroupBuyDetail }) {
   // 안내는 여기에 둔다: 거부로 상세가 바뀌어 폼이 사라져도 문구는 남아야 한다
   const [message, setMessage] = useState<string | null>(null)
   const leave = useLeave(d.id)
+  // 폼은 그 모드가 지금 허용될 때만 둔다(참여 취소 뒤 변경 폼, ALREADY_JOINED 뒤 참여 폼이 남지 않게, data-model 3)
+  const allowed = mode === 'join' ? v.join : mode === 'change' ? v.changeParticipation : false
+  useEffect(() => {
+    if (mode && !allowed) setMode(null)
+  }, [mode, allowed])
 
   const open = (m: Mode) => {
     setMessage(null)
@@ -27,7 +32,7 @@ export function ParticipationPanel({ d }: { d: GroupBuyDetail }) {
       {v.join && mode !== 'join' && <Button onClick={() => open('join')}>참여하기</Button>}
       {v.changeParticipation && mode !== 'change' && <Button variant="secondary" onClick={() => open('change')}>수량 변경</Button>}
       {v.changeParticipation && <Button variant="secondary" onClick={() => { setMessage(null); setLeaving(true) }}>참여 취소</Button>}
-      {mode && (v.join || v.changeParticipation) && <QuantityForm key={mode} mode={mode} d={d} onDone={() => setMode(null)} onMessage={setMessage} />}
+      {mode && allowed && <QuantityForm key={mode} mode={mode} d={d} onDone={() => setMode(null)} onMessage={setMessage} />}
       {message && <p role="alert" style={{ flexBasis: '100%' }}>{message}</p>}
       <ConfirmDialog
         open={leaving}

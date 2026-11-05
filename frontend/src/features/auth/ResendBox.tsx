@@ -16,10 +16,12 @@ export function ResendBox({ initialEmail = '' }: { initialEmail?: string }) {
   const setEmail = setEdited
   const m = useMutation({ mutationFn: () => resend(email.trim()) })
   const err = m.error instanceof ApiError ? m.error : null
-  const failText = err && (err.status === 404 ? RESEND_NOT_FOUND : errorMessage(err))
+  // 400 errors[]의 이메일 문구는 입력칸 옆에 그대로 보여준다(FR-005)
+  const emailErr = err?.fieldErrors.filter((f) => f.field === 'email').map((f) => f.message).join(' / ') || undefined
+  const failText = err && !emailErr && (err.status === 404 ? RESEND_NOT_FOUND : errorMessage(err))
   return (
     <div>
-      <TextField label="인증 메일 받을 이메일" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+      <TextField label="인증 메일 받을 이메일" type="email" error={emailErr} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
       <Button variant="secondary" pending={m.isPending} disabled={!email.trim()} onClick={() => m.mutate()}>
         인증 메일 다시 받기
       </Button>

@@ -49,7 +49,7 @@ export const authHandlers = [
 
     const prev = mockState.pending.find((p) => p.email === email)
     if (prev && Date.now() - prev.lastSentAt < RESEND_MS) return tooMany(prev.lastSentAt + RESEND_MS)
-    const next = { email, token: prev?.token ?? `tok-${mockState.nextToken++}`, lastSentAt: Date.now() }
+    const next = { email, token: `tok-${mockState.nextToken++}`, lastSentAt: Date.now() } // 재신청도 새 토큰(옛 토큰 무효, 002)
     mockState.pending = [...mockState.pending.filter((p) => p.email !== email), next]
     return HttpResponse.json({ email, resendAvailableAt: isoKst(next.lastSentAt + RESEND_MS) }, { status: 202 })
   }),
@@ -63,6 +63,7 @@ export const authHandlers = [
     if (!p) return problem(404, 'NOT_FOUND')
     if (Date.now() - p.lastSentAt < RESEND_MS) return tooMany(p.lastSentAt + RESEND_MS)
     p.lastSentAt = Date.now()
+    p.token = `tok-${mockState.nextToken++}` // 재발송도 새 토큰(백엔드와 같다)
     return HttpResponse.json({ email: p.email, resendAvailableAt: isoKst(p.lastSentAt + RESEND_MS) }, { status: 202 })
   }),
 

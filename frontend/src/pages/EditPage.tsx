@@ -6,6 +6,7 @@ import { useUpdateGroupBuy } from '../features/groupbuy/form/useGroupBuyMutation
 import { ApiError } from '../shared/api/client'
 import type { GroupBuyDetail } from '../shared/api/types'
 import { toKstLocalInput } from '../shared/lib/time'
+import { routeId } from '../shared/lib/routeId'
 import { Layout, StateView } from '../shared/ui'
 
 const valuesOf = (d: GroupBuyDetail): FormValues => ({
@@ -24,7 +25,7 @@ const valuesOf = (d: GroupBuyDetail): FormValues => ({
 })
 
 export default function EditPage() {
-  const id = Number(useParams().id)
+  const id = routeId(useParams().id)
   const q = useGroupBuyDetail(id)
   const update = useUpdateGroupBuy(id)
   const navigate = useNavigate()
