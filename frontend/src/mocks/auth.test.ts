@@ -98,3 +98,20 @@ test('인증 표시 이름: 가운데 제어 문자(탭·개행 포함)는 400, 
   }
   expect(await post('/api/auth/verify', { token, displayName: '\t새내기\n', ...v })).toMatchObject({ member: { displayName: '새내기' } })
 })
+
+test('인증 전 재신청·재발송은 새 토큰을 발급하고 옛 토큰은 무효(002)', async () => {
+  const email = 'rt@school.ac.kr'
+  const v = { displayName: '새내기', password: 'password1234', consent: true, consentVersion: 'v1' }
+  await post('/api/auth/signup', { email })
+  const t1 = mockState.pending[0]!.token
+  mockState.pending[0]!.lastSentAt = 0
+  await post('/api/auth/signup', { email })
+  const t2 = mockState.pending[0]!.token
+  expect(t2).not.toBe(t1)
+  mockState.pending[0]!.lastSentAt = 0
+  await post('/api/auth/signup/resend', { email })
+  const t3 = mockState.pending[0]!.token
+  expect(t3).not.toBe(t2)
+  for (const old of [t1, t2]) expect(await err(post('/api/auth/verify', { token: old, ...v }))).toMatchObject({ status: 400, code: 'INVALID_TOKEN' })
+  expect(await post('/api/auth/verify', { token: t3, ...v })).toMatchObject({ member: { displayName: '새내기' } })
+})
