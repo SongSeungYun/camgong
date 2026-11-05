@@ -172,6 +172,17 @@ describe('체크표 (US6)', () => {
     screen.getByRole('link', { name: '공구 상세로' })
   })
 
+  test('체크 중 PARTICIPATION_NOT_FOUND면 안내하고 체크표를 다시 불러온다', async () => {
+    seedCompleted()
+    mockState.sessionMemberId = 1
+    renderApp('/groupbuys/1/check')
+    await screen.findByRole('listitem', { name: '구경꾼' })
+    mockState.groupBuys[0]!.participations.pop() // 그 사이 구경꾼이 참여를 취소했다
+    await userEvent.click(within(row('구경꾼')).getByRole('button', { name: '입금 확인' }))
+    await screen.findByText('참여 내역이 없어요.')
+    await waitFor(() => expect(screen.queryByRole('listitem', { name: '구경꾼' })).toBeNull())
+  })
+
   test('체크는 알림을 보내지 않는다 (알림 요청 없음)', async () => {
     seedCompleted()
     mockState.sessionMemberId = 1

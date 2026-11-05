@@ -1,9 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ApiError, get, post, setUnauthenticatedHandler } from '../../shared/api/client'
 import type { Member } from '../../shared/api/types'
 
-type Status = 'checking' | 'anonymous' | 'authenticated'
+/** error: 시작 시 me가 401이 아닌 오류(5xx·네트워크)라 로그인 여부를 모른다 */
+type Status = 'checking' | 'anonymous' | 'authenticated' | 'error'
 
 interface Session {
   status: Status
@@ -15,6 +16,8 @@ interface Session {
   ackExpired: () => void
   /** 로그인·인증 성공 응답으로 세션을 채운다 */
   setMember: (m: Member) => void
+  /** status가 error일 때 me를 다시 확인한다 */
+  retry: () => void
   logout: () => Promise<void>
 }
 
@@ -32,24 +35,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [queryClient],
   )
 
-  useEffect(() => {
-    setUnauthenticatedHandler(() => clear(true))
-    let alive = true
+  const alive = useRef(true)
+  const checkMe = useCallback(() => {
+    setState({ status: 'checking', member: null, expired: false })
     get<{ member: Member }>('/api/auth/me', { expect401: true }).then(
-      (r) => alive && setState({ status: 'authenticated', member: r.member, expired: false }),
-      () => alive && setState({ status: 'anonymous', member: null, expired: false }), // 비로그인 401은 정상 응답(공개 화면의 캐시를 비우지 않는다)
+      (r) => alive.current && setState({ status: 'authenticated', member: r.member, expired: false }),
+      // 비로그인 401은 정상 응답(공개 화면의 캐시를 비우지 않는다). 그 밖의 오류는 로그인 여부를 모르니 /login으로 보내지 않는다
+      (e) => alive.current && setState({ status: e instanceof ApiError && e.status === 401 ? 'anonymous' : 'error', member: null, expired: false }),
     )
+  }, [])
+
+  useEffect(() => {
+    alive.current = true
+    setUnauthenticatedHandler(() => clear(true))
+    checkMe()
     return () => {
-      alive = false
+      alive.current = false
       setUnauthenticatedHandler(() => {})
     }
-  }, [clear])
+  }, [clear, checkMe])
 
   const value = useMemo<Session>(
     () => ({
       ...state,
       ackExpired: () => setState((prev) => (prev.expired ? { ...prev, expired: false } : prev)),
       setMember: (member) => setState({ status: 'authenticated', member, expired: false }),
+      retry: checkMe,
       // 서버가 로그아웃을 확인한 뒤에만 화면을 비운다. 실패하면 던져서 호출한 쪽이 안내하고 로그인 상태를 유지한다
       // (화면만 로그아웃되고 세션 쿠키가 살아 있는 상태를 만들지 않는다).
       logout: async () => {
@@ -62,7 +73,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         clear()
       },
     }),
-    [state, clear],
+    [state, clear, checkMe],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

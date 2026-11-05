@@ -1,6 +1,8 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
 import { describe, expect, test } from 'vitest'
+import { server } from '../../mocks/server'
 import { mockState } from '../../mocks/state'
 import { post } from '../../shared/api/client'
 import { seedGroupBuy } from '../../test/factories'
@@ -129,6 +131,19 @@ describe('가입·인증 (변경 B2: 가입은 이메일만, 이름·비밀번�
     const input = screen.getByLabelText('이메일')
     await waitFor(() => expect(input.getAttribute('aria-invalid')).toBe('true'))
     expect(document.getElementById(input.getAttribute('aria-describedby')!)!.textContent).toBe('허용된 학교 이메일이 아니에요')
+  })
+
+  test('가입 뒤 재발송이 404면 신청 내역 없음/이미 인증 완료 문구 (공구 문구가 아님)', async () => {
+    server.use(
+      http.post('/api/auth/signup', () => HttpResponse.json({ email: EMAIL, resendAvailableAt: '2020-01-01T00:00:00+09:00' }, { status: 202 })),
+      http.post('/api/auth/signup/resend', () => HttpResponse.json({ title: 'NOT_FOUND', status: 404 }, { status: 404 })),
+    )
+    renderApp('/signup')
+    await screen.findByRole('heading', { name: '가입' })
+    await signupAs()
+    await userEvent.click(await screen.findByRole('button', { name: /인증 메일 다시 보내기/ }))
+    await screen.findByText('신청 내역이 없거나 이미 인증을 마쳤어요. 로그인하거나 가입해 주세요.')
+    expect(screen.queryByText('찾을 수 없는 공구예요.')).toBeNull()
   })
 
   test('이미 가입된 이메일이면 안내와 로그인 링크', async () => {
