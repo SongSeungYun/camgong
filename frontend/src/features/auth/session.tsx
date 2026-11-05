@@ -27,30 +27,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const [state, setState] = useState<{ status: Status; member: Member | null; expired: boolean }>({ status: 'checking', member: null, expired: false })
 
+  // 세대 번호: 로그인·로그아웃·언마운트 뒤에 도착한 옛 me 응답이 세션을 덮어쓰지 않게 한다
+  const gen = useRef(0)
+
   const clear = useCallback(
     (expired = false) => {
-      setState((prev) => ({ status: 'anonymous', member: null, expired: expired && prev.status === 'authenticated' }))
+      gen.current++
+      // 이미 비운 뒤 다른 요청의 401이 또 와도 처음 정한 만료 안내를 유지한다
+      setState((prev) => ({ status: 'anonymous', member: null, expired: prev.status === 'authenticated' ? expired : prev.expired }))
       queryClient.clear()
     },
     [queryClient],
   )
 
-  const alive = useRef(true)
   const checkMe = useCallback(() => {
+    const mine = ++gen.current
+    const ok = () => gen.current === mine
     setState({ status: 'checking', member: null, expired: false })
     get<{ member: Member }>('/api/auth/me', { expect401: true }).then(
-      (r) => alive.current && setState({ status: 'authenticated', member: r.member, expired: false }),
+      (r) => ok() && setState({ status: 'authenticated', member: r.member, expired: false }),
       // 비로그인 401은 정상 응답(공개 화면의 캐시를 비우지 않는다). 그 밖의 오류는 로그인 여부를 모르니 /login으로 보내지 않는다
-      (e) => alive.current && setState({ status: e instanceof ApiError && e.status === 401 ? 'anonymous' : 'error', member: null, expired: false }),
+      (e) => ok() && setState({ status: e instanceof ApiError && e.status === 401 ? 'anonymous' : 'error', member: null, expired: false }),
     )
   }, [])
 
   useEffect(() => {
-    alive.current = true
     setUnauthenticatedHandler(() => clear(true))
     checkMe()
     return () => {
-      alive.current = false
+      gen.current++
       setUnauthenticatedHandler(() => {})
     }
   }, [clear, checkMe])
@@ -59,7 +64,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       ackExpired: () => setState((prev) => (prev.expired ? { ...prev, expired: false } : prev)),
-      setMember: (member) => setState({ status: 'authenticated', member, expired: false }),
+      setMember: (member) => {
+        gen.current++
+        setState({ status: 'authenticated', member, expired: false })
+      },
       retry: checkMe,
       // 서버가 로그아웃을 확인한 뒤에만 화면을 비운다. 실패하면 던져서 호출한 쪽이 안내하고 로그인 상태를 유지한다
       // (화면만 로그아웃되고 세션 쿠키가 살아 있는 상태를 만들지 않는다).
