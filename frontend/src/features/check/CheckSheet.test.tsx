@@ -183,6 +183,21 @@ describe('체크표 (US6)', () => {
     await waitFor(() => expect(screen.queryByRole('listitem', { name: '구경꾼' })).toBeNull())
   })
 
+  test.each(['/groupbuys/99999999999999999999', '/groupbuys/99999999999999999999/edit', '/groupbuys/99999999999999999999/check', '/groupbuys/0'])(
+    '안전한 정수 범위를 넘거나 1 미만인 id(%s)는 요청 없이 찾을 수 없음',
+    async (path) => {
+      mockState.sessionMemberId = 1
+      let calls = 0
+      server.events.on('request:start', ({ request }) => {
+        if (new URL(request.url).pathname.startsWith('/api/groupbuys/')) calls++
+      })
+      renderApp(path)
+      await screen.findByText('찾을 수 없는 공구예요.')
+      expect(calls).toBe(0)
+      server.events.removeAllListeners()
+    },
+  )
+
   test('체크는 알림을 보내지 않는다 (알림 요청 없음)', async () => {
     seedCompleted()
     mockState.sessionMemberId = 1

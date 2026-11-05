@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router'
 import { GroupBuyDetail } from '../features/groupbuy/detail/GroupBuyDetail'
 import { useGroupBuyDetail } from '../features/groupbuy/detail/useGroupBuyDetail'
 import { ApiError } from '../shared/api/client'
+import { routeId } from '../shared/lib/routeId'
 import { Layout, StateView } from '../shared/ui'
 
 function NotFound() {
@@ -14,7 +15,7 @@ function NotFound() {
 }
 
 export default function DetailPage() {
-  const id = Number(useParams().id)
+  const id = routeId(useParams().id)
   const q = useGroupBuyDetail(id)
   if (!Number.isInteger(id)) return <NotFound />
   if (q.error instanceof ApiError && q.error.status === 404) return <NotFound />

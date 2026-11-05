@@ -8,6 +8,7 @@ import { useSetConfirmed } from '../features/check/useSetConfirmed'
 import chip from '../features/groupbuy/list/GroupBuyCard.module.css'
 import { ApiError } from '../shared/api/client'
 import { errorMessage } from '../shared/lib/errorMessage'
+import { routeId } from '../shared/lib/routeId'
 import { formatWon } from '../shared/lib/money'
 import { Layout, StateView } from '../shared/ui'
 
@@ -20,7 +21,7 @@ const FILTERS: { value: CheckFilter; label: string }[] = [
 const BLOCKING = ['ORGANIZER_ONLY', 'NOT_CHECKABLE']
 
 export default function CheckPage() {
-  const id = Number(useParams().id)
+  const id = routeId(useParams().id)
   const [filter, setFilter] = useState<CheckFilter>('all')
   const q = useCheckSheet(id, filter)
   const set = useSetConfirmed(id)
