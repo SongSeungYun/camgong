@@ -38,6 +38,7 @@ describe('errorMessage', () => {
   test('409 ALREADY_JOINED', () => expect(errorMessage(e(409, 'ALREADY_JOINED'))).toBe("이미 참여했어요. 수량은 '수량 변경'을 써요."))
   test('409 BUSY', () => expect(errorMessage(e(409, 'BUSY'))).toBe('요청이 몰렸어요. 잠시 뒤 다시 시도해 주세요.'))
   test('409 DUPLICATE_REQUEST', () => expect(errorMessage(e(409, 'DUPLICATE_REQUEST'))).toBe('같은 공구가 이미 열려 있어요.'))
+  test('400 INVALID_TARGET', () => expect(errorMessage(e(400, 'INVALID_TARGET'))).toBe('개설자는 체크 대상이 아니에요.'))
   test('409 NOT_CHECKABLE', () => expect(errorMessage(e(409, 'NOT_CHECKABLE'))).toBe('모집이 완료된 공구에서만 체크할 수 있어요.'))
   test('409 ALREADY_REGISTERED', () => expect(errorMessage(e(409, 'ALREADY_REGISTERED'))).toBe('이미 가입된 이메일이에요. 로그인해 주세요.'))
   test('409 DISPLAY_NAME_TAKEN', () =>

@@ -53,6 +53,8 @@ export function errorMessage(err: ApiError, { fromForm = false, nowMs = Date.now
       return '요청이 몰렸어요. 잠시 뒤 다시 시도해 주세요.'
     case 'DUPLICATE_REQUEST':
       return '같은 공구가 이미 열려 있어요.'
+    case 'INVALID_TARGET':
+      return '개설자는 체크 대상이 아니에요.'
     case 'NOT_CHECKABLE':
       return '모집이 완료된 공구에서만 체크할 수 있어요.'
     case 'ALREADY_REGISTERED':
