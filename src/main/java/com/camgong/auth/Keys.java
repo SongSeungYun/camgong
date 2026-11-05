@@ -26,7 +26,7 @@ public final class Keys {
     }
 
     /**
-     * 보이지 않는 글자가 있는지: 서식 문자(폭 없는 공백 U+200B, 태그 문자 U+E0020 등)와 빈칸처럼 보이는 글자(한글 채움 문자·점자 빈칸).
+     * 보이지 않는 글자가 있는지: 서식 문자(폭 없는 공백 U+200B, 태그 문자 U+E0020 등), 제어 문자(U+0000~001F 등)와 빈칸처럼 보이는 글자(한글 채움 문자·점자 빈칸).
      * 같아 보이는 다른 이름(사칭)을 막는 데 쓴다. BMP 밖 글자도 보도록 코드 포인트 단위로 본다.
      */
     public static boolean hasInvisible(String value) {
@@ -34,7 +34,8 @@ public final class Keys {
     }
 
     public static boolean isInvisible(int codePoint) {
-        return Character.getType(codePoint) == Character.FORMAT
+        int type = Character.getType(codePoint);
+        return type == Character.FORMAT || type == Character.CONTROL
                 || codePoint == 0x115F || codePoint == 0x1160 || codePoint == 0x3164 || codePoint == 0xFFA0 || codePoint == 0x2800;
     }
 
@@ -47,8 +48,8 @@ public final class Keys {
         return Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint);
     }
 
-    /** 공백·보이지 않는 글자·제어 문자뿐인지(빈 값과 같다). */
+    /** 공백·보이지 않는 글자(제어 문자 포함)뿐인지(빈 값과 같다). */
     public static boolean isBlank(String value) {
-        return value.codePoints().allMatch(c -> isSpace(c) || isInvisible(c) || Character.isISOControl(c));
+        return value.codePoints().allMatch(c -> isSpace(c) || isInvisible(c));
     }
 }
