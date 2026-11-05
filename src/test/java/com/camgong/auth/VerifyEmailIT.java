@@ -202,6 +202,8 @@ class VerifyEmailIT extends IntegrationTestBase {
                 new Case("displayName", verify(token, "\u00A0\u00A0")),          // 줄바꿈 없는 공백만
                 new Case("displayName", verify(token, "\u200B\u200B")),          // 폭 없는 공백만
                 new Case("displayName", verify(token, "홍\u200B길동")),            // 보이지 않는 글자가 섞임
+                new Case("displayName", verify(token, "\uD83D\uDE00")),             // 이모지 한 글자(UTF-16 2단위)
+                new Case("displayName", verify(token, "\uD83D\uDE00".repeat(21))),
                 new Case("displayName", verify(token, "홍길동\u3164")),            // 한글 채움 문자(빈칸처럼 보임)
                 new Case("displayName", verify(token, "홍길동" + Character.toString(0xE0020))),   // BMP 밖 태그 문자
                 new Case("displayName", with(verify(token), "displayName", null)),
@@ -239,6 +241,8 @@ class VerifyEmailIT extends IntegrationTestBase {
         verifyToken(verify(lastToken(), "가나", "a".repeat(8))).andExpect(status().isOk());          // 이름 2자, 비밀번호 8자
         requestSignup("b@school.ac.kr");
         verifyToken(verify(lastToken(), "가".repeat(20), "a".repeat(72))).andExpect(status().isOk());  // 이름 20자, 72바이트
+        requestSignup("d@school.ac.kr");
+        verifyToken(verify(lastToken(), "\uD83D\uDE00".repeat(20))).andExpect(status().isOk());       // 이모지 20자
         requestSignup("c@school.ac.kr");
         verifyToken(verify(lastToken(), "다라마", "가".repeat(24))).andExpect(status().isOk());      // 한글 72바이트
     }

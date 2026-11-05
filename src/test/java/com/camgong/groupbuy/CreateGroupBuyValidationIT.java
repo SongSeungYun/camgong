@@ -108,6 +108,29 @@ class CreateGroupBuyValidationIT extends IntegrationTestBase {
     }
 
     @Test
+    void lengthsCountCharactersNotUtf16Units() throws Exception {
+        String emoji = "\uD83D\uDE00";                                       // 😀: 한 글자, UTF-16 으로는 2
+        assertCreated(with(with(with(valid(), "title", emoji.repeat(100)), "itemName", emoji.repeat(100)), "description", emoji.repeat(2000)));
+        assertRejected(with(valid(), "title", emoji.repeat(101)), "title");
+    }
+
+    @Test
+    void titleAndItemNameMadeOnlyOfUnicodeSpacesOrInvisibleCharactersAreRejected() throws Exception {
+        for (String blank : new String[] {"\u3000", "\u3164", "\u200B", "\u00A0\u200B\u3000", "\u200B \u200B", "\u3164 \u3164", "\u2800\u3000\u2800", "\u0001"}) {
+            assertRejected(with(valid(), "title", blank), "title");
+            assertRejected(with(valid(), "itemName", blank), "itemName");
+        }
+        assertThat(count("group_buy")).isZero();
+    }
+
+    @Test
+    void unicodeSpacesAroundTitleAndItemNameAreStrippedButInnerSpacesStay() throws Exception {
+        assertCreated(with(with(valid(), "title", "\u3000햇반 24개\u00A0"), "itemName", "\u2003햇반　210g\u3000"));
+        assertThat(jdbc.queryForObject("SELECT title FROM group_buy", String.class)).isEqualTo("햇반 24개");
+        assertThat(jdbc.queryForObject("SELECT item_name FROM group_buy", String.class)).isEqualTo("햇반　210g");
+    }
+
+    @Test
     void failedRequestLeavesNoGuardAndResendIsStillBadRequest() throws Exception {
         Map<String, Object> bad = valid(START.minus(Duration.ofDays(1)));
 

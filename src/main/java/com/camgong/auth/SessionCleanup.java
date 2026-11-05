@@ -20,11 +20,25 @@ import org.springframework.stereotype.Component;
 @Component
 class SessionCleanup {
 
-    /** 자동 실행 스위치: 테스트는 꺼 두고 run() 을 직접 부른다. */
+    /**
+     * 자동 실행 스위치: 테스트는 꺼 두고 run() 을 직접 부른다. @Scheduled 를 여기에 두어야 다른 기능이 스케줄링을 켜도
+     * 꺼진 스위치가 지켜진다(SessionCleanup 자체에 두면 어느 @EnableScheduling 이든 켜지는 순간 예약된다).
+     */
     @Configuration
     @EnableScheduling
     @ConditionalOnProperty(name = "camgong.auth.cleanup.enabled", havingValue = "true", matchIfMissing = true)
     static class Scheduling {
+
+        private final SessionCleanup cleanup;
+
+        Scheduling(SessionCleanup cleanup) {
+            this.cleanup = cleanup;
+        }
+
+        @Scheduled(fixedDelayString = "PT1H", initialDelayString = "PT1M")
+        void scheduled() {
+            cleanup.run();
+        }
     }
 
     private static final Logger log = LoggerFactory.getLogger(SessionCleanup.class);
@@ -39,7 +53,6 @@ class SessionCleanup {
         this.props = props;
     }
 
-    @Scheduled(fixedDelayString = "PT1H", initialDelayString = "PT1M")
     void run() {
         Instant now = Instant.now(clock);
         int sessions = jdbc.sql("DELETE FROM login_session WHERE last_used_at < :cut")

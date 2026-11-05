@@ -4,6 +4,7 @@ import static com.camgong.support.GroupBuySeed.groupBuy;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.camgong.support.IntegrationTestBase;
@@ -142,6 +144,17 @@ class GroupBuyDetailIT extends IntegrationTestBase {
         long id = openGroupBuy();
         mockMvc.perform(get("/api/groupbuys/" + id)).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/groupbuys/" + id).header("X-Member-Id", "1")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void aNonNumericPathIdIs400WithAFieldError() throws Exception {
+        mockMvc.perform(get("/api/groupbuys/abc").with(as(OUTSIDER))).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("id"))
+                .andExpect(jsonPath("$.errors[0].message").isNotEmpty());
+        mockMvc.perform(put("/api/groupbuys/1/participations/x/payment").with(as(ORGANIZER))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmed\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("memberId"));
     }
 
     @Test

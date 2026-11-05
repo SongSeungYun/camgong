@@ -30,11 +30,25 @@ public final class Keys {
      * 같아 보이는 다른 이름(사칭)을 막는 데 쓴다. BMP 밖 글자도 보도록 코드 포인트 단위로 본다.
      */
     public static boolean hasInvisible(String value) {
-        return value.codePoints().anyMatch(c -> Character.getType(c) == Character.FORMAT
-                || c == 0x115F || c == 0x1160 || c == 0x3164 || c == 0xFFA0 || c == 0x2800);
+        return value.codePoints().anyMatch(Keys::isInvisible);
     }
 
-    private static boolean isSpace(char c) {
-        return Character.isWhitespace(c) || Character.isSpaceChar(c);
+    public static boolean isInvisible(int codePoint) {
+        return Character.getType(codePoint) == Character.FORMAT
+                || codePoint == 0x115F || codePoint == 0x1160 || codePoint == 0x3164 || codePoint == 0xFFA0 || codePoint == 0x2800;
+    }
+
+    /** 글자 수(코드 포인트 수). 이모지처럼 UTF-16 두 단위인 글자도 한 글자로 센다(DB VARCHAR 와 같은 기준). */
+    public static int length(String value) {
+        return value.codePointCount(0, value.length());
+    }
+
+    public static boolean isSpace(int codePoint) {
+        return Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint);
+    }
+
+    /** 공백·보이지 않는 글자·제어 문자뿐인지(빈 값과 같다). */
+    public static boolean isBlank(String value) {
+        return value.codePoints().allMatch(c -> isSpace(c) || isInvisible(c) || Character.isISOControl(c));
     }
 }
