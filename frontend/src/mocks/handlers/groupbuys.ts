@@ -128,7 +128,7 @@ export const groupBuyHandlers = [
     if (category !== null && !isKnownCategory(category)) return badRequest('category', '지원하지 않는 카테고리예요')
     if (sort !== 'latest' && sort !== 'deadline') return badRequest('sort', '지원하지 않는 정렬이에요')
     if (!Number.isInteger(size) || size < 1 || size > 50) return badRequest('size', '1~50 사이여야 해요')
-    if (q.length > 50) return badRequest('q', '50자 이하여야 해요')
+    if (chars(q) > 50) return badRequest('q', '50자 이하여야 해요')
 
     const words = q.split(/\s+/).filter(Boolean).slice(0, 5).map((w) => w.toLowerCase())
     const rows = mockState.groupBuys

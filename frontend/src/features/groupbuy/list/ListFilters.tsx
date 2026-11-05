@@ -20,7 +20,7 @@ interface Props {
 export function ListFilters({ params, qInput, onQ, onChange }: Props) {
   return (
     <section aria-label="조건">
-      <TextField label="검색" type="search" value={qInput} maxLength={50} placeholder="제목·상품명" onChange={(e) => onQ(e.target.value)} />
+      <TextField label="검색" type="search" value={qInput} placeholder="제목·상품명" onChange={(e) => onQ(e.target.value)} />
       <div className={s.row}>
         <SelectField label="정렬" value={params.sort} onChange={(e) => onChange({ sort: e.target.value as ListParams['sort'] })}>
           <option value="latest">최신순</option>

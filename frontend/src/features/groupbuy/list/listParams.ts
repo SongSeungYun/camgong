@@ -13,8 +13,8 @@ const DEFAULTS: ListParams = { status: 'OPEN', category: null, q: '', sort: 'lat
 const Q_MAX = 50
 const DEBOUNCE_MS = 300
 
-/** 앞뒤 공백 제거, 공백뿐이면 검색 안 함(''), 50자 제한. */
-export const normalizeQ = (raw: string): string => raw.trim().slice(0, Q_MAX)
+/** 앞뒤 공백 제거, 공백뿐이면 검색 안 함(''), 50자 제한(서버와 같이 글자 수로 세어 이모지가 반쪽으로 잘리지 않게). */
+export const normalizeQ = (raw: string): string => [...raw.trim()].slice(0, Q_MAX).join('')
 
 /** 주소 쿼리 → 조건. 알 수 없는 값은 기본값으로 되돌린다. 커서는 읽지 않는다. */
 export function parseListParams(sp: URLSearchParams): ListParams {

@@ -178,3 +178,9 @@ test('참여: 같은 수량이어도 FAILED면 409, 완료된 공구에 다른 �
   expect(await put('/api/groupbuys/1/participations/me', body(6))).toMatchObject({ quantity: 6 })
   expect(await rejects(post('/api/groupbuys/1/participations', body(2)))).toMatchObject({ status: 409, code: 'NOT_JOINABLE', reason: 'COMPLETED' })
 })
+
+test('목록 검색어 50자 제한은 글자 수: 이모지 50개는 통과, 51개는 400', async () => {
+  mockState.reset()
+  await list(`?q=${encodeURIComponent('😀'.repeat(50))}`)
+  expect(await rejects(list(`?q=${encodeURIComponent('😀'.repeat(51))}`))).toMatchObject({ status: 400, fieldErrors: [{ field: 'q' }] })
+})
