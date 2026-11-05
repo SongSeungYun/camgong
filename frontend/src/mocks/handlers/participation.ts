@@ -50,13 +50,11 @@ export const participationHandlers = [
     const quantity = b.quantity as number
 
     const mine = g.participations.find((p) => p.memberId === me.id)
-    if (mine) {
-      // 재시도 안전: 같은 수량이면 공구가 이후 COMPLETED여도 200. FAILED의 옛 참여는 거부.
-      if (g.status === 'FAILED') return problem(409, 'NOT_JOINABLE', { reason: 'FAILED' })
-      return mine.quantity === quantity ? HttpResponse.json(state(g, mine.quantity)) : problem(409, 'ALREADY_JOINED')
-    }
-    const reason = closedReason(g)
+    // 재시도 안전: 같은 수량이면 공구가 이후 COMPLETED·마감이어도 200. FAILED의 옛 참여는 거부.
+    if (mine && mine.quantity === quantity && g.status !== 'FAILED') return HttpResponse.json(state(g, mine.quantity))
+    const reason = closedReason(g) // 004: FAILED·마감·완료(NOT_JOINABLE)가 ALREADY_JOINED보다 먼저
     if (reason) return problem(409, 'NOT_JOINABLE', { reason })
+    if (mine) return problem(409, 'ALREADY_JOINED')
     if (mockState.priceChangeTo !== null) {
       g.unitPrice = mockState.priceChangeTo
       mockState.priceChangeTo = null
@@ -79,7 +77,7 @@ export const participationHandlers = [
     const quantity = b.quantity as number
     const mine = g.participations.find((p) => p.memberId === me.id)
     if (!mine) return problem(404, 'PARTICIPATION_NOT_FOUND')
-    if (quantity === mine.quantity) return HttpResponse.json(state(g, quantity))
+    if (quantity === mine.quantity && g.status !== 'FAILED') return HttpResponse.json(state(g, quantity)) // FAILED는 같은 수량이어도 409
     const reason = closedReason(g)
     if (reason) return problem(409, 'NOT_JOINABLE', { reason })
     if (b.expectedUnitPrice !== g.unitPrice) return problem(409, 'PRICE_CHANGED', { currentUnitPrice: g.unitPrice })

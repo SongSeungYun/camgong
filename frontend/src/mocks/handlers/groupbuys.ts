@@ -2,12 +2,15 @@ import { http, HttpResponse } from 'msw'
 import { isKnownCategory, isKnownStatus } from '../../shared/api/types'
 import type { SeedGroupBuy } from '../data/seed'
 import { currentMember, mockState } from '../state'
+import { chars, isBlank, strip } from '../text'
 
 const problem = (status: number, title: string, extra: Record<string, unknown> = {}) =>
   HttpResponse.json({ title, status, ...extra }, { status })
 const badRequest = (field: string, message: string) => problem(400, 'Bad Request', { errors: [{ field, message }] })
 
 const secured = (g: SeedGroupBuy) => g.participations.reduce((n, p) => n + p.quantity, 0)
+/** 003 표시 상태: 모집 중인데 마감이 지났으면 PENDING_CLOSE */
+const shownStatus = (g: SeedGroupBuy) => (g.status === 'OPEN' && Date.parse(g.deadline) <= Date.now() ? 'PENDING_CLOSE' : g.status)
 
 /** 003 목록 카드 모양. 개설자·구매처는 넣지 않는다. */
 export const toCard = (g: SeedGroupBuy) => ({
@@ -19,7 +22,7 @@ export const toCard = (g: SeedGroupBuy) => ({
   securedQuantity: secured(g),
   totalQuantity: g.totalQuantity,
   deadline: g.deadline,
-  status: g.status,
+  status: shownStatus(g),
 })
 
 // 불투명 커서: 조건 서명 + 오프셋. 조건이 다르면 거부한다(003: sort·필터와 맞지 않으면 400).
@@ -47,13 +50,13 @@ interface Body {
 function validate(b: Body, ctx: { existing?: SeedGroupBuy; others?: number }): { field: string; message: string }[] {
   const errors: { field: string; message: string }[] = []
   const add = (field: string, message: string) => errors.push({ field, message })
-  const title = typeof b.title === 'string' ? b.title.trim() : ''
-  if (!title) add('title', '제목을 입력해 주세요')
-  else if (title.length > 100) add('title', '제목은 100자 이하여야 해요')
-  if (b.description != null && (typeof b.description !== 'string' || b.description.length > 2000)) add('description', '설명은 2000자 이하여야 해요')
-  const itemName = typeof b.itemName === 'string' ? b.itemName.trim() : ''
-  if (!itemName) add('itemName', '상품명을 입력해 주세요')
-  else if (itemName.length > 100) add('itemName', '상품명은 100자 이하여야 해요')
+  const title = typeof b.title === 'string' ? strip(b.title) : ''
+  if (isBlank(title)) add('title', '제목을 입력해 주세요')
+  else if (chars(title) > 100) add('title', '제목은 100자 이하여야 해요')
+  if (b.description != null && (typeof b.description !== 'string' || chars(b.description) > 2000)) add('description', '설명은 2000자 이하여야 해요')
+  const itemName = typeof b.itemName === 'string' ? strip(b.itemName) : ''
+  if (isBlank(itemName)) add('itemName', '상품명을 입력해 주세요')
+  else if (chars(itemName) > 100) add('itemName', '상품명은 100자 이하여야 해요')
   if (!isInt(b.unitPrice, 1, 1_000_000)) add('unitPrice', '개당 가격은 1~1,000,000원이어야 해요')
   if (!isInt(b.totalQuantity, 2, 1000)) add('totalQuantity', '총 수량은 2~1,000개여야 해요')
   if (typeof b.category !== 'string' || !isKnownCategory(b.category)) add('category', '카테고리를 선택해 주세요')
@@ -83,9 +86,9 @@ const body001 = (g: SeedGroupBuy) => ({
 })
 
 function applyBody(g: SeedGroupBuy, b: Body) {
-  g.title = (b.title as string).trim()
+  g.title = strip(b.title as string)
   g.description = typeof b.description === 'string' && b.description ? b.description : null
-  g.itemName = (b.itemName as string).trim()
+  g.itemName = strip(b.itemName as string)
   g.category = b.category as string
   g.itemUrl = b.itemUrl as string
   g.openChatUrl = b.openChatUrl as string
@@ -129,7 +132,7 @@ export const groupBuyHandlers = [
 
     const words = q.split(/\s+/).filter(Boolean).slice(0, 5).map((w) => w.toLowerCase())
     const rows = mockState.groupBuys
-      .filter((g) => g.status === status)
+      .filter((g) => shownStatus(g) === status)
       .filter((g) => !category || g.category === category)
       .filter((g) => words.every((w) => g.title.toLowerCase().includes(w) || g.itemName.toLowerCase().includes(w)))
       .sort((a, b) =>
@@ -170,7 +173,7 @@ export const groupBuyHandlers = [
       securedQuantity: total,
       remainingQuantity: g.totalQuantity - total,
       deadline: g.deadline,
-      status: g.status,
+      status: shownStatus(g),
       organizerName: nameOf(g.organizerId),
       isOrganizer,
       participantCount: g.participations.length,
@@ -183,7 +186,7 @@ export const groupBuyHandlers = [
           }
         : null,
       // 공개 규칙(003 data-model): 개설자는 OPEN·PENDING_CLOSE·COMPLETED에서 항상, 참여자는 COMPLETED일 때만
-      openChatUrl: (isOrganizer && ['OPEN', 'PENDING_CLOSE', 'COMPLETED'].includes(g.status)) || (mine && g.status === 'COMPLETED') ? g.openChatUrl : null,
+      openChatUrl: (isOrganizer && ['OPEN', 'PENDING_CLOSE', 'COMPLETED'].includes(shownStatus(g))) || (mine && g.status === 'COMPLETED') ? g.openChatUrl : null,
       participants: isOrganizer ? g.participations.map((p) => ({ memberId: p.memberId, name: nameOf(p.memberId), quantity: p.quantity })) : null,
       createdAt: g.createdAt,
     })
