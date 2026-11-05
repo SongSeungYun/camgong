@@ -34,7 +34,8 @@ export default function EditPage() {
   return (
     <Layout>
       <h1>공구 수정</h1>
-      <StateView state={q.isPending ? 'loading' : q.isError ? 'error' : 'ready'} onRetry={() => void q.refetch()}>
+      {/* 재조회가 실패해도 폼(입력값)을 언마운트하지 않는다 */}
+      <StateView state={q.isPending ? 'loading' : q.isError && !q.data ? 'error' : 'ready'} onRetry={() => void q.refetch()}>
         {q.data && !q.data.isOrganizer && <><p>개설자만 쓸 수 있어요.</p>{back}</>}
         {q.data && q.data.isOrganizer && q.data.status !== 'OPEN' && <><p>이미 모집이 끝났거나 마감이 지나서 수정·취소할 수 없어요.</p>{back}</>}
         {q.data && q.data.isOrganizer && q.data.status === 'OPEN' && (

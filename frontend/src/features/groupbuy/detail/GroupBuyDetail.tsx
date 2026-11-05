@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { categoryLabel, type GroupBuyDetail as Detail } from '../../../shared/api/types'
 import { formatWon } from '../../../shared/lib/money'
@@ -15,6 +16,7 @@ export function GroupBuyDetail({ d, nowMs }: { d: Detail; nowMs: number }) {
   const itemUrl = safeHttpsUrl(d.itemUrl)
   const chatUrl = safeHttpsUrl(d.openChatUrl)
   const my = d.myParticipation
+  const [orgMessage, setOrgMessage] = useState<string | null>(null)
   return (
     <article>
       <h1>{d.title}</h1>
@@ -43,7 +45,8 @@ export function GroupBuyDetail({ d, nowMs }: { d: Detail; nowMs: number }) {
       </div>
 
       <div className={s.actions}>
-        {v.edit && <OrganizerActions d={d} />}
+        {v.edit && <OrganizerActions d={d} onMessage={setOrgMessage} />}
+        {orgMessage && <p role="alert" style={{ flexBasis: '100%' }}>{orgMessage}</p>}
         <ParticipationPanel d={d} />
         {v.checkSheet && <Link className={s.linkButton} to={`/groupbuys/${d.id}/check`}>참여자 체크</Link>}
         {v.openChat && chatUrl && <a className={s.linkButton} href={chatUrl} {...externalLinkProps}>오픈채팅 입장 (새 창, 서비스 밖)</a>}

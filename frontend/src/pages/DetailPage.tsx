@@ -20,7 +20,8 @@ export default function DetailPage() {
   if (q.error instanceof ApiError && q.error.status === 404) return <NotFound />
   return (
     <Layout>
-      <StateView state={q.isPending ? 'loading' : q.isError ? 'error' : 'ready'} onRetry={() => void q.refetch()}>
+      {/* 재조회가 실패해도 이미 보인 상세(열린 폼·거부 안내 포함)는 언마운트하지 않는다 */}
+      <StateView state={q.isPending ? 'loading' : q.isError && !q.data ? 'error' : 'ready'} onRetry={() => void q.refetch()}>
         {q.data && <GroupBuyDetail d={q.data} nowMs={q.dataUpdatedAt} />}
       </StateView>
     </Layout>

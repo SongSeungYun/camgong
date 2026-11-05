@@ -8,17 +8,16 @@ import { useCancelGroupBuy } from '../form/useGroupBuyMutations'
 import s from './GroupBuyDetail.module.css'
 
 /** 개설자 영역: 수정 이동과 공구 취소(확인 대화상자를 거친 뒤에만 실행, FR-026). */
-export function OrganizerActions({ d }: { d: GroupBuyDetail }) {
+/** 거부 안내는 onMessage로 부모에 올린다: 재조회로 상태가 바뀌면 이 영역이 사라져도 문구는 남아야 한다. */
+export function OrganizerActions({ d, onMessage }: { d: GroupBuyDetail; onMessage: (m: string | null) => void }) {
   const [asking, setAsking] = useState(false)
   const cancel = useCancelGroupBuy(d.id)
   const navigate = useNavigate()
-  const err = cancel.error instanceof ApiError ? cancel.error : cancel.error ? new ApiError(0) : null
 
   return (
     <>
       <Link className={s.linkButton} to={`/groupbuys/${d.id}/edit`}>수정</Link>
-      <Button variant="secondary" onClick={() => setAsking(true)}>공구 취소</Button>
-      {err && <p role="alert">{errorMessage(err)}</p>}
+      <Button variant="secondary" onClick={() => { onMessage(null); setAsking(true) }}>공구 취소</Button>
       <ConfirmDialog
         open={asking}
         title="공구를 취소할까요?"
@@ -30,6 +29,7 @@ export function OrganizerActions({ d }: { d: GroupBuyDetail }) {
         onConfirm={() =>
           cancel.mutate(undefined, {
             onSuccess: () => navigate('/', { state: { notice: '공구를 취소했어요. 목록에서 사라졌어요.' } }),
+            onError: (e) => onMessage(errorMessage(e instanceof ApiError ? e : new ApiError(0))),
             onSettled: () => setAsking(false),
           })
         }
