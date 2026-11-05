@@ -9,9 +9,9 @@
 
 | 필드 | 타입 | 필수 | 규칙 |
 |------|------|------|------|
-| title | string | O | 공백만 불가, 1~100자 |
+| title | string | O | 공백만 불가(유니코드 공백·보이지 않는 글자만인 값 포함), 앞뒤 공백을 지운 뒤 1~100자 |
 | description | string | X | 최대 2000자 |
-| itemName | string | O | 공백만 불가, 1~100자 |
+| itemName | string | O | 공백만 불가(유니코드 공백·보이지 않는 글자만인 값 포함), 앞뒤 공백을 지운 뒤 1~100자 |
 | unitPrice | integer | O | 1~1,000,000 (원) |
 | totalQuantity | integer | O | 2~1000 |
 | deadline | datetime | O | 개설: 현재 이후 & 개설 시점 +30일 이내. 수정: 현재 값 이상 & 개설 시점 +30일 이내 |
@@ -19,6 +19,8 @@
 | category | string | O | `FOOD`, `DAILY`, `KITCHEN`, `HEALTH_BEAUTY`, `STATIONERY`, `ETC` 중 하나 |
 | itemUrl | string | O | https URL, 최대 500자 (구매처 링크) |
 | openChatUrl | string | O | https URL, 최대 500자 |
+
+글자 수는 유니코드 글자(code point) 기준이다(이모지 1개 = 1자, DB `VARCHAR` 길이와 같은 기준). 2026-11-05 전체 검수에서 정했다.
 
 ## POST /api/groupbuys — 개설 (FR-001~010, 016)
 
