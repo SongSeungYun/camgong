@@ -104,6 +104,31 @@ describe('참여 (US4)', () => {
     screen.getByRole('heading', { name: '햇반 24개 공구' })
   })
 
+  test('수량 변경 폼을 연 채 참여를 취소하면 변경 폼이 사라진다(참여 안 한 사람에게 변경 폼 없음)', async () => {
+    seedGroupBuy()
+    mockState.sessionMemberId = 2
+    renderApp('/groupbuys/1')
+    await userEvent.click(await screen.findByRole('button', { name: '수량 변경' }))
+    screen.getByLabelText('수량')
+    await userEvent.click(screen.getByRole('button', { name: '참여 취소' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '참여 취소하기' }))
+    await screen.findByText('참여 안 함')
+    expect(screen.queryByLabelText('수량')).toBeNull()
+    screen.getByRole('button', { name: '참여하기' })
+  })
+
+  test('참여 폼에서 ALREADY_JOINED로 거부돼 이미 참여한 상태가 되면 참여 폼이 사라진다', async () => {
+    asOutsider()
+    renderApp('/groupbuys/1')
+    await openJoin()
+    await typeQty('2')
+    mockState.groupBuys[0]!.participations.push({ memberId: 3, quantity: 1 }) // 다른 탭에서 이미 참여했다
+    await userEvent.click(submit())
+    await screen.findByText("이미 참여했어요. 수량은 '수량 변경'을 써요.")
+    await screen.findByRole('button', { name: '수량 변경' })
+    expect(screen.queryByLabelText('수량')).toBeNull()
+  })
+
   test('개설자 거부 문구(ORGANIZER_NOT_ALLOWED)', async () => {
     asOutsider()
     server.use(http.post('/api/groupbuys/1/participations', () => HttpResponse.json({ title: 'ORGANIZER_NOT_ALLOWED', status: 403 }, { status: 403 })))
