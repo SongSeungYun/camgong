@@ -1,6 +1,7 @@
 import { describe } from 'vitest'
 import { expect, test } from 'vitest'
 import { ApiError, get } from '../shared/api/client'
+import { makeGroupBuy } from '../test/factories'
 import type { GroupBuyCard, Page } from '../shared/api/types'
 
 const list = (qs = '') => get<Page<GroupBuyCard>>(`/api/groupbuys${qs}`)
@@ -145,4 +146,35 @@ test('내 활동 목: role 누락·잘못된 값은 400, 비로그인은 401', a
   expect(await rejects(get('/api/me/groupbuys?role=organizer&size=0'))).toMatchObject({ status: 400 })
   mockState.sessionMemberId = null
   expect(await rejects(get('/api/me/groupbuys?role=organizer'))).toMatchObject({ status: 401 })
+})
+
+test('개설 검증: 길이는 글자 수, 제목·상품명이 공백·보이지 않는 글자뿐이면 400', async () => {
+  mockState.reset()
+  mockState.sessionMemberId = 1
+  const base = { category: 'FOOD', itemUrl: 'https://e.com/a', openChatUrl: 'https://open.kakao.com/o/x', unitPrice: 1000, totalQuantity: 10, organizerQuantity: 1, deadline: new Date(Date.now() + 86_400_000).toISOString() }
+  const fields = async (b: Record<string, unknown>) => (await rejects(post('/api/groupbuys', { ...base, ...b }))).fieldErrors.map((f) => f.field)
+  expect(await fields({ title: '\u200b\u3164', itemName: '\u3000\u2800' })).toEqual(['title', 'itemName'])
+  expect(await fields({ title: '😀'.repeat(101), itemName: '😀'.repeat(101), description: '😀'.repeat(2001) })).toEqual(['title', 'description', 'itemName'])
+  await post('/api/groupbuys', { ...base, title: '😀'.repeat(100), itemName: '😀'.repeat(100), description: '😀'.repeat(2000) })
+})
+
+test('마감이 지난 OPEN은 목록·상세에서 PENDING_CLOSE로 보인다(003 표시 상태)', async () => {
+  mockState.reset()
+  mockState.groupBuys = [makeGroupBuy({ deadline: new Date(Date.now() - 60_000).toISOString() })]
+  expect((await list()).items).toHaveLength(0)
+  expect((await list('?status=PENDING_CLOSE')).items.map((i) => i.status)).toEqual(['PENDING_CLOSE'])
+  mockState.sessionMemberId = 1
+  expect(await get('/api/groupbuys/1')).toMatchObject({ status: 'PENDING_CLOSE' })
+})
+
+test('참여: 같은 수량이어도 FAILED면 409, 완료된 공구에 다른 수량은 ALREADY_JOINED가 아니라 NOT_JOINABLE(004)', async () => {
+  mockState.reset()
+  mockState.sessionMemberId = 2
+  mockState.groupBuys = [makeGroupBuy({ status: 'FAILED' })]
+  const body = (quantity: number) => ({ quantity, expectedUnitPrice: 1200 })
+  expect(await rejects(put('/api/groupbuys/1/participations/me', body(6)))).toMatchObject({ status: 409, code: 'NOT_JOINABLE', reason: 'FAILED' })
+  mockState.groupBuys = [makeGroupBuy({ status: 'COMPLETED' })]
+  expect(await post('/api/groupbuys/1/participations', body(6))).toMatchObject({ quantity: 6 })
+  expect(await put('/api/groupbuys/1/participations/me', body(6))).toMatchObject({ quantity: 6 })
+  expect(await rejects(post('/api/groupbuys/1/participations', body(2)))).toMatchObject({ status: 409, code: 'NOT_JOINABLE', reason: 'COMPLETED' })
 })

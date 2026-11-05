@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { expect, test } from 'vitest'
 import { get } from '../../shared/api/client'
 import { server } from '../../mocks/server'
@@ -60,4 +60,24 @@ test('시작 시 me가 5xx·네트워크 오류면 anonymous로 정하지 않는
     expect(router.state.location.pathname).toBe('/me')
     unmount()
   }
+})
+
+test('시작 시 느린 me(401)가 로그인 성공 뒤에 도착해도 로그인 상태를 덮어쓰지 않는다', async () => {
+  server.use(http.get('/api/auth/me', async () => { await delay(300); return HttpResponse.json({ title: 'UNAUTHENTICATED', status: 401 }, { status: 401 }) }, { once: true }))
+  renderApp('/login')
+  await userEvent.type(await screen.findByLabelText('이메일'), 'organizer@school.ac.kr')
+  await userEvent.type(screen.getByLabelText('비밀번호'), 'password1234')
+  await userEvent.click(screen.getByRole('button', { name: '로그인' }))
+  await screen.findByRole('button', { name: '로그아웃' })
+  await new Promise((r) => setTimeout(r, 400))
+  screen.getByRole('button', { name: '로그아웃' })
+})
+
+test('401이 연달아 와도(예: 화면 이동 시 상세와 읽지 않은 수) 만료 안내가 사라지지 않는다', async () => {
+  mockState.sessionMemberId = 1
+  renderApp('/me')
+  await screen.findByRole('button', { name: '로그아웃' })
+  mockState.sessionExpired = true
+  await Promise.all([get('/api/auth/me').catch(() => {}), get('/api/notifications/unread-count').catch(() => {})])
+  await screen.findByText('로그인이 필요해요. 입력하던 내용은 저장되지 않아요.')
 })

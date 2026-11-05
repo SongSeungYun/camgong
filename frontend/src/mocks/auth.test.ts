@@ -71,3 +71,20 @@ test('시드: 공구 25개 이상, 상태 4종·카테고리 6종, 마감 임박
   expect(new Set(g.map((x) => x.category)).size).toBe(6)
   expect(g.some((x) => x.status === 'OPEN' && Date.parse(x.deadline) - Date.now() < 24 * 3_600_000)).toBe(true)
 })
+
+test('인증 표시 이름: 앞뒤 유니코드 공백 제거, 보이지 않는 글자 거부, 길이는 글자 수, consent 문자열 허용(002 dd044dd)', async () => {
+  const v = { password: 'password1234', consentVersion: 'v1' }
+  const pend = async (email: string) => {
+    await post('/api/auth/signup', { email })
+    return mockState.pending.find((p) => p.email === email)!.token
+  }
+  const t1 = await pend('a1@school.ac.kr')
+  for (const bad of ['새\u200b내기', '\u3164\u3164', '가\u115f나', '가\u1160나', '가\uffa0나', '가\u2800나', '😀'.repeat(21)]) {
+    expect(await err(post('/api/auth/verify', { token: t1, displayName: bad, consent: true, ...v }))).toMatchObject({ status: 400, fieldErrors: [{ field: 'displayName' }] })
+  }
+  expect(await err(post('/api/auth/verify', { token: t1, displayName: '새내기', consent: 'false', ...v }))).toMatchObject({ status: 400, fieldErrors: [{ field: 'consent' }] })
+  expect(await post('/api/auth/verify', { token: t1, displayName: '\u3000새내기\u00a0', consent: 'true', ...v })).toMatchObject({ member: { displayName: '새내기' } })
+  await post('/api/auth/logout')
+  const t2 = await pend('a2@school.ac.kr')
+  expect(await post('/api/auth/verify', { token: t2, displayName: '😀'.repeat(20), consent: true, ...v })).toMatchObject({ member: { displayName: '😀'.repeat(20) } })
+})

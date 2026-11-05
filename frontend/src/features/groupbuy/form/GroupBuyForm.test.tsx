@@ -173,6 +173,23 @@ describe('수정 폼', () => {
     expect(router.state.location.pathname).toBe('/groupbuys/1')
   })
 
+  test('수정 저장이 네트워크 오류이고 상세 재조회도 실패해도 폼과 입력값이 남는다', async () => {
+    seedGroupBuy()
+    asOrganizer()
+    renderApp('/groupbuys/1/edit')
+    const title = await screen.findByDisplayValue('햇반 24개 공구')
+    await userEvent.type(title, ' 수정')
+    let gets = 0
+    server.use(
+      http.put('/api/groupbuys/1', () => HttpResponse.error()),
+      http.get('/api/groupbuys/1', () => { gets++; return HttpResponse.error() }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: '수정 저장' }))
+    await waitFor(() => expect(gets).toBeGreaterThan(0))
+    await new Promise((r) => setTimeout(r, 50))
+    expect((screen.getByLabelText('제목') as HTMLInputElement).value).toBe('햇반 24개 공구 수정')
+  })
+
   test('개설자가 아니면 수정 화면을 거부한다', async () => {
     seedGroupBuy()
     mockState.sessionMemberId = 2
@@ -214,6 +231,18 @@ describe('취소·권한', () => {
     await userEvent.click(await screen.findByRole('button', { name: '공구 취소' }))
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '공구 취소하기' }))
     await screen.findByText('이미 모집이 끝났거나 마감이 지나서 수정·취소할 수 없어요.')
+  })
+
+  test('취소 거부 뒤 상세가 마감됨으로 바뀌어 취소 버튼이 사라져도 사유 문구는 남는다', async () => {
+    seedGroupBuy()
+    asOrganizer()
+    server.use(http.post('/api/groupbuys/1/cancel', () => HttpResponse.json({ title: 'NOT_MODIFIABLE', status: 409, reason: 'DEADLINE_PASSED' }, { status: 409 })))
+    renderApp('/groupbuys/1')
+    await userEvent.click(await screen.findByRole('button', { name: '공구 취소' }))
+    mockState.groupBuys[0]!.deadline = new Date(Date.now() - 60_000).toISOString() // 그 사이 마감이 지났다
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '공구 취소하기' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: '공구 취소' })).toBeNull())
+    screen.getByText('이미 모집이 끝났거나 마감이 지나서 수정·취소할 수 없어요.')
   })
 
   test.each([[2], [3]])('20. 개설자가 아닌 회원(%i)에게는 수정·취소 버튼이 없다', async (id) => {

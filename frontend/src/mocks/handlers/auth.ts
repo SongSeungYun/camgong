@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw'
+import { chars, hasInvisible, strip } from '../text'
 import { currentMember, mockState } from '../state'
 
 const problem = (status: number, title: string, extra: Record<string, unknown> = {}, headers?: HeadersInit) =>
@@ -75,13 +76,15 @@ export const authHandlers = [
     const p = mockState.pending.find((x) => x.token === token)
     if (!p) return problem(400, 'INVALID_TOKEN')
 
-    const name = typeof b.displayName === 'string' ? b.displayName.trim() : ''
+    const name = typeof b.displayName === 'string' ? strip(b.displayName) : ''
+    const consent = b.consent === 'true' ? true : b.consent === 'false' ? false : b.consent // 서버는 문자열 "true"/"false"도 불리언으로 받는다
     const password = typeof b.password === 'string' ? b.password : ''
     const errors: { field: string; message: string }[] = []
-    if (name.length < 2 || name.length > 20) errors.push({ field: 'displayName', message: '2~20자로 입력해 주세요' })
+    if (chars(name) < 2 || chars(name) > 20) errors.push({ field: 'displayName', message: '2~20자로 입력해 주세요' })
+    else if (hasInvisible(name)) errors.push({ field: 'displayName', message: '보이지 않는 글자는 쓸 수 없어요' })
     if (password.length < 8) errors.push({ field: 'password', message: '8자 이상 입력해 주세요' })
     else if (new TextEncoder().encode(password).length > 72) errors.push({ field: 'password', message: '72바이트 이하로 입력해 주세요' })
-    if (b.consent !== true) errors.push({ field: 'consent', message: '동의가 필요해요' })
+    if (consent !== true) errors.push({ field: 'consent', message: '동의가 필요해요' })
     if (typeof b.consentVersion !== 'string' || !b.consentVersion) errors.push({ field: 'consentVersion', message: '동의 안내문 버전이 필요해요' })
     if (errors.length) return problem(400, 'Bad Request', { errors })
 

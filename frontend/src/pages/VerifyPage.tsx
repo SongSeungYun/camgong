@@ -27,7 +27,8 @@ interface Form {
  */
 export default function VerifyPage() {
   const token = useSearchParams()[0].get('token') ?? ''
-  const { status, setMember } = useSession()
+  const { status, setMember, logout } = useSession()
+  const [logoutFailed, setLogoutFailed] = useState(false)
   const { register, handleSubmit, setError, formState: { errors } } = useForm<Form>({ defaultValues: { consent: false } })
   const [topErrors, setTopErrors] = useState<string[]>([])
   const [already, setAlready] = useState(false)
@@ -46,6 +47,18 @@ export default function VerifyPage() {
     },
   })
 
+  // 로그인한 채 링크를 열면 말없이 옮기지 않고 안내한다. 로그아웃하면 이 화면에서 바로 인증을 이어 간다
+  if (status === 'authenticated' && !m.isSuccess) {
+    return (
+      <Layout>
+        <h1>이메일 인증</h1>
+        <p>이미 로그인돼 있어요. 다른 계정으로 가입을 마치려면 로그아웃해 주세요.</p>
+        <Button variant="secondary" onClick={() => logout().then(() => setLogoutFailed(false), () => setLogoutFailed(true))}>로그아웃</Button>
+        {logoutFailed && <p role="alert">로그아웃을 서버에 알리지 못했어요. 다시 시도해 주세요.</p>}
+        <p><Link to="/">목록으로</Link></p>
+      </Layout>
+    )
+  }
   if (status === 'authenticated') return <Navigate to="/" replace />
 
   if (tokenError) {

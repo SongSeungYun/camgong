@@ -87,6 +87,23 @@ describe('참여 (US4)', () => {
     }
   })
 
+  test('참여 거부 뒤 상세 재조회가 실패해도 상세와 거부 안내가 남는다', async () => {
+    seedGroupBuy()
+    mockState.sessionMemberId = 3
+    renderApp('/groupbuys/1')
+    await userEvent.click(await screen.findByRole('button', { name: '참여하기' }))
+    await userEvent.type(screen.getByLabelText('수량'), '1')
+    server.use(
+      http.post('/api/groupbuys/1/participations', () => HttpResponse.json({ title: 'NOT_JOINABLE', status: 409, reason: 'DEADLINE_PASSED' }, { status: 409 })),
+      http.get('/api/groupbuys/1', () => HttpResponse.error()),
+    )
+    await userEvent.click(screen.getByRole('button', { name: '참여 신청' }))
+    await screen.findByText('마감 시간이 지나서 참여할 수 없어요.')
+    await new Promise((r) => setTimeout(r, 50))
+    screen.getByText('마감 시간이 지나서 참여할 수 없어요.')
+    screen.getByRole('heading', { name: '햇반 24개 공구' })
+  })
+
   test('개설자 거부 문구(ORGANIZER_NOT_ALLOWED)', async () => {
     asOutsider()
     server.use(http.post('/api/groupbuys/1/participations', () => HttpResponse.json({ title: 'ORGANIZER_NOT_ALLOWED', status: 403 }, { status: 403 })))

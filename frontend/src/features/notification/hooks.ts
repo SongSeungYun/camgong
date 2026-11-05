@@ -1,12 +1,14 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
+import { useLocation } from 'react-router'
 import { useSession } from '../auth/session'
 import { fetchNotifications, fetchUnreadCount, markRead } from './api'
 
-// 읽지 않은 수는 로그인된 화면을 불러올 때 한 번만 조회한다(폴링·포커스 재조회 없음, FR-035).
+// 읽지 않은 수는 화면을 옮길 때마다 한 번 조회한다(폴링·포커스 재조회 없음, FR-035, research 3).
 // 실패하면 배지만 숨기므로 재시도하지 않는다.
 export function useUnreadCount() {
   const { status } = useSession()
-  return useQuery({
+  const q = useQuery({
     queryKey: ['notifications', 'unread'],
     queryFn: fetchUnreadCount,
     enabled: status === 'authenticated',
@@ -14,6 +16,15 @@ export function useUnreadCount() {
     refetchOnWindowFocus: false,
     retry: false,
   })
+  const { pathname } = useLocation()
+  const first = useRef(true)
+  const { refetch } = q
+  useEffect(() => {
+    if (first.current) return void (first.current = false) // 첫 화면은 위 쿼리가 조회한다
+    if (status === 'authenticated') void refetch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 화면 이동에만 반응한다
+  }, [pathname])
+  return q
 }
 
 export const useNotifications = () =>

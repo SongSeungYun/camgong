@@ -54,6 +54,20 @@ describe('알림 (US7)', () => {
     expect(calls).toBe(1)
   })
 
+  test('화면을 옮기면 읽지 않은 수를 다시 한 번 조회한다', async () => {
+    asParticipant(note())
+    let calls = 0
+    server.events.on('request:start', ({ request }) => {
+      if (new URL(request.url).pathname === '/api/notifications/unread-count') calls++
+    })
+    const { router } = renderApp('/')
+    await waitFor(() => expect(badge()).not.toBeNull())
+    await router.navigate('/me')
+    await waitFor(() => expect(calls).toBe(2))
+    await new Promise((r) => setTimeout(r, 200))
+    expect(calls).toBe(2)
+  })
+
   test('조회가 실패하면 배지만 조용히 숨기고 화면은 멀쩡하다', async () => {
     asParticipant(note())
     server.use(http.get('/api/notifications/unread-count', () => new HttpResponse(null, { status: 500 })))
