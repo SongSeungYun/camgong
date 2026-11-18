@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.camgong.auth.ActiveMember;
 import com.camgong.common.ApiException;
 import com.camgong.groupbuy.GroupBuyCompletion;
 import com.camgong.groupbuy.GroupBuyStatus;
@@ -39,9 +40,12 @@ public class ParticipationService {
     private final GroupBuyCompletion completion;
     private final Clock clock;
     private final TransactionTemplate tx;
+    private final ActiveMember activeMember;
 
     public ParticipationService(JoinQueryRepository query, ParticipationRepository participations, QuantityGate gate,
-            GroupBuyCompletion completion, Clock clock, PlatformTransactionManager transactionManager) {
+            GroupBuyCompletion completion, Clock clock, PlatformTransactionManager transactionManager,
+            ActiveMember activeMember) {
+        this.activeMember = activeMember;
         this.query = query;
         this.participations = participations;
         this.gate = gate;
@@ -56,6 +60,7 @@ public class ParticipationService {
      */
     public Joined join(Long memberId, Long groupBuyId, ParticipationRequest r) {
         return retrying(() -> {
+            activeMember.lockShared(memberId);          // 첫 문장: 동시에 온 탈퇴와 직렬화한다(010). 수량 변경·취소는 기존 참여 행만 다뤄 잠그지 않는다
             Instant now = Instant.now(clock);
             GroupBuyHead head = requireJoinable(groupBuyId, memberId);
             Integer existing = query.findQuantity(groupBuyId, memberId).orElse(null);

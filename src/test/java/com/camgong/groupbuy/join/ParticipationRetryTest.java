@@ -44,7 +44,7 @@ class ParticipationRetryTest {
                 NOW.plusSeconds(3600))));
         when(query.findQuantity(anyLong(), anyLong())).thenReturn(Optional.empty());
         service = new ParticipationService(query, mock(ParticipationRepository.class), gate, mock(GroupBuyCompletion.class),
-                Clock.fixed(NOW, ZoneOffset.UTC), mock(PlatformTransactionManager.class));
+                Clock.fixed(NOW, ZoneOffset.UTC), mock(PlatformTransactionManager.class), mock(com.camgong.auth.ActiveMember.class));
     }
 
     private ApiException joinFailing() {

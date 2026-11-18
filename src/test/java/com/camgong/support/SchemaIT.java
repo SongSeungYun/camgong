@@ -16,9 +16,9 @@ class SchemaIT extends IntegrationTestBase {
 
     @Test
     void schemaComesFromFlywayMigrationsNotFromSqlInit() {
-        // 빈 DB 에 V1·V2 가 차례로 적용되었고(그 뒤 validate 통과), 기동 때마다 다시 도는 schema.sql 은 더 없다
+        // 빈 DB 에 V1~V3 이 차례로 적용되었고(그 뒤 validate 통과), 기동 때마다 다시 도는 schema.sql 은 더 없다
         assertThat(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank", String.class))
-                .containsExactly("1", "2");
+                .containsExactly("1", "2", "3");
         assertThat(new ClassPathResource("schema.sql").exists()).isFalse();
     }
 

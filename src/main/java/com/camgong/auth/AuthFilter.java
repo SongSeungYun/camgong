@@ -16,7 +16,10 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-/** 쿠키 camgong_session → 세션 → 회원을 해석한다. 요청자를 알려 주는 헤더는 읽지 않는다(FR-014). */
+/**
+ * 쿠키 camgong_session → 세션 → 회원을 해석한다. 요청자를 알려 주는 헤더는 읽지 않는다(FR-014).
+ * 탈퇴한 회원의 세션은 없는 세션과 같다(010): 로그인이 회원을 읽은 뒤 탈퇴가 커밋되고 세션이 들어가는 경쟁도 여기서 막힌다.
+ */
 class AuthFilter extends OncePerRequestFilter {
 
     private static final String LOGOUT_PATH = "/api/auth/logout";
@@ -34,7 +37,8 @@ class AuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String raw = sessionCookie(request);
         if (raw != null) {
-            sessions.resolveSession(raw).ifPresent(session -> members.findById(session.memberId()).ifPresent(m -> {
+            sessions.resolveSession(raw).ifPresent(session -> members.findById(session.memberId())
+                    .filter(m -> !m.isWithdrawn()).ifPresent(m -> {
                 var principal = new CurrentMember(m.getId(), m.getName(), m.getSchool());
                 SecurityContextHolder.getContext()
                         .setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, List.of()));

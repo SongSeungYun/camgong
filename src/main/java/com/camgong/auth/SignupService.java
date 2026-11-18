@@ -164,6 +164,8 @@ public class SignupService {
             errors.add(new ApiException.Field("displayName", "표시 이름을 입력해 주세요."));
         } else if (Keys.length(displayName) < 2 || Keys.length(displayName) > 20) {
             errors.add(new ApiException.Field("displayName", "표시 이름은 2~20자여야 합니다."));
+        } else if (isReservedName(displayName)) {
+            errors.add(new ApiException.Field("displayName", "쓸 수 없는 이름입니다."));
         } else if (Keys.hasInvisible(displayName)) {
             errors.add(new ApiException.Field("displayName", "보이지 않는 글자는 이름에 쓸 수 없습니다."));
         } else if (Keys.length(Keys.normalize(displayName)) > 20) {
@@ -188,6 +190,17 @@ public class SignupService {
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.", errors);
         }
+    }
+
+    /** "탈퇴한 회원"(010): 모든 공백(유니코드 공백, 가운데 공백 포함)을 지워 비교한다. "탈퇴한회원", "탈퇴한　회원"도 사칭이다. */
+    private static boolean isReservedName(String displayName) {
+        return withoutSpaces(displayName).equals(withoutSpaces(Member.WITHDRAWN_NAME));
+    }
+
+    private static String withoutSpaces(String value) {
+        StringBuilder out = new StringBuilder();
+        value.codePoints().filter(c -> !Keys.isSpace(c)).forEach(out::appendCodePoint);
+        return out.toString();
     }
 
     /** 인증 메일 재발송. 표시 이름·비밀번호는 그대로 두고 새 토큰만 건다. */

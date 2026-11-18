@@ -68,6 +68,7 @@ class NotificationResilienceIT extends NotificationTestBase {
         }).when(writer).insertOne(any());
         String eventId = UUID.randomUUID().toString();
 
+        seedMembers(4, 4);                                  // 받는 사람은 있는 회원이어야 한다(010: 탈퇴·없는 회원은 거른다)
         publish(new GroupBuyCompleted(eventId, 1L, "t", List.of(1L, 2L, 3L, 4L)));
 
         assertThat(recipientsOf("GROUPBUY_COMPLETED")).containsExactly(1L, 2L, 4L);
@@ -136,6 +137,7 @@ class NotificationResilienceIT extends NotificationTestBase {
             return inv.callRealMethod();
         }).when(writer).insertOne(any());
 
+        seedMembers(4, 5);                                  // 받는 사람은 있는 회원이어야 한다(010)
         publish(new GroupBuyCompleted(UUID.randomUUID().toString(), 1L, "t", List.of(1L, 2L, 3L, 4L, 5L)));
 
         assertThat(recipientsOf("GROUPBUY_COMPLETED")).containsExactly(1L, 3L, 5L);
