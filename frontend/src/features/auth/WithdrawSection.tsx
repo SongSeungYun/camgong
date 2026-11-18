@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { useId, useRef, useState } from 'react'
+import { startTransition, useId, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { ApiError } from '../../shared/api/client'
 import { errorMessage } from '../../shared/lib/errorMessage'
@@ -27,9 +27,10 @@ export function WithdrawSection() {
     mutationFn: (pw: string) => withdraw(pw),
     gcTime: 0, // 비밀번호(variables)가 캐시에 남지 않게
     onSuccess: async () => {
-      // 목록으로 옮기기를 마친 뒤 세션을 비운다(반대면 보호 라우트가 /login으로 먼저 보낸다)
+      // 라우터는 이동을 트랜지션으로 그린다. 세션 비우기도 트랜지션으로 해야 같이 반영된다
+      // (급한 업데이트로 먼저 비우면 아직 /me인 화면에서 보호 라우트가 /login으로 보낸다)
       await navigate('/', { replace: true, state: { notice: '탈퇴했어요.' } })
-      forget()
+      startTransition(forget)
     },
     onError: (e) => {
       const err = e instanceof ApiError ? e : new ApiError(0)

@@ -99,8 +99,10 @@ describe('탈퇴 (010)', () => {
     await userEvent.type(pw(), 'password1234')
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '탈퇴하기' }))
     await screen.findByText('탈퇴했어요.')
+    await screen.findByRole('link', { name: '로그인' }) // 세션이 비워졌다
+    await new Promise((r) => setTimeout(r, 100)) // 세션을 비운 뒤에도 보호 라우트가 /login으로 보내지 않는다
     expect(router.state.location.pathname).toBe('/')
-    screen.getByRole('link', { name: '로그인' })
+    screen.getByText('탈퇴했어요.')
     await waitFor(() => expect(mockState.members.find((m) => m.id === 3)!.withdrawn).toBe(true))
   })
 })
