@@ -1,0 +1,63 @@
+# 서버 한 대: MySQL 8.4 + 백엔드 + Caddy(HTTPS, 프론트 정적 파일, /api 프록시).
+# 값은 같은 디렉터리의 .env(저장소에 넣지 않는다, .env.example 참고). 밖으로 여는 포트는 Caddy 80/443 뿐이다.
+name: camgong
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
+      MYSQL_DATABASE: camgong
+      # 앱 계정. camgong DB 전체 권한(Flyway 의 CREATE·ALTER, CREATE TEMPORARY TABLES 포함)을 받는다.
+      # 세 값은 볼륨을 처음 만들 때만 쓰인다. 그 뒤 .env 를 바꿔도 DB 계정은 그대로다.
+      MYSQL_USER: ${DB_USER:?}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # TCP 로 확인한다: 초기화 중의 임시 서버는 소켓만 열어서, 소켓 ping 은 초기화가 끝나기 전에 성공한다.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # 도메인에서 만든다(빠뜨리면 모든 쓰기가 403 이거나 메일 링크가 깨진다). Caddy 가 HTTPS 를 끝내 백엔드는 http 로 받으므로 Origin 허용이 필요하다.
+      ALLOWED_ORIGINS: https://${DOMAIN:?}
+      VERIFY_LINK_BASE_URL: https://${DOMAIN:?}/verify?token=
+      # env_file 로 같이 들어오는 DB root 비밀번호는 앱에 주지 않는다.
+      MYSQL_ROOT_PASSWORD: ""
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../frontend
+      dockerfile: ../deploy/web.Dockerfile
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 인증서를 잃으면 재발급 횟수 제한에 걸릴 수 있다. 지우지 않는다.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:
+  caddy-data:
+  caddy-config:
