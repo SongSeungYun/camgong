@@ -6,3 +6,5 @@ export const chars = (s: string) => [...s].length
 export const hasInvisible = (s: string) => INVISIBLE.test(s)
 /** 공백·보이지 않는 글자(제어 문자 포함)뿐이면 true */
 export const isBlank = (s: string) => /^[\p{White_Space}\p{Cc}\p{Cf}\u115f\u1160\u3164\uffa0\u2800]*$/u.test(s)
+/** 010 예약 이름 판정용(계약 931d416): NFC로 모은 뒤 공백·보이지 않는 글자·결합 표시(Mn)를 모두 지운다 */
+export const reservedKey = (s: string) => s.normalize('NFC').replace(/[\p{White_Space}\p{Mn}\p{Cc}\p{Cf}\u115f\u1160\u3164\uffa0\u2800]/gu, '')
