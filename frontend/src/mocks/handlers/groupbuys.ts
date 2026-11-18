@@ -131,8 +131,8 @@ export const groupBuyHandlers = [
     if (!Number.isInteger(size) || size < 1 || size > 50) return badRequest('size', '1~50 사이여야 해요')
     if (chars(q) > 50) return badRequest('q', '50자 이하여야 해요')
     // 009: 로그인했으면 회원 학교로 거르고 school 파라미터는 무시한다. 비로그인은 school이 있으면 그 학교만
-    const schoolParam = sp.get('school') || null
-    if (schoolParam !== null && schoolParam.length > 253) return badRequest('school', '253자 이하여야 해요')
+    const schoolParam = strip(sp.get('school') ?? '').toLowerCase() || null // 서버처럼 trim·소문자, 빈 값은 필터 없음
+    if (schoolParam !== null && chars(schoolParam) > 253) return badRequest('school', '253자 이하여야 해요')
     const school = currentMember()?.school ?? schoolParam
 
     const words = q.split(/\s+/).filter(Boolean).slice(0, 5).map((w) => w.toLowerCase())
@@ -147,7 +147,7 @@ export const groupBuyHandlers = [
           : Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id - a.id,
       )
 
-    const sig = [status, category, sort, words.join(' ')].join('|') // 009(93ba8f9): 커서는 학교와 묶지 않는다
+    const sig = sort // 계약: 커서는 sort만 본다(상태·카테고리·검색어·학교와 묶지 않는다)
     const cursor = sp.get('cursor')
     const offset = cursor === null ? 0 : decodeCursor(cursor, sig)
     if (offset === null) return badRequest('cursor', '올바르지 않은 커서예요')

@@ -1,5 +1,7 @@
-import { uniqueById } from '../shared/lib/uniqueById'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
+import { uniqueById } from '../shared/lib/uniqueById'
 import { useSession } from '../features/auth/session'
 import { GroupBuyCard } from '../features/groupbuy/list/GroupBuyCard'
 import s from '../features/groupbuy/list/GroupBuyCard.module.css'
@@ -11,7 +13,8 @@ import { Button, Layout, StateView } from '../shared/ui'
 
 export default function ListPage() {
   const { params: urlParams, qInput, setQInput, setParams } = useListParams()
-  const { status, member } = useSession()
+  const { status, member, retry } = useSession()
+  const qc = useQueryClient()
   // 009: 로그인하면 서버가 회원 학교로 거르므로 주소의 school은 보내지 않는다. 확인 중에는 기다린다(전국 목록이 잠깐 섞이지 않게).
   // 로그인 확인이 실패(error)하면 로그인 여부를 모르니 학교 검색을 숨기고 school도 보내지 않는다(서버가 쿠키로 정한다).
   const mySchool = status === 'authenticated' ? (member?.school ?? '') : null
@@ -20,10 +23,23 @@ export default function ListPage() {
   const scope = status === 'checking' ? null : status === 'error' ? 'unknown' : (mySchool ?? 'all')
   const q = useGroupBuyList(params, scope)
   const notice = (useLocation().state as { notice?: string } | null)?.notice
-  const items = uniqueById(q.data?.pages.flatMap((p) => p.items) ?? [])
+  const loaded = uniqueById(q.data?.pages.flatMap((p) => p.items) ?? [])
+  // 검수 4: 화면이 아는 범위와 서버가 쓴 범위가 다르면(다른 탭에서 로그인·로그아웃, 세션 만료·탈퇴) 그 목록을 버리고 로그인을 다시 확인한다.
+  // 기대 학교: 로그인이면 내 학교, 비로그인이고 학교를 골랐으면 그 학교. 비로그인 전국 목록은 확인할 기준이 없다.
+  const expected = mySchool ?? (anonymous && params.school ? params.school : null)
+  const mismatch = expected !== null && loaded.some((it) => it.school !== undefined && it.school !== expected)
+  const lastFix = useRef(0)
+  useEffect(() => {
+    // ponytail: 5초에 한 번만 고친다(서버가 계속 어긋나도 무한 반복하지 않게). 계속 어긋나면 그 사이 목록을 비워 둔다
+    if (!mismatch || Date.now() - lastFix.current < 5_000) return
+    lastFix.current = Date.now()
+    qc.removeQueries({ queryKey: ['groupbuys'] })
+    retry()
+  }, [mismatch, qc, retry])
+  const items = mismatch ? [] : loaded
   // FR-014: 정렬을 뺀 조건(검색어·카테고리·기본이 아닌 상태)이 하나라도 걸려 있으면 '결과 없음'
   const filtered = !!params.q || params.category !== null || params.status !== 'OPEN' || !!params.school
-  const state = q.isPending ? 'loading' : q.isError && items.length === 0 ? 'error' : items.length === 0 ? 'empty' : 'ready'
+  const state = q.isPending || mismatch ? 'loading' : q.isError && items.length === 0 ? 'error' : items.length === 0 ? 'empty' : 'ready'
 
   return (
     <Layout>
@@ -40,7 +56,7 @@ export default function ListPage() {
         <ul className={s.list}>
           {items.map((it) => (
             <li key={it.id}>
-              <GroupBuyCard item={it} nowMs={q.dataUpdatedAt} />
+              <GroupBuyCard item={it} nowMs={q.dataUpdatedAt} showSchool={anonymous} />
             </li>
           ))}
         </ul>

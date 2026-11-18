@@ -95,3 +95,33 @@ test('학교 검색 /api/schools: 공구가 있는 학교 키 중 q가 들어간
   for (const q of ['', '%20%20', 'a'.repeat(51)]) expect(await err(get(`/api/schools?q=${q}`))).toMatchObject({ status: 400, fieldErrors: [{ field: 'q' }] })
   expect(await err(get('/api/schools'))).toMatchObject({ status: 400, fieldErrors: [{ field: 'q' }] })
 })
+
+test('검수 3: 내 활동 항목에는 school이 없다(계약 fc49fdd)', async () => {
+  mockState.sessionMemberId = 1
+  const r = await get<Page<GroupBuyCard>>('/api/me/groupbuys?role=organizer')
+  expect(r.items.length).toBeGreaterThan(0)
+  expect(r.items.every((i) => !('school' in i))).toBe(true)
+})
+
+test('검수 9: 목록 school은 trim·소문자로 다루고 빈 값은 필터 없음, 길이는 글자 수', async () => {
+  const one = await list(`?school=${encodeURIComponent('  SNU.ac.kr ')}`)
+  expect(one.items.map((i) => i.school)).toEqual(['snu.ac.kr'])
+  const empty = await list(`?school=${encodeURIComponent('   ')}`)
+  expect(new Set(empty.items.map((i) => i.school)).size).toBeGreaterThan(1)
+})
+
+test('검수 10: 커서는 sort만 본다(다른 status·category·q·school 커서도 400 아님)', async () => {
+  const first = await list('?size=5')
+  for (const qs of ['?status=FAILED', '?category=ETC', '?q=x', '?school=snu.ac.kr']) {
+    await list(`${qs}&size=5&cursor=${encodeURIComponent(first.nextCursor!)}`)
+  }
+  expect(await err(list(`?sort=deadline&cursor=${encodeURIComponent(first.nextCursor!)}`))).toMatchObject({ status: 400 })
+})
+
+test('검수 11: verify의 학교 재판정은 토큰 검사 바로 다음, 본문 검증보다 먼저', async () => {
+  await post('/api/auth/signup', { email: 'x@snu.ac.kr' })
+  const p = mockState.pending.find((x) => x.email === 'x@snu.ac.kr')!
+  p.email = 'x@gmail.com' // 그 사이 받을 수 없는 도메인이 됐다고 가정
+  const e = await err(post('/api/auth/verify', { token: p.token, displayName: '', password: '', consent: false }))
+  expect(e).toMatchObject({ status: 400, fieldErrors: [{ field: 'token', message: '이 메일로는 더 이상 가입할 수 없습니다.' }] })
+})

@@ -77,6 +77,9 @@ export const authHandlers = [
     if (token === 'used-token') return problem(409, 'TOKEN_USED')
     const p = mockState.pending.find((x) => x.token === token)
     if (!p) return problem(400, 'INVALID_TOKEN')
+    // 009: 확인 시점에 다시 판정한다(그 사이 추가 목록에서 빠졌으면 token 필드 400). 서버처럼 토큰 검사 바로 다음, 본문 검증보다 먼저
+    const school = schoolOf(p.email)
+    if (!school) return problem(400, 'Bad Request', { errors: [{ field: 'token', message: '이 메일로는 더 이상 가입할 수 없습니다.' }] })
 
     const name = typeof b.displayName === 'string' ? strip(b.displayName) : ''
     const consent = b.consent === 'true' ? true : b.consent === 'false' ? false : b.consent // 서버는 문자열 "true"/"false"도 불리언으로 받는다
@@ -90,9 +93,6 @@ export const authHandlers = [
     if (typeof b.consentVersion !== 'string' || !b.consentVersion) errors.push({ field: 'consentVersion', message: '동의 안내문 버전이 필요해요' })
     if (errors.length) return problem(400, 'Bad Request', { errors })
 
-    // 009: 확인 시점에 다시 판정한다(그 사이 추가 목록에서 빠졌으면 token 필드 400)
-    const school = schoolOf(p.email)
-    if (!school) return problem(400, 'Bad Request', { errors: [{ field: 'token', message: '이 메일로는 더 이상 가입할 수 없습니다.' }] })
     if (mockState.members.some((m) => m.displayName === name)) return problem(409, 'DISPLAY_NAME_TAKEN')
     const member = { id: mockState.nextMemberId++, displayName: name, email: p.email, password, school }
     mockState.members.push(member)

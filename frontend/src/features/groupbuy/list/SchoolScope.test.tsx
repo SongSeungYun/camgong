@@ -8,7 +8,9 @@ import { renderApp } from '../../../test/utils'
 
 // 009 T014. 시드: school.ac.kr 공구 대부분, 47·48 snu.ac.kr(모집 중은 48 하나), 49·50 snue.ac.kr
 const combo = () => screen.getByRole('combobox', { name: '학교 검색' })
-const cardSchools = () => screen.getAllByRole('listitem').map((li) => within(li).getByText(/^학교 /).textContent!.replace('학교 ', ''))
+// 비로그인 카드의 학교 표시(로그인하면 늘 내 학교라 카드에 넣지 않는다, 검수 8)
+const cardSchools = () => screen.getAllByRole('listitem').map((li) => within(li).getByText(/^학교 · /).textContent!.replace('학교 · ', ''))
+const listbox = () => document.getElementById(combo().getAttribute('aria-controls')!)!
 
 describe('학교 범위 목록 (009)', () => {
   test('비로그인 목록 카드에 공구의 학교가 보인다(전국)', async () => {
@@ -31,7 +33,7 @@ describe('학교 범위 목록 (009)', () => {
     await waitFor(() => expect(router.state.location.search).toContain('school=snu.ac.kr'))
     expect(screen.queryByRole('listbox')).toBeNull()
     expect(document.activeElement).toBe(combo())
-    screen.getByText('선택한 학교: snu.ac.kr')
+    screen.getByText('선택한 학교 · snu.ac.kr')
     await waitFor(() => expect(cardSchools()).toEqual(['snu.ac.kr']))
   })
 
@@ -53,6 +55,7 @@ describe('학교 범위 목록 (009)', () => {
     await screen.findByRole('listbox')
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('listbox')).toBeNull()
+    expect(listbox().hidden).toBe(true) // 접혀도 aria-controls 대상은 남는다(검수 7)
     expect(combo().getAttribute('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(combo())
     expect(router.state.location.search).not.toContain('school=')
@@ -77,7 +80,7 @@ describe('학교 범위 목록 (009)', () => {
     let sent: string | null = null
     server.use(http.get('/api/groupbuys', ({ request }) => void (sent = new URL(request.url).searchParams.get('school'))))
     renderApp('/?school=snu.ac.kr')
-    await screen.findByText('선택한 학교: snu.ac.kr')
+    await screen.findByText('선택한 학교 · snu.ac.kr')
     await waitFor(() => expect(sent).toBe('snu.ac.kr'))
     await waitFor(() => expect(cardSchools()).toEqual(['snu.ac.kr']))
   })
@@ -101,16 +104,18 @@ describe('학교 범위 목록 (009)', () => {
   test('비로그인으로 본 전국 목록 캐시가 로그인 뒤 목록에 섞이지 않는다', async () => {
     const { router } = renderApp('/')
     await screen.findAllByRole('listitem')
-    expect(cardSchools()).toContain('snu.ac.kr')
+    expect(cardSchools()).toContain('snue.ac.kr')
     await router.navigate('/login')
     await userEvent.type(await screen.findByLabelText('이메일'), 'organizer@school.ac.kr')
     await userEvent.type(screen.getByLabelText('비밀번호'), 'password1234')
     await userEvent.click(screen.getByRole('button', { name: '로그인' }))
     await screen.findByText('우리 학교 · school.ac.kr')
-    // 전국 캐시가 잠깐이라도 보이면 안 된다: 머리말이 뜬 순간 카드는 없거나(불러오는 중) 우리 학교뿐
-    expect(screen.queryAllByRole('listitem').length === 0 || new Set(cardSchools()).size === 1).toBe(true)
-    expect(screen.queryByText('학교 snu.ac.kr')).toBeNull()
-    await waitFor(() => expect(new Set(cardSchools())).toEqual(new Set(['school.ac.kr'])))
+    // 전국 캐시가 잠깐이라도 보이면 안 된다: 머리말이 뜬 순간 다른 학교 공구(48·49·50) 카드가 없다
+    const otherSchool = () => ['48', '49', '50'].some((id) => document.querySelector(`a[href="/groupbuys/${id}"]`))
+    expect(otherSchool()).toBe(false)
+    await screen.findAllByRole('listitem')
+    expect(otherSchool()).toBe(false)
+    expect(screen.queryByText(/^학교 · /)).toBeNull() // 로그인 카드에는 학교 표시가 없다
   })
 
   test('로그인 확인이 실패(5xx)한 상태에서는 학교 검색을 보이지 않고 school도 보내지 않는다', async () => {
@@ -127,7 +132,7 @@ describe('학교 범위 목록 (009)', () => {
 
   test('주소의 school은 소문자 학교 키로 읽는다', async () => {
     renderApp('/?school=SNU.ac.kr')
-    await screen.findByText('선택한 학교: snu.ac.kr')
+    await screen.findByText('선택한 학교 · snu.ac.kr')
     await waitFor(() => expect(cardSchools()).toEqual(['snu.ac.kr']))
   })
 
@@ -155,7 +160,78 @@ describe('학교 범위 목록 (009)', () => {
     await userEvent.type(combo(), 'snu')
     await waitFor(() => expect(live.textContent).toBe('학교 후보 2개'))
     await userEvent.keyboard('{ArrowDown}{Enter}')
-    await waitFor(() => expect(live.textContent).toBe('선택한 학교: snu.ac.kr'))
+    await waitFor(() => expect(live.textContent).toBe('snu.ac.kr 공구만 보여요.'))
     expect(screen.getByTestId('school-status')).toBe(live) // 같은 노드가 남아 있다
+    await userEvent.click(screen.getByRole('button', { name: '학교 선택 해제' }))
+    await waitFor(() => expect(live.textContent).toBe('전국 공구를 보여요.'))
+  })
+
+  test('검수 1: 후보가 줄어 하이라이트가 범위를 벗어나면 초기화되고, Enter는 고른 학교를 풀지 않는다', async () => {
+    const { router } = renderApp('/?school=snu.ac.kr')
+    await screen.findByText('선택한 학교 · snu.ac.kr')
+    await userEvent.type(combo(), 'snu')
+    await waitFor(() => expect(within(listbox()).getAllByRole('option')).toHaveLength(2))
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}') // 두 번째(snue)
+    await userEvent.type(combo(), '.')
+    await waitFor(() => expect(within(listbox()).getAllByRole('option').map((o) => o.textContent)).toEqual(['snu.ac.kr']))
+    expect(combo().getAttribute('aria-activedescendant')).toBeNull()
+    await userEvent.keyboard('{Enter}')
+    expect(router.state.location.search).toContain('school=snu.ac.kr')
+    screen.getByText('선택한 학교 · snu.ac.kr')
+  })
+
+  test('검수 2: 이전 검색어의 후보는 새 검색어 아래에 보이지도, 골라지지도 않는다', async () => {
+    const { router } = renderApp('/')
+    await screen.findAllByRole('listitem')
+    await userEvent.type(combo(), 'snu')
+    await waitFor(() => expect(within(listbox()).getAllByRole('option')).toHaveLength(2))
+    await userEvent.clear(combo())
+    await userEvent.type(combo(), 'zzz')
+    expect(within(listbox()).queryAllByRole('option', { hidden: true })).toHaveLength(0)
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}')
+    expect(router.state.location.search).not.toContain('school=')
+    await screen.findByText('맞는 학교가 없어요.')
+  })
+
+  test('검수 5: 입력칸에 다시 포커스하면 후보가 다시 열린다', async () => {
+    renderApp('/')
+    await screen.findAllByRole('listitem')
+    await userEvent.type(combo(), 'snu')
+    await waitFor(() => expect(listbox().hidden).toBe(false))
+    await userEvent.tab()
+    expect(listbox().hidden).toBe(true)
+    await userEvent.click(combo())
+    expect(listbox().hidden).toBe(false)
+    expect(combo().getAttribute('aria-expanded')).toBe('true')
+  })
+
+  test('검수 6: 다시 검색하는 동안에도 고른 학교가 화면에 남는다(상태 영역이 아닌 글)', async () => {
+    renderApp('/?school=snu.ac.kr')
+    const sel = await screen.findByText('선택한 학교 · snu.ac.kr')
+    expect(sel.closest('[role=status]')).toBeNull()
+    await userEvent.type(combo(), 'sn')
+    await waitFor(() => expect(within(listbox()).getAllByRole('option').length).toBeGreaterThan(0))
+    screen.getByText('선택한 학교 · snu.ac.kr')
+  })
+
+  test('검수 4: 비로그인으로 학교를 골라 뒀는데 다른 탭에서 로그인돼 응답 범위가 다르면 캐시를 버리고 로그인을 다시 확인한다', async () => {
+    renderApp('/?school=snu.ac.kr')
+    await screen.findByText('선택한 학교 · snu.ac.kr')
+    await waitFor(() => expect(cardSchools()).toEqual(['snu.ac.kr']))
+    mockState.sessionMemberId = 1 // 다른 탭에서 로그인
+    await userEvent.click(screen.getByRole('button', { name: '생활용품' }))
+    await screen.findByText('우리 학교 · school.ac.kr')
+    expect(screen.queryByRole('combobox', { name: '학교 검색' })).toBeNull()
+  })
+
+  test('검수 4: 로그인 상태인데 서버 세션이 끝나 전국 목록이 오면 캐시를 버리고 로그인을 다시 확인한다', async () => {
+    mockState.sessionMemberId = 1
+    renderApp('/')
+    await screen.findByText('우리 학교 · school.ac.kr')
+    await screen.findAllByRole('listitem')
+    mockState.sessionMemberId = null // 다른 탭에서 로그아웃
+    await userEvent.click(screen.getByRole('button', { name: '주방' })) // 모집 중 주방에 snu 공구(48)가 있다
+    await screen.findByRole('combobox', { name: '학교 검색' })
+    expect(screen.queryByText('우리 학교 · school.ac.kr')).toBeNull()
   })
 })
