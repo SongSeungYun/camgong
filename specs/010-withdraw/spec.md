@@ -8,6 +8,13 @@
 
 **Input**: User description: "회원 탈퇴". 사용자 결정(2026-11-19): "익명화 ㄱㄱ", "탈퇴는 a로가자"(앱 안 탈퇴 버튼). 근거: `docs/consent-v1.md`(동의문의 "탈퇴하면 지체 없이 지운다"를 지킬 방법), specs/002·003·004·006·007.
 
+## Clarifications
+
+### Session 2026-11-19
+
+- Q: 모집 완료 공구에 입금·수령이 남아 있어도 탈퇴를 허용하나? → A: 허용.
+- Q: 탈퇴 때 비밀번호를 다시 입력하나? → A: 재입력 필요.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 내가 직접 탈퇴하기 (Priority: P1)

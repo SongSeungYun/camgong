@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,5 +31,5 @@
 
 ## Notes
 
-- 남은 질문 1개: 비로그인 목록(US2 시나리오 5, FR-008). 사용자 답을 받으면 반영한다.
+- 비로그인 목록 결정 반영(2026-11-19). 학교 검색은 도메인 글자 기준(관제탑 기본값).
 - "도메인", "하위 도메인", "점 경계"는 규칙을 시험할 수 있게 쓰려고 남긴 용어다. 구현 방식은 아니다.
