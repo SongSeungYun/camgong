@@ -52,8 +52,8 @@
 
 ## 4. DB
 
-- MySQL 8.4. 스키마는 앱 기동 때 `schema.sql`(`CREATE TABLE IF NOT EXISTS`)로 만들고 JPA는 `validate`만 한다. 스키마가 바뀌면 기존 테이블은 고쳐지지 않는다. **Flyway로 옮기기로 했다**(2026-11-18 사용자 "추천대로"). 백엔드 세션이 작업하고 관제탑이 검수한다. 반영 전까지 이 항목은 옛 방식 기준이다.
-- 앱 계정 권한: 테이블 생성(`CREATE`), 읽기·쓰기, **`CREATE TEMPORARY TABLES`**(기동 시 `DatabaseSettingsCheck`가 임시 테이블로 `useAffectedRows`를 검사).
+- MySQL 8.4. 스키마는 앱 기동 때 Flyway가 `src/main/resources/db/migration`을 적용하고 JPA는 `validate`만 한다(2026-11-18 사용자 결정으로 `schema.sql`에서 옮김). 빈 DB에서 시작해야 한다(이력 테이블 없이 테이블만 있는 DB는 Flyway가 기동을 막는다). 스키마 변경은 적용된 파일을 고치지 말고 `V2__…`로 추가한다.
+- 앱 계정 권한: 테이블 생성·변경(`CREATE`, `ALTER`, `INDEX`, Flyway 이력 테이블 포함), 읽기·쓰기, **`CREATE TEMPORARY TABLES`**(기동 시 `DatabaseSettingsCheck`가 임시 테이블로 `useAffectedRows`를 검사).
 - 세션마다 `innodb_lock_wait_timeout=5`를 앱이 건다(Hikari `connection-init-sql`). DB 쪽 설정은 필요 없다.
 - 시간은 UTC로 저장된다(`hibernate.jdbc.time_zone=UTC`). 응답은 +09:00.
 - 옛 스키마(B2 이전 `pending_signup` 컬럼)가 남은 DB는 `DatabaseSettingsCheck`가 기동을 막는다. 새 DB로 시작한다.
