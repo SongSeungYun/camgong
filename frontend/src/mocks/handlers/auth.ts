@@ -2,12 +2,16 @@ import { http, HttpResponse } from 'msw'
 import { chars, hasInvisible, strip } from '../text'
 import { NOT_UNIVERSITY, schoolOf } from '../school'
 import { currentMember, mockState } from '../state'
+import { shownStatus } from './groupbuys'
 
 const problem = (status: number, title: string, extra: Record<string, unknown> = {}, headers?: HeadersInit) =>
   HttpResponse.json({ title, status, ...extra }, { status, headers })
 
 const toMember = (m: { id: number; displayName: string; school: string }) => ({ member: { id: m.id, displayName: m.displayName, school: m.school } })
 const RESEND_MS = 60_000
+export const WITHDRAWN_NAME = '탈퇴한 회원'
+const locked = () => mockState.loginLocked || mockState.loginFailures >= 5
+const lockedRes = () => problem(429, 'LOGIN_LOCKED', { retryAt: isoKst(Date.now() + 15 * 60_000) }, { 'Retry-After': '900' })
 const isoKst = (ms: number) => new Date(ms).toISOString()
 const tooMany = (retryAtMs: number) =>
   problem(429, 'TOO_MANY_REQUESTS', { retryAt: isoKst(retryAtMs) }, { 'Retry-After': String(Math.ceil((retryAtMs - Date.now()) / 1000)) })
@@ -20,11 +24,8 @@ export const authHandlers = [
 
   http.post('/api/auth/login', async ({ request }) => {
     const { email, password } = (await request.json()) as { email: string; password: string }
-    if (mockState.loginLocked || mockState.loginFailures >= 5) {
-      const at = Date.now() + 15 * 60_000
-      return problem(429, 'LOGIN_LOCKED', { retryAt: isoKst(at) }, { 'Retry-After': '900' })
-    }
-    const m = mockState.members.find((x) => x.email === email.trim().toLowerCase())
+    if (locked()) return lockedRes()
+    const m = mockState.members.find((x) => !x.withdrawn && x.email === email.trim().toLowerCase()) // 탈퇴 계정은 없는 계정과 같다(010)
     if (m && m.password === password) {
       mockState.loginFailures = 0
       mockState.sessionMemberId = m.id
@@ -87,6 +88,7 @@ export const authHandlers = [
     const errors: { field: string; message: string }[] = []
     if (chars(name) < 2 || chars(name) > 20) errors.push({ field: 'displayName', message: '2~20자로 입력해 주세요' })
     else if (hasInvisible(name)) errors.push({ field: 'displayName', message: '보이지 않는 글자는 쓸 수 없어요' })
+    else if (name === WITHDRAWN_NAME) errors.push({ field: 'displayName', message: '쓸 수 없는 이름입니다.' }) // 010 예약어
     if (password.length < 8) errors.push({ field: 'password', message: '8자 이상 입력해 주세요' })
     else if (new TextEncoder().encode(password).length > 72) errors.push({ field: 'password', message: '72바이트 이하로 입력해 주세요' })
     if (consent !== true) errors.push({ field: 'consent', message: '동의가 필요해요' })
@@ -99,5 +101,28 @@ export const authHandlers = [
     mockState.pending = mockState.pending.filter((x) => x !== p)
     mockState.sessionMemberId = member.id
     return HttpResponse.json(toMember(member))
+  }),
+
+  // 010 탈퇴: 401 → 400(비밀번호 누락) → 429(잠금) → 400 INVALID_PASSWORD(실패 횟수 증가) → 409 ACTIVE_GROUPBUY → 204
+  http.post('/api/auth/withdraw', async ({ request }) => {
+    const me = currentMember()
+    if (!me) return problem(401, 'UNAUTHENTICATED')
+    const b = (await request.json().catch(() => ({}))) as { password?: unknown }
+    if (typeof b.password !== 'string' || !b.password) return problem(400, 'Bad Request', { errors: [{ field: 'password', message: '비밀번호를 입력해 주세요' }] })
+    if (locked()) return lockedRes()
+    if (b.password !== me.password) {
+      mockState.loginFailures++
+      return problem(400, 'INVALID_PASSWORD', { errors: [{ field: 'password', message: '비밀번호가 맞지 않습니다.' }] })
+    }
+    const blockers = mockState.groupBuys
+      .filter((g) => ['OPEN', 'PENDING_CLOSE'].includes(shownStatus(g)) && (g.organizerId === me.id || g.participations.some((p) => p.memberId === me.id)))
+      .sort((a, b) => a.id - b.id)
+      .map((g) => ({ groupBuyId: g.id, title: g.title, role: g.organizerId === me.id ? 'ORGANIZER' : 'PARTICIPANT', status: shownStatus(g) }))
+    if (blockers.length) return problem(409, 'ACTIVE_GROUPBUY', { detail: '진행 중인 공구가 있어 탈퇴할 수 없습니다.', blockers })
+    mockState.notifications = mockState.notifications.filter((n) => n.memberId !== me.id)
+    mockState.pending = mockState.pending.filter((p) => p.email !== me.email)
+    Object.assign(me, { withdrawn: true, displayName: WITHDRAWN_NAME, email: '', password: '' })
+    mockState.sessionMemberId = null
+    return new HttpResponse(null, { status: 204 })
   }),
 ]

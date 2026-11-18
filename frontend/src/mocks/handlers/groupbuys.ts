@@ -10,7 +10,7 @@ const badRequest = (field: string, message: string) => problem(400, 'Bad Request
 
 const secured = (g: SeedGroupBuy) => g.participations.reduce((n, p) => n + p.quantity, 0)
 /** 003 표시 상태: 모집 중인데 마감이 지났으면 PENDING_CLOSE */
-const shownStatus = (g: SeedGroupBuy) => (g.status === 'OPEN' && Date.parse(g.deadline) <= Date.now() ? 'PENDING_CLOSE' : g.status)
+export const shownStatus = (g: SeedGroupBuy) => (g.status === 'OPEN' && Date.parse(g.deadline) <= Date.now() ? 'PENDING_CLOSE' : g.status)
 
 /** 003 목록 카드 모양. 개설자·구매처는 넣지 않는다. */
 export const toCard = (g: SeedGroupBuy) => ({

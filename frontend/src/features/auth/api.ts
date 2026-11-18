@@ -18,3 +18,12 @@ export const signup = (email: string) => post<Accepted>('/api/auth/signup', { em
 export const resend = (email: string) => post<Accepted>('/api/auth/signup/resend', { email })
 export const login = (email: string, password: string) => post<{ member: Member }>('/api/auth/login', { email, password })
 export const verify = (b: VerifyBody) => post<{ member: Member }>('/api/auth/verify', b)
+
+/** 010 탈퇴를 막는 진행 중 공구(409 ACTIVE_GROUPBUY의 blockers) */
+export interface WithdrawBlocker {
+  groupBuyId: number
+  title: string
+  role: 'ORGANIZER' | 'PARTICIPANT' | string
+  status: 'OPEN' | 'PENDING_CLOSE' | string
+}
+export const withdraw = (password: string) => post('/api/auth/withdraw', { password })
