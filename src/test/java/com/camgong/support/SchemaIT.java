@@ -1,19 +1,11 @@
 package com.camgong.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-
-import javax.sql.DataSource;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 class SchemaIT extends IntegrationTestBase {
-
-    @Autowired
-    DataSource dataSource;
 
     @Test
     void contextLoadsAndSchemaValidatesWithSeededMembers() {
@@ -22,9 +14,10 @@ class SchemaIT extends IntegrationTestBase {
     }
 
     @Test
-    void schemaSqlIsSafeToRunAgain() {
-        // 앱 재시작은 schema.sql 을 다시 실행한다
-        assertThatCode(() -> new ResourceDatabasePopulator(new ClassPathResource("schema.sql")).execute(dataSource))
-                .doesNotThrowAnyException();
+    void schemaComesFromFlywayMigrationsNotFromSqlInit() {
+        // 빈 DB 에 V1 이 적용되었고(그 뒤 validate 통과), 기동 때마다 다시 도는 schema.sql 은 더 없다
+        assertThat(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank", String.class))
+                .containsExactly("1");
+        assertThat(new ClassPathResource("schema.sql").exists()).isFalse();
     }
 }
