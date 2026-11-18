@@ -117,12 +117,14 @@ interface ConfirmDialogProps {
   pending?: boolean
   onConfirm: () => void
   onCancel: () => void
+  /** 안내와 버튼 사이에 넣을 내용(예: 비밀번호 입력). 첫 포커스는 그 안의 첫 입력으로 간다 */
+  children?: ReactNode
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 /** 열리면 포커스가 안으로 가고, Tab은 안에서만 돌며, Esc는 취소, 닫으면 열기 전 요소로 포커스가 돌아온다. */
-export function ConfirmDialog({ open, title, message, confirmLabel = '확인', cancelLabel = '취소', pending, onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, message, confirmLabel = '확인', cancelLabel = '취소', pending, onConfirm, onCancel, children }: ConfirmDialogProps) {
   const ref = useRef<HTMLDivElement>(null)
   const cancelRef = useRef(onCancel)
   cancelRef.current = onCancel
@@ -176,6 +178,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '확인', c
       <div ref={ref} className={s.dialog} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
         <h2>{title}</h2>
         {message && <p>{message}</p>}
+        {children}
         <div className={s.actions}>
           <Button variant="secondary" onClick={onCancel} disabled={pending}>{cancelLabel}</Button>
           <Button onClick={onConfirm} pending={pending}>{confirmLabel}</Button>

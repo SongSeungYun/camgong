@@ -19,7 +19,8 @@ function seedMine() {
   ]
   mockState.sessionMemberId = 1
 }
-const titles = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+// 목록 패널 안의 카드 제목만(아래 탈퇴 영역 제목 h2는 빼고)
+const titles = () => within(screen.getByRole('tabpanel')).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
 
 describe('내 활동 (US5)', () => {
   test('28. 탭1은 내가 연 공구 2개, 탭2는 참여한 공구 5개(내가 연 것 포함), 최신 개설순 + 상태 뱃지', async () => {
