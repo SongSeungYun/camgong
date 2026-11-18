@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router'
 import { uniqueById } from '../shared/lib/uniqueById'
 import { useSession } from '../features/auth/session'
@@ -29,17 +29,23 @@ export default function ListPage() {
   const expected = mySchool ?? (anonymous && params.school ? params.school : null)
   const mismatch = expected !== null && loaded.some((it) => it.school !== undefined && it.school !== expected)
   const lastFix = useRef(0)
-  useEffect(() => {
-    // ponytail: 5초에 한 번만 고친다(서버가 계속 어긋나도 무한 반복하지 않게). 계속 어긋나면 그 사이 목록을 비워 둔다
-    if (!mismatch || Date.now() - lastFix.current < 5_000) return
+  const [stuck, setStuck] = useState(false)
+  const fix = useCallback(() => {
     lastFix.current = Date.now()
+    setStuck(false)
     qc.removeQueries({ queryKey: ['groupbuys'] })
     retry()
-  }, [mismatch, qc, retry])
+  }, [qc, retry])
+  useEffect(() => {
+    if (!mismatch) return
+    // 바로 다시 어긋나면(5초 안) 자동으로 되풀이하지 않고 오류와 다시 시도를 보여준다(무한 반복·영원한 로딩 방지)
+    if (Date.now() - lastFix.current < 5_000) setStuck(true)
+    else fix()
+  }, [mismatch, fix])
   const items = mismatch ? [] : loaded
   // FR-014: 정렬을 뺀 조건(검색어·카테고리·기본이 아닌 상태)이 하나라도 걸려 있으면 '결과 없음'
   const filtered = !!params.q || params.category !== null || params.status !== 'OPEN' || !!params.school
-  const state = q.isPending || mismatch ? 'loading' : q.isError && items.length === 0 ? 'error' : items.length === 0 ? 'empty' : 'ready'
+  const state = mismatch ? (stuck ? 'error' : 'loading') : q.isPending ? 'loading' : q.isError && items.length === 0 ? 'error' : items.length === 0 ? 'empty' : 'ready'
 
   return (
     <Layout>
@@ -50,7 +56,7 @@ export default function ListPage() {
       <ListFilters params={params} qInput={qInput} onQ={setQInput} onChange={setParams} />
       <StateView
         state={state}
-        onRetry={() => void q.refetch()}
+        onRetry={mismatch ? fix : () => void q.refetch()}
         emptyText={filtered ? '검색 결과가 없어요. 다른 검색어나 조건을 써보세요.' : '아직 올라온 공구가 없어요.'}
       >
         <ul className={s.list}>

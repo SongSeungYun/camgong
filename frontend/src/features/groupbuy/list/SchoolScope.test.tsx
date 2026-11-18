@@ -234,4 +234,34 @@ describe('학교 범위 목록 (009)', () => {
     await screen.findByRole('combobox', { name: '학교 검색' })
     expect(screen.queryByText('우리 학교 · school.ac.kr')).toBeNull()
   })
+
+  test('재검수 1: 범위 어긋남이 계속되면 "불러오는 중"에 멈추지 않고 다시 시도를 보여준다', async () => {
+    mockState.sessionMemberId = 1
+    // 서버가 계속 다른 학교 카드를 준다(로그인 학교는 school.ac.kr)
+    server.use(http.get('/api/groupbuys', () => HttpResponse.json({ items: [{ id: 48, title: 't', itemName: 'i', category: 'FOOD', unitPrice: 1, securedQuantity: 1, totalQuantity: 2, deadline: '2099-01-01T00:00:00Z', status: 'OPEN', school: 'snu.ac.kr' }], nextCursor: null })))
+    renderApp('/')
+    await screen.findByRole('button', { name: '다시 시도' }, { timeout: 3000 })
+    expect(screen.queryByRole('link', { name: /^t/ })).toBeNull() // 어긋난 카드는 보이지 않는다
+  })
+
+  test('재검수 2: 고른 학교가 풀리면(주소가 바뀌면) 이전 선택 알림을 남기지 않는다', async () => {
+    const { router } = renderApp('/')
+    await screen.findAllByRole('listitem')
+    const live = screen.getByTestId('school-status')
+    await userEvent.type(combo(), 'snue')
+    await waitFor(() => expect(within(listbox()).getAllByRole('option')).toHaveLength(1))
+    await userEvent.keyboard('{ArrowDown}{Enter}')
+    await waitFor(() => expect(live.textContent).toBe('snue.ac.kr 공구만 보여요.'))
+    await router.navigate('/') // 헤더 "캠공" 링크처럼 학교 없이 이동
+    await waitFor(() => expect(screen.getByTestId('school-status').textContent).toBe(''))
+  })
+
+  test('재검수 3: 로그인 확인이 실패한 상태에서 헤더의 "로그인 다시 확인"으로 빠져나온다', async () => {
+    mockState.sessionMemberId = 1
+    server.use(http.get('/api/auth/me', () => new HttpResponse(null, { status: 503 }), { once: true }))
+    renderApp('/')
+    await userEvent.click(await screen.findByRole('button', { name: '로그인 다시 확인' }))
+    await screen.findByRole('button', { name: '로그아웃' })
+    await screen.findByText('우리 학교 · school.ac.kr')
+  })
 })

@@ -26,7 +26,7 @@ export const toCard = (g: SeedGroupBuy) => ({
   school: g.school,
 })
 
-// 불투명 커서: 조건 서명 + 오프셋. 조건이 다르면 거부한다(003: sort·필터와 맞지 않으면 400).
+// 불투명 커서: 서명 + 오프셋. 목록은 sort만 서명에 넣는다(계약: sort가 다르거나 형식이 잘못된 커서만 400). 내 활동은 회원·역할을 넣는다.
 export const encodeCursor = (sig: string, offset: number) => btoa(JSON.stringify({ sig, offset }))
 export const decodeCursor = (c: string, sig: string): number | null => {
   try {

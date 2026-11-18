@@ -19,7 +19,8 @@ export function SchoolSearch({ selected, onSelect }: { selected: string; onSelec
   const [term, setTerm] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
-  const [announce, setAnnounce] = useState('')
+  // 고르거나 풀었을 때 한 번 알린다. 그 선택이 지금도 유효할 때만 보인다(주소가 바뀌면 남지 않게)
+  const [announce, setAnnounce] = useState<{ school: string; text: string } | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setTerm(normalize(text)), DEBOUNCE_MS)
@@ -43,7 +44,9 @@ export function SchoolSearch({ selected, onSelect }: { selected: string; onSelec
       ? '맞는 학교가 없어요.'
       : showList
         ? `학교 후보 ${items.length}개`
-        : announce
+        : announce && announce.school === selected
+          ? announce.text
+          : ''
 
   const close = () => {
     setOpen(false)
@@ -53,7 +56,7 @@ export function SchoolSearch({ selected, onSelect }: { selected: string; onSelec
     onSelect(school)
     setText('')
     setTerm('')
-    setAnnounce(`${school} 공구만 보여요.`)
+    setAnnounce({ school, text: `${school} 공구만 보여요.` })
     close()
   }
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -91,7 +94,7 @@ export function SchoolSearch({ selected, onSelect }: { selected: string; onSelec
         value={text}
         onChange={(e) => {
           setText(e.target.value)
-          setAnnounce('')
+          setAnnounce(null)
           setOpen(true)
           setActive(-1)
         }}
@@ -125,7 +128,7 @@ export function SchoolSearch({ selected, onSelect }: { selected: string; onSelec
             variant="secondary"
             onClick={() => {
               onSelect('')
-              setAnnounce('전국 공구를 보여요.')
+              setAnnounce({ school: '', text: '전국 공구를 보여요.' })
               inputRef.current?.focus() // 사라지는 버튼 대신 입력칸으로
             }}
           >
