@@ -15,6 +15,7 @@ export function GroupBuyCard({ item, nowMs }: { item: Card; nowMs: number }) {
       </div>
       <h2 className={s.title}>{item.title}</h2>
       <p className={s.meta}>{item.itemName}</p>
+      {item.school && <p className={s.meta}>학교 {item.school}</p>}
       <p className={s.meta}>{formatWon(item.unitPrice)} / 개</p>
       <ProgressBar value={item.securedQuantity} max={item.totalQuantity} />
       <p className={s.meta}>{item.securedQuantity}/{item.totalQuantity}</p>

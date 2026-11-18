@@ -7,9 +7,13 @@ export function fetchGroupBuys(p: ListParams, cursor?: string): Promise<Page<Gro
   const sp = new URLSearchParams({ status: p.status, sort: p.sort })
   if (p.category) sp.set('category', p.category)
   if (p.q) sp.set('q', p.q)
+  if (p.school) sp.set('school', p.school)
   if (cursor) sp.set('cursor', cursor)
   return get(`/api/groupbuys?${sp}`)
 }
+
+/** 009 비로그인 학교 검색 후보 */
+export const fetchSchools = (q: string) => get<{ items: string[] }>(`/api/schools?${new URLSearchParams({ q })}`)
 
 export const createGroupBuy = (b: GroupBuyRequest) => post<{ id: number }>('/api/groupbuys', b)
 export const updateGroupBuy = (id: number, b: GroupBuyRequest) => put<{ id: number }>(`/api/groupbuys/${id}`, b)
