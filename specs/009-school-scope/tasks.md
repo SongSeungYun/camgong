@@ -6,23 +6,23 @@
 
 ## Phase 1: 백엔드 기반
 
-- [ ] T001 `src/main/resources/db/migration/V2__school.sql`: `member.school`, `group_buy.school` (`VARCHAR(253) NOT NULL`), 엔티티 필드, 테스트 시드 회원에 학교 (plan 결정 2)
-- [ ] T002 [P] 테스트: 학교 키 판정 단위 테스트 — `snu.ac.kr`, `cs.snu.ac.kr`→`snu.ac.kr`, 대문자·앞뒤 공백, `ac.kr`·`fakeac.kr`·`stanford.edu`·`gmail.com` 거부, 묶음(`skku.edu,g.skku.edu` → `skku.edu`, `mail.g.skku.edu`), 묶음이 `ac.kr` 규칙보다 먼저, 설정 형식 오류(빈 도메인·중복)는 기동 실패 (plan 결정 1)
+- [ ] T001 `src/main/resources/db/migration/V2__school.sql`: `member.school`, `group_buy.school` (`VARCHAR(253) NOT NULL`), 엔티티 필드, 테스트 시드 회원에 학교, `load/seed*.sql`에 학교 (plan 결정 2·8)
+- [ ] T002 [P] 테스트: 학교 키 판정 단위 테스트 — `snu.ac.kr`, `cs.snu.ac.kr`→`snu.ac.kr`, 대문자·앞뒤 공백, `ac.kr`·`fakeac.kr`·`stanford.edu`·`gmail.com` 거부, 묶음(`skku.edu=skku.edu,g.skku.edu` → `skku.edu`, `mail.g.skku.edu`), 묶음 키는 설정 순서와 무관, 묶음이 `ac.kr` 규칙보다 먼저, 설정 오류(빈 키·빈 도메인·키 중복·묶음 간 도메인 겹침/하위 도메인)는 기동 실패, 설정이 `String`으로 바인딩되어 `;` 묶음이 유지됨 (plan 결정 1)
 - [ ] T003 학교 키 판정과 `camgong.auth.extra-school-domains` 설정 구현, 옛 `allowed-email-domains` 제거(설정 파일·`.env.example` 주석·`EXTRA_SCHOOL_DOMAINS`)
 
 ## Phase 2: US1 가입 (P1)
 
 - [ ] T004 [US1] 테스트: signup 거부 400 `errors[email]`, verify 시 학교 저장, verify 시점에 목록에서 빠진 도메인은 400 `errors[token]`, `member` 응답에 `school`(login·verify·me)
-- [ ] T005 [US1] SignupService·verify·MemberView 구현
+- [ ] T005 [US1] SignupService·verify·MemberView 구현, `CurrentMember`에 `school`·`AuthFilter`가 채움 (plan 결정 6)
 
 ## Phase 3: US2 학교 범위 (P1)
 
 - [ ] T006 [US2] 테스트: 개설 시 `group_buy.school` = 개설자 학교
-- [ ] T007 [US2] 테스트: 로그인 목록·검색은 내 학교만(`school` 파라미터 무시), 비로그인 목록은 전국, 비로그인 `school` 필터, 카드에 `school`, 커서가 다른 `school`이면 400, `school` 253자 초과 400
+- [ ] T007 [US2] 테스트: 로그인 목록·검색은 내 학교만(`school` 파라미터 무시), 비로그인 목록은 전국이고 200(401 아님), 비로그인 `school` 필터, 카드에 `school`, `school` 253자 초과 400
 - [ ] T008 [US2] 테스트: 다른 학교 공구의 상세·참여·수량 변경·참여 취소는 없는 공구와 같은 404(본문 비교)
-- [ ] T009 [US2] 테스트: `GET /api/schools?q=` — 부분 일치, 대소문자, 최대 10개 사전순, 공구 없는 학교 제외, q 누락·50자 초과 400
-- [ ] T010 [US2] 구현: 개설 시 학교 복사, 목록·검색 쿼리와 인덱스(EXPLAIN 확인), 상세·`findHead` 학교 조건, `/api/schools`
-- [ ] T011 [US2] 003 목록 k6 측정 재실행, 결과를 메시지로 관제탑에 보냄(관제탑이 `docs/benchmarks/`에 반영)
+- [ ] T009 [US2] 테스트: `GET /api/schools?q=` — 비로그인 200, 부분 일치, 대소문자, `q=_`·`q=%`는 글자로 취급, 최대 10개 사전순, 공구 없는 학교·취소 공구만 있는 학교 제외, q 누락·50자 초과 400
+- [ ] T010 [US2] 구현: 개설 시 학교 복사, 목록 컨트롤러의 선택적 로그인 읽기, 목록·검색 쿼리와 인덱스(EXPLAIN 확인), 상세·`findHead` 학교 조건, `/api/schools`와 `SecurityConfig` 공개 (plan 결정 3~6)
+- [ ] T011 [US2] `load/k6/browse.js`에 로그인 회원 목록 시나리오 추가, 003 목록 k6 재실행(비로그인 전국·로그인 학교 둘 다), 결과를 메시지로 관제탑에 보냄 (plan 결정 8)
 
 ## Phase 4: 프론트 (US1·US2)
 
