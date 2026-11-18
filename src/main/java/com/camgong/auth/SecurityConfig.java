@@ -35,7 +35,7 @@ class SecurityConfig {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/signup/resend",
                                 "/api/auth/verify", "/api/auth/login", "/api/auth/logout").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/groupbuys").permitAll()  // 003 이 목록을 구현하면 열린다
+                        .requestMatchers(HttpMethod.GET, "/api/groupbuys", "/api/schools").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
                 .exceptionHandling(e -> e.authenticationEntryPoint((request, response, ex) ->

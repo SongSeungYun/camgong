@@ -18,7 +18,8 @@ class AuthConfigIT extends IntegrationTestBase {
 
     @Test
     void bindsContractDefaults() {
-        assertThat(props.allowedEmailDomains()).containsExactly("school.ac.kr");
+        // List 가 아니라 String 하나로 받아야 ';' 묶음과 ',' 가 그대로 남는다
+        assertThat(props.extraSchoolDomains()).isEqualTo("skku.edu=skku.edu,g.skku.edu;sogang.ac.kr=sogang.ac.kr,sg.ac.kr");
         assertThat(props.sessionTtl()).isEqualTo(Duration.ofDays(14));
         assertThat(props.sessionTouchInterval()).isEqualTo(Duration.ofMinutes(10));
         assertThat(props.verifyTokenTtl()).isEqualTo(Duration.ofHours(24));

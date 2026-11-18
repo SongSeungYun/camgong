@@ -3,7 +3,7 @@
 DELETE FROM participation;
 DELETE FROM group_buy;
 INSERT INTO group_buy (id, organizer_id, title, description, item_name, unit_price, total_quantity, secured_quantity,
-                       deadline, category, item_url, open_chat_url, status, version, created_at, updated_at)
+                       deadline, category, item_url, open_chat_url, status, version, created_at, updated_at, school)
 VALUES (1, 1, '측정용 공구', NULL, '햇반', 1200, @TOTAL, @ORG, TIMESTAMPADD(DAY, 7, UTC_TIMESTAMP(6)), 'FOOD',
-        'https://example.com/item', 'https://open.kakao.com/o/abc', 'OPEN', 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6));
+        'https://example.com/item', 'https://open.kakao.com/o/abc', 'OPEN', 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), 'school.ac.kr');
 INSERT INTO participation (group_buy_id, member_id, quantity, created_at) VALUES (1, 1, @ORG, UTC_TIMESTAMP(6));

@@ -40,7 +40,7 @@ class ParticipationRetryTest {
 
     @BeforeEach
     void setUp() {
-        when(query.findHead(anyLong())).thenReturn(Optional.of(new GroupBuyHead(1L, GroupBuyStatus.OPEN, 1200, 9, 24,
+        when(query.findHeadInSchoolOf(anyLong(), anyLong())).thenReturn(Optional.of(new GroupBuyHead(1L, GroupBuyStatus.OPEN, 1200, 9, 24,
                 NOW.plusSeconds(3600))));
         when(query.findQuantity(anyLong(), anyLong())).thenReturn(Optional.empty());
         service = new ParticipationService(query, mock(ParticipationRepository.class), gate, mock(GroupBuyCompletion.class),

@@ -18,7 +18,7 @@ import com.camgong.groupbuy.GroupBuyCategory;
 import com.camgong.groupbuy.GroupBuyStatus;
 
 /**
- * 목록의 동적 조건(상태, 카테고리, 검색 단어, 키셋)을 Criteria API 로 조립한다(research 결정 6).
+ * 목록의 동적 조건(학교, 상태, 카테고리, 검색 단어, 키셋)을 Criteria API 로 조립한다(research 결정 6).
  * 카운트 쿼리는 하지 않고 size + 1 건을 읽어 다음 페이지 유무를 판정한다.
  */
 @Repository
@@ -26,7 +26,7 @@ public class GroupBuySearchRepository {
 
     /** 카드에 필요한 컬럼만 읽는 프로젝션. 표시 상태는 서비스가 마감과 시계로 계산한다. */
     public record Row(Long id, String title, String itemName, GroupBuyCategory category, int unitPrice,
-            int securedQuantity, int totalQuantity, Instant deadline, GroupBuyStatus status) {
+            int securedQuantity, int totalQuantity, Instant deadline, GroupBuyStatus status, String school) {
     }
 
     @PersistenceContext
@@ -37,11 +37,14 @@ public class GroupBuySearchRepository {
         CriteriaQuery<Row> cq = cb.createQuery(Row.class);
         Root<GroupBuy> g = cq.from(GroupBuy.class);
         cq.select(cb.construct(Row.class, g.get("id"), g.get("title"), g.get("itemName"), g.get("category"),
-                g.get("unitPrice"), g.get("securedQuantity"), g.get("totalQuantity"), g.get("deadline"), g.get("status")));
+                g.get("unitPrice"), g.get("securedQuantity"), g.get("totalQuantity"), g.get("deadline"), g.get("status"), g.get("school")));
 
         List<Predicate> where = new ArrayList<>();
         where.add(cb.notEqual(g.get("status"), GroupBuyStatus.CANCELLED));
         where.add(q.status().toPredicate(cb, g, now));
+        if (q.school() != null) {
+            where.add(cb.equal(g.get("school"), q.school()));
+        }
         if (q.category() != null) {
             where.add(cb.equal(g.get("category"), q.category()));
         }

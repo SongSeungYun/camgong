@@ -36,10 +36,13 @@ public class SignupService {
     private final Clock clock;
     private final AuthProperties props;
     private final SessionService sessions;
+    private final SchoolDomains schools;
 
     public SignupService(JdbcClient jdbc, MemberRepository members, PasswordEncoder encoder,
-            ApplicationEventPublisher events, Clock clock, AuthProperties props, SessionService sessions) {
+            ApplicationEventPublisher events, Clock clock, AuthProperties props, SessionService sessions,
+            SchoolDomains schools) {
         this.sessions = sessions;
+        this.schools = schools;
         this.jdbc = jdbc;
         this.members = members;
         this.encoder = encoder;
@@ -55,9 +58,9 @@ public class SignupService {
     @Transactional
     public SignupResponse signup(SignupRequest r) {
         String emailKey = Keys.normalize(r.email());
-        if (emailKey.length() > MAX_EMAIL_KEY || !asciiOnly(r.email()) || !allowedDomain(emailKey)) {
+        if (emailKey.length() > MAX_EMAIL_KEY || !asciiOnly(r.email()) || schools.schoolOf(emailKey).isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.",
-                    List.of(new ApiException.Field("email", "허용되지 않은 이메일 도메인입니다.")));
+                    List.of(new ApiException.Field("email", "대학 메일로만 가입할 수 있습니다.")));
         }
         if (members.existsByEmailKey(emailKey)) {
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_REGISTERED", "이미 가입된 이메일입니다.");
@@ -113,6 +116,10 @@ public class SignupService {
         if (!p.tokenExpiresAt().isAfter(now)) {
             throw new ApiException(HttpStatus.GONE, "TOKEN_EXPIRED", "인증 링크가 만료되었습니다. 인증 메일을 다시 받아 주세요.");
         }
+        // 학교는 확인 시점의 규칙으로 정한다. 신청 뒤 운영자가 추가 목록에서 뺐으면 토큰을 쓰지 않고 거부한다(009).
+        String school = schools.schoolOf(p.emailKey()).orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST,
+                "Bad Request", "입력값이 올바르지 않습니다.",
+                List.of(new ApiException.Field("token", "이 메일로는 더 이상 가입할 수 없습니다."))));
 
         String displayName = r.displayName() == null ? null : Keys.strip(r.displayName());
         validateSignupInput(r, displayName);
@@ -131,7 +138,7 @@ public class SignupService {
 
         Member member;
         try {
-            member = members.saveAndFlush(new Member(displayName, p.email(), passwordHash, now, r.consentVersion(), now));
+            member = members.saveAndFlush(new Member(displayName, p.email(), passwordHash, now, r.consentVersion(), now, school));
         } catch (DataIntegrityViolationException e) {
             // 어느 UNIQUE 가 걸렸는지는 MySQL 오류 메시지의 키 이름으로 가른다. 던지면 used_at 도 롤백된다.
             // 메시지 앞쪽의 'Duplicate entry <값>' 에는 사용자 입력이 섞이므로 "for key" 뒤쪽만 본다.
@@ -147,7 +154,7 @@ public class SignupService {
             throw e;
         }
         String sessionToken = sessions.issue(member.getId());
-        return new Authenticated(new AuthResponse(new MemberView(member.getId(), member.getName())), sessionToken);
+        return new Authenticated(new AuthResponse(MemberView.of(member)), sessionToken);
     }
 
     /** 본문 검증 오류를 모아 400 으로 돌려준다. 토큰은 아직 소진되지 않았다. */
@@ -260,23 +267,12 @@ public class SignupService {
                 "인증 메일을 너무 자주 요청했습니다. 잠시 뒤에 다시 시도해 주세요.").retryAt(retryAt, now);
     }
 
-    // ponytail: 허용 도메인은 설정값(ALLOWED_EMAIL_DOMAINS). 학교가 여럿으로 늘고 관리가 필요해지면 DB 테이블로
     /**
      * 이메일은 ASCII(공백·제어문자 제외)만 받는다. 정규화한 키가 아니라 입력 원문을 검사한다 — 켈빈 기호는 소문자 변환 뒤에 ASCII 가 된다. 소문자 변환이 같은 키를 만드는 다른 글자(켈빈 기호 K 등)를 허용하면,
      * 공격자가 그 문자열로 먼저 신청해 저장된 주소를 굳히고 진짜 주소의 사용자에게 메일이 가지 못하게 막을 수 있다.
      */
     private static boolean asciiOnly(String value) {
         return value.chars().allMatch(c -> c > 0x20 && c < 0x7f);
-    }
-
-    /** 마지막 @ 뒤가 허용 목록과 정확히 같아야 한다. endsWith·contains 는 evil.school.ac.kr 같은 우회를 못 막는다. */
-    private boolean allowedDomain(String emailKey) {
-        int at = emailKey.lastIndexOf('@');
-        if (at <= 0 || emailKey.indexOf('@') != at) {
-            return false;
-        }
-        String domain = emailKey.substring(at + 1);
-        return props.allowedEmailDomains().stream().anyMatch(d -> Keys.normalize(d).equals(domain));
     }
 
     private static LocalDateTime utcTime(Instant t) {

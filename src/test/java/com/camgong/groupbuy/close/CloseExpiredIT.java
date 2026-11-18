@@ -159,10 +159,10 @@ class CloseExpiredIT extends CloseTestBase {
     @Test
     void failIsGuardedOnTheEntityToo() {
         var g = new com.camgong.groupbuy.GroupBuy(1L, "t", null, "i", 1200, 24, 24, T, com.camgong.groupbuy.GroupBuyCategory.FOOD,
-                "https://a.b", "https://c.d", START);
+                "https://a.b", "https://c.d", "school.ac.kr", START);
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> g.fail(T)).isInstanceOf(IllegalStateException.class);   // 가득 참
         var open = new com.camgong.groupbuy.GroupBuy(1L, "t", null, "i", 1200, 24, 9, T, com.camgong.groupbuy.GroupBuyCategory.FOOD,
-                "https://a.b", "https://c.d", START);
+                "https://a.b", "https://c.d", "school.ac.kr", START);
         open.fail(T);
         assertThat(open.getStatus()).isEqualTo(com.camgong.groupbuy.GroupBuyStatus.FAILED);
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> open.fail(T)).isInstanceOf(IllegalStateException.class);   // 종료 상태

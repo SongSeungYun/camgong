@@ -64,7 +64,7 @@ class AuthController {
 
     @GetMapping("/me")
     AuthResponse me(CurrentMember me) {
-        return new AuthResponse(new MemberView(me.id(), me.displayName()));
+        return new AuthResponse(new MemberView(me.id(), me.displayName(), me.school()));
     }
 
     private ResponseEntity<AuthResponse> withSession(Authenticated authenticated) {

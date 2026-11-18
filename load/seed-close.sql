@@ -4,11 +4,11 @@ SET SESSION cte_max_recursion_depth = 100000;
 DELETE FROM participation;
 DELETE FROM group_buy;
 INSERT INTO group_buy (organizer_id, title, description, item_name, unit_price, total_quantity, secured_quantity,
-                       deadline, category, item_url, open_chat_url, status, version, created_at, updated_at)
+                       deadline, category, item_url, open_chat_url, status, version, created_at, updated_at, school)
 WITH RECURSIVE seq (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < @N)
 SELECT 1, CONCAT('마감 측정 ', n), NULL, '햇반', 1200, 24, 15,
        TIMESTAMPADD(MICROSECOND, FLOOR((@MIN_OFFSET + RAND() * (@MAX_OFFSET - @MIN_OFFSET)) * 1000000), UTC_TIMESTAMP(6)),
-       'FOOD', 'https://example.com/item', 'https://open.kakao.com/o/abc', 'OPEN', 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+       'FOOD', 'https://example.com/item', 'https://open.kakao.com/o/abc', 'OPEN', 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), 'school.ac.kr'
 FROM seq;
 INSERT INTO participation (group_buy_id, member_id, quantity, created_at)
 SELECT id, 1, 9, UTC_TIMESTAMP(6) FROM group_buy;

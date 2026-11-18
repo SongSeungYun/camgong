@@ -11,11 +11,12 @@ import com.camgong.groupbuy.GroupBuyCategory;
 
 /** 목록 요청 파라미터. 지원하지 않는 값은 400(errors 에 파라미터 이름). */
 public record GroupBuyListQuery(DisplayStatus status, GroupBuyCategory category, List<String> words, Sort sort,
-        PageCursor cursor, int size) {
+        PageCursor cursor, int size, String school) {
 
     public static final int DEFAULT_SIZE = 20;
     public static final int MAX_SIZE = 50;
     static final int MAX_QUERY_LENGTH = 50;
+    static final int MAX_SCHOOL_LENGTH = 253;     // member.school / group_buy.school 컬럼 길이
     // ponytail: 단어는 앞 5개만 쓴다(계약은 초과 시 오류를 정하지 않았다). 오류로 바꾸려면 여기서 errors 에 q 를 더한다.
     static final int MAX_WORDS = 5;
 
@@ -39,6 +40,15 @@ public record GroupBuyListQuery(DisplayStatus status, GroupBuyCategory category,
     }
 
     public static GroupBuyListQuery of(String status, String category, String q, String sort, String cursor, String size) {
+        return of(status, category, q, sort, cursor, size, null, null);
+    }
+
+    /**
+     * @param school       요청의 학교 파라미터(비로그인만 쓴다, 009)
+     * @param memberSchool 로그인한 회원의 학교. 있으면 school 파라미터 대신 이것으로 좁힌다. 비로그인이면 null
+     */
+    public static GroupBuyListQuery of(String status, String category, String q, String sort, String cursor, String size,
+            String school, String memberSchool) {
         List<ApiException.Field> errors = new ArrayList<>();
 
         DisplayStatus displayStatus = DisplayStatus.OPEN;
@@ -74,11 +84,16 @@ public record GroupBuyListQuery(DisplayStatus status, GroupBuyCategory category,
             }
         }
         int pageSize = parseSize(size, errors);
+        String schoolParam = school == null ? "" : com.camgong.auth.Keys.normalize(school);
+        if (com.camgong.auth.Keys.length(schoolParam) > MAX_SCHOOL_LENGTH) {
+            errors.add(new ApiException.Field("school", "학교는 253자 이하여야 합니다."));
+        }
         if (!errors.isEmpty()) {
             throw badRequest(errors);
         }
+        String scope = memberSchool != null ? memberSchool : schoolParam.isEmpty() ? null : schoolParam;
         PageCursor pageCursor = cursor == null || cursor.isBlank() ? null : PageCursor.decode(cursor, parsedSort);
-        return new GroupBuyListQuery(displayStatus, groupBuyCategory, words, parsedSort, pageCursor, pageSize);
+        return new GroupBuyListQuery(displayStatus, groupBuyCategory, words, parsedSort, pageCursor, pageSize, scope);
     }
 
     /** size 파라미터: 비어 있으면 기본값, 숫자가 아니거나 1~50 밖이면 errors[size] 를 더한다. */

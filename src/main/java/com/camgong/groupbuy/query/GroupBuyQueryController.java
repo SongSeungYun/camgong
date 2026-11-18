@@ -1,5 +1,7 @@
 package com.camgong.groupbuy.query;
 
+import java.util.Optional;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,16 +18,22 @@ class GroupBuyQueryController {
         this.service = service;
     }
 
-    /** 인증 불필요. X-Member-Id 같은 헤더는 쓰지 않는다. 파라미터는 문자열로 받아 검증 오류를 400 + errors 로 돌려준다. */
+    /**
+     * 인증 선택. 로그인했으면 회원의 학교로, 아니면 school 파라미터(있을 때)로 좁힌다(009). X-Member-Id 같은 헤더는 쓰지 않는다.
+     * 파라미터는 문자열로 받아 검증 오류를 400 + errors 로 돌려준다.
+     */
     @GetMapping("/api/groupbuys")
     GroupBuyQueryService.Page<GroupBuySummary> list(
+            Optional<CurrentMember> me,
+            @RequestParam(required = false) String school,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) String size) {
-        return service.list(GroupBuyListQuery.of(status, category, q, sort, cursor, size));
+        return service.list(GroupBuyListQuery.of(status, category, q, sort, cursor, size, school,
+                me.map(CurrentMember::school).orElse(null)));
     }
 
     /** 로그인 필수(보안 설정이 막는다). 001 의 최소 상세 GET 을 대체한다. */

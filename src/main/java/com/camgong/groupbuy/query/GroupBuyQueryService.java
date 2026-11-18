@@ -83,7 +83,7 @@ public class GroupBuyQueryService {
      */
     public GroupBuyDetail detail(Long memberId, Long id) {
         Instant now = Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
-        GroupBuy g = groupBuys.findDetailById(id)
+        GroupBuy g = groupBuys.findDetailById(id, memberId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Not Found", "공구를 찾을 수 없습니다."));
         DisplayStatus status = DisplayStatus.derive(g.getStatus(), g.getDeadline(), now);
         boolean isOrganizer = memberId.equals(g.getOrganizerId());
@@ -137,7 +137,7 @@ public class GroupBuyQueryService {
         }
         List<GroupBuySummary> items = page.stream().map(r -> new GroupBuySummary(r.id(), r.title(), r.itemName(),
                 r.category(), r.unitPrice(), r.securedQuantity(), r.totalQuantity(), toOffset(r.deadline()),
-                DisplayStatus.derive(r.status(), r.deadline(), now))).toList();
+                DisplayStatus.derive(r.status(), r.deadline(), now), r.school())).toList();
         return new Page<>(items, nextCursor);
     }
 
