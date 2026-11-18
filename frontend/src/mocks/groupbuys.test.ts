@@ -19,7 +19,7 @@ test('기본은 모집 중 최신순, 카드 필드만 담긴다(003 목록 계�
   expect(r.items.length).toBe(20)
   expect(r.items.every((i) => i.status === 'OPEN')).toBe(true)
   expect(Object.keys(r.items[0]!).sort()).toEqual(
-    ['category', 'deadline', 'id', 'itemName', 'securedQuantity', 'status', 'title', 'totalQuantity', 'unitPrice'],
+    ['category', 'deadline', 'id', 'itemName', 'school', 'securedQuantity', 'status', 'title', 'totalQuantity', 'unitPrice'],
   )
 })
 

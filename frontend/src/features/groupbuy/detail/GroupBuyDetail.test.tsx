@@ -7,6 +7,7 @@ import { seedGroupBuy } from '../../../test/factories'
 import { visibleActions } from './visibleActions'
 
 const detail = (over: Partial<GroupBuyDetail> = {}): GroupBuyDetail => ({
+  school: 'school.ac.kr',
   id: 1, title: 't', description: null, itemName: 'i', category: 'FOOD', itemUrl: null, unitPrice: 100,
   totalQuantity: 10, securedQuantity: 5, remainingQuantity: 5, deadline: '2099-01-01T00:00:00+09:00',
   status: 'OPEN', organizerName: 'o', isOrganizer: false, participantCount: 1, myParticipation: null,

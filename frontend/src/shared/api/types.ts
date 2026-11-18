@@ -27,6 +27,8 @@ export const isKnownNotificationType = (t: string): t is KnownNotificationType =
 export interface Member {
   id: number
   displayName: string
+  /** 009: 학교 키(예: snu.ac.kr). 가입 때 정해지고 바뀌지 않는다 */
+  school: string
 }
 
 export interface Page<T> {
@@ -44,6 +46,8 @@ export interface GroupBuyCard {
   totalQuantity: number
   deadline: string
   status: string
+  /** 009: 공구의 학교 키. 내 활동 응답에는 없다 */
+  school?: string
   /** 내 활동 role=participant일 때만 */
   myQuantity?: number
 }
@@ -82,6 +86,8 @@ export interface GroupBuyDetail {
   openChatUrl: string | null
   participants: ParticipantSummary[] | null
   createdAt: string
+  /** 009 */
+  school: string
 }
 
 export interface CheckRow {

@@ -138,7 +138,7 @@ describe('가입·인증 (변경 B2: 가입은 이메일만, 이름·비밀번�
     await signupAs('x@gmail.com')
     const input = screen.getByLabelText('이메일')
     await waitFor(() => expect(input.getAttribute('aria-invalid')).toBe('true'))
-    expect(document.getElementById(input.getAttribute('aria-describedby')!)!.textContent).toBe('허용된 학교 이메일이 아니에요')
+    expect(document.getElementById(input.getAttribute('aria-describedby')!)!.textContent).toBe('대학 메일로만 가입할 수 있습니다.')
   })
 
   test('가입 뒤 재발송이 404면 신청 내역 없음/이미 인증 완료 문구 (공구 문구가 아님)', async () => {

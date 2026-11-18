@@ -20,7 +20,7 @@ function guard(id: string) {
   const me = currentMember()
   if (!me) return { res: problem(401, 'UNAUTHENTICATED') }
   const g = mockState.groupBuys.find((x) => x.id === Number(id))
-  if (!g) return { res: problem(404, 'Not Found') }
+  if (!g || g.school !== me.school) return { res: problem(404, 'Not Found') } // 009: 다른 학교 공구는 없는 공구와 같다
   const forced = mockState.forceNext
   if (forced) {
     mockState.forceNext = null
