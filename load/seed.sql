@@ -1,5 +1,5 @@
 -- 참여 측정용 시드(한 번만): 회원 1~101 과 로그인 세션. 쿠키 값은 "bench-session-<회원 id>" 이다.
--- 앱을 한 번 띄워 schema.sql 이 적용된 DB 에서 쓴다.
+-- 앱을 한 번 띄워 Flyway 마이그레이션이 적용된 DB 에서 쓴다.
 SET SESSION cte_max_recursion_depth = 1000;
 
 DELETE FROM login_session;

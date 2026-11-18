@@ -17,9 +17,6 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
-  sql:
-    init:
-      mode: always
   mail:
     properties:
       # SMTP 가 멈춰도 메일 스레드가 영원히 묶이지 않게(JavaMail 기본은 무한 대기)

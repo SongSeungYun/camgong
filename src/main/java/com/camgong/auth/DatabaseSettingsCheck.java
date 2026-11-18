@@ -44,8 +44,8 @@ class DatabaseSettingsCheck implements InitializingBean {
     }
 
     /**
-     * 변경 B2 이전 스키마(pending_signup 에 display_name·password_hash 가 NOT NULL 로 남은 DB)는 schema.sql 이
-     * CREATE TABLE IF NOT EXISTS 라서 바뀌지 않고, 그대로 두면 신청마다 500 이 난다. 알려 주고 기동을 막는다.
+     * 변경 B2 이전 스키마(pending_signup 에 display_name·password_hash 가 NOT NULL 로 남은 DB)는 그대로 두면 신청마다 500 이 난다.
+     * Flyway 이전 schema.sql 로 만든 로컬 DB 를 baseline 으로 넘기는 경우를 대비해 남겨 둔다. 알려 주고 기동을 막는다.
      */
     static void checkNoLegacySchema(Statement st) throws SQLException {
         try (var rs = st.executeQuery("SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() "
@@ -57,7 +57,7 @@ class DatabaseSettingsCheck implements InitializingBean {
         }
     }
 
-    /** 006 이전 스키마(participation 에 paid_at 이 없는 DB): CREATE TABLE IF NOT EXISTS 가 컬럼을 더해 주지 않아 체크 요청이 500 이 난다. */
+    /** 006 이전 스키마(participation 에 paid_at 이 없는 DB, 옛 schema.sql 의 CREATE TABLE IF NOT EXISTS 는 컬럼을 더해 주지 않았다): 체크 요청이 500 이 난다. */
     static void checkParticipationHasCheckColumns(Statement st) throws SQLException {
         try (var rs = st.executeQuery("SELECT (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() "
                 + "AND table_name = 'participation'), (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() "

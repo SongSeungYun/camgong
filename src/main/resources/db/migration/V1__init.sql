@@ -1,5 +1,4 @@
--- ponytail: Flyway로 올릴 시점은 운영 데이터가 생기는 5단계 전
--- 모든 테이블은 CREATE TABLE IF NOT EXISTS 라 앱 재시작에 안전하다.
+-- 첫 스키마(옛 schema.sql 그대로). 적용된 마이그레이션은 고치지 말고 V2__… 로 이어 쓴다.
 
 CREATE TABLE IF NOT EXISTS member (
     id                BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,

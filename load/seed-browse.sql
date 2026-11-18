@@ -1,4 +1,4 @@
--- 조회 부하 시드: 공구를 @N 건 넣는다. 앱을 한 번 띄워 schema.sql 이 적용된 DB 에서 쓴다.
+-- 조회 부하 시드: 공구를 @N 건 넣는다. 앱을 한 번 띄워 Flyway 마이그레이션이 적용된 DB 에서 쓴다.
 --   (echo "SET @N=10000;"; cat load/seed-browse.sql) | docker exec -i <mysql 컨테이너> mysql -uroot -ppw camgong
 -- 상태·카테고리·마감 시각을 분산하고, 제목에 흔한 단어와 드문 단어('희귀템', 3000건에 1건)를 섞는다.
 -- 마감은 앱 시계(실제 시각) 기준이라 UTC_TIMESTAMP 에서 상대적으로 만든다.
