@@ -76,3 +76,14 @@ test('가입 인증에서 표시 이름 "탈퇴한 회원"은 400 errors[display
     })
   }
 })
+
+test('리뷰 4·5: 공백뿐인 비밀번호는 누락과 같은 400(횟수 안 늘림), 성공하면 로그인 실패 횟수가 지워진다', async () => {
+  mockState.sessionMemberId = 3
+  mockState.groupBuys = []
+  expect(await err(withdraw('   '))).toMatchObject({ status: 400, code: 'Bad Request', fieldErrors: [{ field: 'password' }] })
+  expect(mockState.loginFailures).toBe(0)
+  await err(withdraw('wrong-password'))
+  await err(withdraw('wrong-password'))
+  await withdraw('password1234')
+  expect(mockState.loginFailures).toBe(0)
+})

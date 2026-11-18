@@ -5,7 +5,7 @@ import { renderApp } from '../test/utils'
 
 // 010 T013: 인증 화면의 동의문 본문은 docs/consent-v1.md의 두 구분선(---) 사이 내용 그대로여야 한다.
 // 마크다운 표기(**, `, 표 구분, 목록 기호)를 걷어낸 글자를 공백 없이 순서대로 비교한다.
-const md = readFileSync('../docs/consent-v1.md', 'utf8') // vitest는 frontend/에서 실행된다
+const md = readFileSync(new URL('../../../docs/consent-v1.md', import.meta.url), 'utf8')
 const body = md.split(/\n---\n/)[1]!
 const plain = (s: string) =>
   s

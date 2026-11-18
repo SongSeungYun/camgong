@@ -17,6 +17,7 @@ export function WithdrawSection() {
   const { forget } = useSession()
   const navigate = useNavigate()
   const pwRef = useRef<HTMLInputElement>(null)
+  const inFlight = useRef(false) // Enter 연타가 렌더 전에 두 번 보내지 않게(버튼은 pending으로 막지만 폼 제출은 아니다)
   const [open, setOpen] = useState(false)
   const [password, setPassword] = useState('')
   const [fieldError, setFieldError] = useState<string | null>(null)
@@ -25,14 +26,17 @@ export function WithdrawSection() {
 
   const m = useMutation({
     mutationFn: (pw: string) => withdraw(pw),
-    gcTime: 0, // 비밀번호(variables)가 캐시에 남지 않게
+    gcTime: 0, // 관찰자가 떨어지면(reset) 바로 지워져 비밀번호(variables)가 캐시에 남지 않는다
     onSuccess: async () => {
-      // 라우터는 이동을 트랜지션으로 그린다. 세션 비우기도 트랜지션으로 해야 같이 반영된다
-      // (급한 업데이트로 먼저 비우면 아직 /me인 화면에서 보호 라우트가 /login으로 보낸다)
+      // 라우터는 이동을 트랜지션으로 그린다. 세션 비우기도 트랜지션으로 해야 같은 커밋에 반영된다
+      // (급한 업데이트로 먼저 비우면 아직 /me인 화면에서 보호 라우트가 /login으로 보낸다).
+      // 같이 커밋되지 않으면 만료 안내가 켜질 수 있어 Withdraw.test '리뷰 3'이 지킨다.
       await navigate('/', { replace: true, state: { notice: '탈퇴했어요.' } })
       startTransition(forget)
     },
     onError: (e) => {
+      inFlight.current = false
+      m.reset() // 비밀번호(variables)를 캐시에서 떼어 낸다
       const err = e instanceof ApiError ? e : new ApiError(0)
       if (err.code === 'ACTIVE_GROUPBUY') {
         setBlockers(Array.isArray(err.extra.blockers) ? (err.extra.blockers as WithdrawBlocker[]) : [])
@@ -49,13 +53,15 @@ export function WithdrawSection() {
   })
 
   const close = () => {
+    m.reset()
     setOpen(false)
     setPassword('')
     setFieldError(null)
     setFormError(null)
   }
   const submit = () => {
-    if (m.isPending) return
+    if (inFlight.current) return
+    inFlight.current = true
     setFieldError(null)
     setFormError(null)
     m.mutate(password)
@@ -97,7 +103,10 @@ export function WithdrawSection() {
             autoComplete="current-password"
             value={password}
             error={fieldError ?? undefined}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value)
+              setFieldError(null) // 다시 입력하기 시작하면 이전 오류를 걷는다
+            }}
           />
         </form>
         {formError && <p role="alert">{formError}</p>}

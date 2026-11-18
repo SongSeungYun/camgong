@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test } from 'vitest'
 import { server } from '../../mocks/server'
 import { mockState } from '../../mocks/state'
 import { makeGroupBuy } from '../../test/factories'
@@ -20,6 +20,8 @@ async function openDialog() {
 const pw = () => within(screen.getByRole('dialog')).getByLabelText('비밀번호') as HTMLInputElement
 
 describe('탈퇴 (010)', () => {
+  afterEach(() => server.events.removeAllListeners())
+
   test('대화상자: 열면 비밀번호 입력에 포커스, 되돌릴 수 없다는 안내, Esc로 닫으면 탈퇴 버튼으로 돌아오고 요청 없음', async () => {
     asOutsider()
     let calls = 0
@@ -32,7 +34,6 @@ describe('탈퇴 (010)', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(document.activeElement).toBe(within(screen.getByRole('region', { name: '탈퇴' })).getByRole('button', { name: '탈퇴' }))
     expect(calls).toBe(0)
-    server.events.removeAllListeners()
   })
 
   test('비밀번호가 틀리면 대화상자 안에 필드 오류, 입력을 비우고 다시 비밀번호에 포커스', async () => {
@@ -104,5 +105,81 @@ describe('탈퇴 (010)', () => {
     expect(router.state.location.pathname).toBe('/')
     screen.getByText('탈퇴했어요.')
     await waitFor(() => expect(mockState.members.find((m) => m.id === 3)!.withdrawn).toBe(true))
+  })
+
+  test('리뷰 1: 거부된 뒤 비밀번호가 뮤테이션 캐시에 남지 않는다', async () => {
+    asOutsider()
+    const { client } = renderApp('/me')
+    await openDialog()
+    await userEvent.type(pw(), 'wrong-password')
+    await userEvent.keyboard('{Enter}')
+    await within(screen.getByRole('dialog')).findByText('비밀번호가 맞지 않습니다.')
+    await waitFor(() => expect(client.getMutationCache().getAll().map((m) => m.state.variables)).not.toContain('wrong-password'))
+  })
+
+  test('리뷰 2: 같은 틱에 두 번 제출해도 요청은 한 번', async () => {
+    asOutsider()
+    let calls = 0
+    server.events.on('request:start', ({ request }) => void (request.url.endsWith('/withdraw') && calls++))
+    renderApp('/me')
+    await openDialog()
+    await userEvent.type(pw(), 'password1234')
+    const form = pw().closest('form')!
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    await screen.findByText('탈퇴했어요.')
+    expect(calls).toBe(1)
+  })
+
+  test('리뷰 3: 성공 뒤 로그인 화면에 세션 만료 안내가 뜨지 않는다', async () => {
+    asOutsider()
+    const { router } = renderApp('/me')
+    await openDialog()
+    await userEvent.type(pw(), 'password1234')
+    await userEvent.keyboard('{Enter}')
+    await screen.findByText('탈퇴했어요.')
+    await router.navigate('/login')
+    await screen.findByRole('heading', { name: '로그인' })
+    expect(screen.queryByText('로그인이 필요해요. 입력하던 내용은 저장되지 않아요.')).toBeNull()
+  })
+
+  test('리뷰 8: 세션이 이미 끝났으면(401) 로그인으로 간다', async () => {
+    asOutsider()
+    const { router } = renderApp('/me')
+    await openDialog()
+    await userEvent.type(pw(), 'password1234')
+    mockState.sessionMemberId = null
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+  })
+
+  test('리뷰 8: 처리 중 Esc로 닫히지 않는다, 409로 닫힌 뒤 포커스는 탈퇴 버튼·비밀번호는 비워진다', async () => {
+    asOutsider([makeGroupBuy({ organizerId: 3, participations: [{ memberId: 3, quantity: 1 }] })])
+    server.use(http.post('/api/auth/withdraw', async () => {
+      await new Promise((r) => setTimeout(r, 150))
+      return HttpResponse.json({ title: 'ACTIVE_GROUPBUY', status: 409, blockers: [{ groupBuyId: 1, title: '햇반 24개 공구', role: 'ORGANIZER', status: 'OPEN' }] }, { status: 409 })
+    }))
+    renderApp('/me')
+    await openDialog()
+    await userEvent.type(pw(), 'password1234')
+    await userEvent.keyboard('{Enter}')
+    await userEvent.keyboard('{Escape}')
+    screen.getByRole('dialog')
+    await screen.findByRole('alert', { name: '진행 중인 공구가 있어 탈퇴할 수 없어요.' })
+    const opener = within(screen.getByRole('region', { name: '탈퇴' })).getByRole('button', { name: '탈퇴' })
+    await waitFor(() => expect(document.activeElement).toBe(opener))
+    await userEvent.click(opener)
+    expect(pw().value).toBe('')
+  })
+
+  test('리뷰 10: 필드 오류는 다시 입력하기 시작하면 걷힌다', async () => {
+    asOutsider()
+    renderApp('/me')
+    await openDialog()
+    await userEvent.type(pw(), 'wrong-password')
+    await userEvent.keyboard('{Enter}')
+    await within(screen.getByRole('dialog')).findByText('비밀번호가 맞지 않습니다.')
+    await userEvent.type(pw(), 'p')
+    expect(pw().getAttribute('aria-invalid')).toBe('false')
   })
 })

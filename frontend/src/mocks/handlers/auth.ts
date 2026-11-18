@@ -108,7 +108,7 @@ export const authHandlers = [
     const me = currentMember()
     if (!me) return problem(401, 'UNAUTHENTICATED')
     const b = (await request.json().catch(() => ({}))) as { password?: unknown }
-    if (typeof b.password !== 'string' || !b.password) return problem(400, 'Bad Request', { errors: [{ field: 'password', message: '비밀번호를 입력해 주세요' }] })
+    if (typeof b.password !== 'string' || !b.password.trim()) return problem(400, 'Bad Request', { errors: [{ field: 'password', message: '비밀번호를 입력해 주세요' }] })
     if (locked()) return lockedRes()
     if (b.password !== me.password) {
       mockState.loginFailures++
@@ -122,6 +122,7 @@ export const authHandlers = [
     mockState.notifications = mockState.notifications.filter((n) => n.memberId !== me.id)
     mockState.pending = mockState.pending.filter((p) => p.email !== me.email)
     Object.assign(me, { withdrawn: true, displayName: WITHDRAWN_NAME, email: '', password: '' })
+    mockState.loginFailures = 0 // 같은 이메일의 로그인 실패 기록도 지운다(plan 5)
     mockState.sessionMemberId = null
     return new HttpResponse(null, { status: 204 })
   }),
