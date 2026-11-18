@@ -69,7 +69,8 @@ test('성공 204: 로그아웃, 이름은 "탈퇴한 회원", 로그인은 없�
 test('가입 인증에서 표시 이름 "탈퇴한 회원"은 400 errors[displayName]', async () => {
   await post('/api/auth/signup', { email: 'n@school.ac.kr' })
   const token = mockState.pending[0]!.token
-  for (const displayName of ['탈퇴한 회원', '  탈퇴한 회원 ']) {
+  // 계약 cab0cdd: 모든 공백(유니코드·가운데 포함)을 지운 값이 '탈퇴한회원'이면 거부
+  for (const displayName of ['탈퇴한 회원', '  탈퇴한 회원 ', '탈퇴한회원', '탈퇴한  회원', '탈퇴한\u3000회원', '탈퇴한\u00a0회원']) {
     expect(await err(post('/api/auth/verify', { token, displayName, password: 'password1234', consent: true, consentVersion: 'v1' }))).toMatchObject({
       status: 400,
       fieldErrors: [{ field: 'displayName', message: '쓸 수 없는 이름입니다.' }],
@@ -86,4 +87,13 @@ test('리뷰 4·5: 공백뿐인 비밀번호는 누락과 같은 400(횟수 안 
   await err(withdraw('wrong-password'))
   await withdraw('password1234')
   expect(mockState.loginFailures).toBe(0)
+})
+
+test('검수 7: 공백뿐인 비밀번호로는 가입(인증)할 수 없다', async () => {
+  await post('/api/auth/signup', { email: 'b@school.ac.kr' })
+  const token = mockState.pending[0]!.token
+  expect(await err(post('/api/auth/verify', { token, displayName: '공백비번', password: '        ', consent: true, consentVersion: 'v1' }))).toMatchObject({
+    status: 400,
+    fieldErrors: [{ field: 'password' }],
+  })
 })

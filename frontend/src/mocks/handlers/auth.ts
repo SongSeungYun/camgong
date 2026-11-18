@@ -88,8 +88,9 @@ export const authHandlers = [
     const errors: { field: string; message: string }[] = []
     if (chars(name) < 2 || chars(name) > 20) errors.push({ field: 'displayName', message: '2~20자로 입력해 주세요' })
     else if (hasInvisible(name)) errors.push({ field: 'displayName', message: '보이지 않는 글자는 쓸 수 없어요' })
-    else if (name === WITHDRAWN_NAME) errors.push({ field: 'displayName', message: '쓸 수 없는 이름입니다.' }) // 010 예약어
+    else if (name.replace(/\p{White_Space}/gu, '') === '탈퇴한회원') errors.push({ field: 'displayName', message: '쓸 수 없는 이름입니다.' }) // 010 예약어
     if (password.length < 8) errors.push({ field: 'password', message: '8자 이상 입력해 주세요' })
+    else if (!password.trim()) errors.push({ field: 'password', message: '공백만으로는 쓸 수 없어요' }) // 서버 isBlank
     else if (new TextEncoder().encode(password).length > 72) errors.push({ field: 'password', message: '72바이트 이하로 입력해 주세요' })
     if (consent !== true) errors.push({ field: 'consent', message: '동의가 필요해요' })
     if (typeof b.consentVersion !== 'string' || !b.consentVersion) errors.push({ field: 'consentVersion', message: '동의 안내문 버전이 필요해요' })

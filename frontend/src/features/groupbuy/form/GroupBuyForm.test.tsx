@@ -223,6 +223,20 @@ describe('취소·권한', () => {
     server.events.removeAllListeners()
   })
 
+  test('검수 5·6: 포커스 없이 연 대화상자를 닫으면 본문으로, 취소 성공 안내는 포커스를 받고 기록에 남지 않는다', async () => {
+    seedGroupBuy()
+    asOrganizer()
+    const { router } = renderApp('/groupbuys/1')
+    fireEvent.click(await screen.findByRole('button', { name: '공구 취소' })) // 버튼에 포커스가 가지 않는 경우
+    await userEvent.keyboard('{Escape}')
+    expect(document.activeElement).toBe(screen.getByRole('main'))
+    fireEvent.click(screen.getByRole('button', { name: '공구 취소' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '공구 취소하기' }))
+    const notice = await screen.findByText('공구를 취소했어요. 목록에서 사라졌어요.')
+    await waitFor(() => expect(document.activeElement).toBe(notice))
+    await waitFor(() => expect(router.state.location.state).toBeNull())
+  })
+
   test('취소가 NOT_MODIFIABLE로 거부되면 사유 문구를 보인다', async () => {
     seedGroupBuy()
     asOrganizer()

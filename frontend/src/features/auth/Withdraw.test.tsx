@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { onlineManager } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, test } from 'vitest'
 import { server } from '../../mocks/server'
@@ -181,5 +182,54 @@ describe('탈퇴 (010)', () => {
     await within(screen.getByRole('dialog')).findByText('비밀번호가 맞지 않습니다.')
     await userEvent.type(pw(), 'p')
     expect(pw().getAttribute('aria-invalid')).toBe('false')
+  })
+
+  test('검수 2: 오프라인이어도 대화상자에 갇히지 않는다(요청을 바로 보내고 실패면 안내)', async () => {
+    asOutsider()
+    renderApp('/me')
+    await openDialog()
+    await userEvent.type(pw(), 'password1234')
+    onlineManager.setOnline(false)
+    try {
+      server.use(http.post('/api/auth/withdraw', () => HttpResponse.error()))
+      await userEvent.keyboard('{Enter}')
+      await within(screen.getByRole('dialog')).findByText('잠시 문제가 생겼어요. 다시 시도해 주세요.')
+      await userEvent.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog')).toBeNull()
+    } finally {
+      onlineManager.setOnline(true)
+    }
+  })
+
+  test('검수 4: 대화상자의 "되돌릴 수 없어요" 안내가 aria-describedby로 연결된다', async () => {
+    asOutsider()
+    renderApp('/me')
+    const dialog = await openDialog()
+    const desc = document.getElementById(dialog.getAttribute('aria-describedby') ?? '')
+    expect(desc?.textContent).toMatch(/되돌릴 수 없어요/)
+  })
+
+  test('검수 5: 버튼에 포커스가 가지 않는 브라우저(Safari)에서도 409 뒤 탈퇴 버튼으로 돌아온다', async () => {
+    asOutsider([makeGroupBuy({ organizerId: 3, participations: [{ memberId: 3, quantity: 1 }] })])
+    renderApp('/me')
+    const region = await screen.findByRole('region', { name: '탈퇴' })
+    const opener = within(region).getByRole('button', { name: '탈퇴' })
+    fireEvent.click(opener) // 클릭해도 포커스가 버튼으로 가지 않는 경우
+    await userEvent.type(pw(), 'password1234')
+    await userEvent.keyboard('{Enter}')
+    await screen.findByRole('alert', { name: '진행 중인 공구가 있어 탈퇴할 수 없어요.' })
+    await waitFor(() => expect(document.activeElement).toBe(opener))
+  })
+
+  test('검수 6: "탈퇴했어요" 안내로 포커스가 가고, 주소 기록(state)에는 남지 않는다', async () => {
+    asOutsider()
+    const { router } = renderApp('/me')
+    await openDialog()
+    await userEvent.type(pw(), 'password1234')
+    await userEvent.keyboard('{Enter}')
+    const notice = await screen.findByText('탈퇴했어요.')
+    await waitFor(() => expect(document.activeElement).toBe(notice))
+    await waitFor(() => expect(router.state.location.state).toBeNull())
+    screen.getByText('탈퇴했어요.') // 화면에서는 남아 있다
   })
 })

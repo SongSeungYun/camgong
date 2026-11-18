@@ -17,6 +17,7 @@ export function WithdrawSection() {
   const { forget } = useSession()
   const navigate = useNavigate()
   const pwRef = useRef<HTMLInputElement>(null)
+  const openerRef = useRef<HTMLButtonElement>(null)
   const inFlight = useRef(false) // Enter 연타가 렌더 전에 두 번 보내지 않게(버튼은 pending으로 막지만 폼 제출은 아니다)
   const [open, setOpen] = useState(false)
   const [password, setPassword] = useState('')
@@ -26,6 +27,7 @@ export function WithdrawSection() {
 
   const m = useMutation({
     mutationFn: (pw: string) => withdraw(pw),
+    networkMode: 'always', // 오프라인이어도 멈춰 있지 않고 바로 실패로 안내한다(다시 연결될 때 확인 없이 실행되지 않게)
     gcTime: 0, // 관찰자가 떨어지면(reset) 바로 지워져 비밀번호(variables)가 캐시에 남지 않는다
     onSuccess: async () => {
       // 라우터는 이동을 트랜지션으로 그린다. 세션 비우기도 트랜지션으로 해야 같은 커밋에 반영된다
@@ -72,7 +74,7 @@ export function WithdrawSection() {
       <h2 id={`${id}-h`}>탈퇴</h2>
       <p>탈퇴하면 이름·이메일·비밀번호가 지워지고 되돌릴 수 없어요. 함께한 공구의 수량과 입금·수령 기록은 "탈퇴한 회원"으로 남아요.</p>
       <p>모집 중이거나 확정을 기다리는 공구가 있으면 탈퇴할 수 없어요.</p>
-      <Button variant="secondary" onClick={() => { setBlockers(null); setOpen(true) }}>탈퇴</Button>
+      <Button ref={openerRef} variant="secondary" onClick={() => { setBlockers(null); setOpen(true) }}>탈퇴</Button>
       {blockers && (
         <div role="alert" aria-labelledby={`${id}-b`}>
           <p id={`${id}-b`}>진행 중인 공구가 있어 탈퇴할 수 없어요.</p>
@@ -94,6 +96,7 @@ export function WithdrawSection() {
         pending={m.isPending}
         onCancel={close}
         onConfirm={submit}
+        returnFocus={openerRef}
       >
         <form noValidate onSubmit={(e) => { e.preventDefault(); submit() }}>
           <TextField

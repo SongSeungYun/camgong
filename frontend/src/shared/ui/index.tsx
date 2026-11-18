@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ComponentProps, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ComponentProps, type ReactNode, type RefObject } from 'react'
 import { isKnownStatus, type KnownStatus } from '../api/types'
 import s from './ui.module.css'
 
@@ -119,13 +119,18 @@ interface ConfirmDialogProps {
   onCancel: () => void
   /** 안내와 버튼 사이에 넣을 내용(예: 비밀번호 입력). 첫 포커스는 그 안의 첫 입력으로 간다 */
   children?: ReactNode
+  /** 닫힌 뒤 포커스를 돌려줄 요소. 없으면 열 때 포커스가 있던 요소(Safari처럼 클릭해도 버튼에 포커스가 안 가면 본문) */
+  returnFocus?: RefObject<HTMLElement | null>
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 /** 열리면 포커스가 안으로 가고, Tab은 안에서만 돌며, Esc는 취소, 닫으면 열기 전 요소로 포커스가 돌아온다. */
-export function ConfirmDialog({ open, title, message, confirmLabel = '확인', cancelLabel = '취소', pending, onConfirm, onCancel, children }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, message, confirmLabel = '확인', cancelLabel = '취소', pending, onConfirm, onCancel, children, returnFocus }: ConfirmDialogProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const descId = useId()
+  const returnRef = useRef(returnFocus)
+  returnRef.current = returnFocus
   const cancelRef = useRef(onCancel)
   cancelRef.current = onCancel
   const pendingRef = useRef(pending)
@@ -133,7 +138,9 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '확인', c
 
   useEffect(() => {
     if (!open) return
-    const opener = document.activeElement as HTMLElement | null
+    const active = document.activeElement as HTMLElement | null
+    // 클릭해도 버튼에 포커스가 가지 않는 브라우저(Safari·iOS)에선 activeElement가 body다. 그건 돌아갈 곳이 아니다
+    const opener = returnRef.current?.current ?? (active && active !== document.body ? active : null)
     const node = ref.current!
     const items = () => Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE))
     // 취소(첫 버튼)에 먼저 포커스: 실수로 Enter를 눌러도 되돌릴 수 없는 확인이 실행되지 않는다
@@ -175,9 +182,9 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '확인', c
   if (!open) return null
   return (
     <div className={s.backdrop}>
-      <div ref={ref} className={s.dialog} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
+      <div ref={ref} className={s.dialog} role="dialog" aria-modal="true" aria-label={title} aria-describedby={message ? descId : undefined} tabIndex={-1}>
         <h2>{title}</h2>
-        {message && <p>{message}</p>}
+        {message && <p id={descId}>{message}</p>}
         {children}
         <div className={s.actions}>
           <Button variant="secondary" onClick={onCancel} disabled={pending}>{cancelLabel}</Button>
