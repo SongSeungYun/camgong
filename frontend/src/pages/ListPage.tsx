@@ -12,10 +12,13 @@ import { Button, Layout, StateView } from '../shared/ui'
 export default function ListPage() {
   const { params: urlParams, qInput, setQInput, setParams } = useListParams()
   const { status, member } = useSession()
-  // 009: 로그인하면 서버가 회원 학교로 거르므로 주소의 school은 보내지 않는다. 확인 중에는 기다린다(전국 목록이 잠깐 섞이지 않게)
+  // 009: 로그인하면 서버가 회원 학교로 거르므로 주소의 school은 보내지 않는다. 확인 중에는 기다린다(전국 목록이 잠깐 섞이지 않게).
+  // 로그인 확인이 실패(error)하면 로그인 여부를 모르니 학교 검색을 숨기고 school도 보내지 않는다(서버가 쿠키로 정한다).
   const mySchool = status === 'authenticated' ? (member?.school ?? '') : null
-  const params = mySchool !== null ? { ...urlParams, school: '' } : urlParams
-  const q = useGroupBuyList(params, status === 'checking' ? null : (mySchool ?? 'all'))
+  const anonymous = status === 'anonymous'
+  const params = anonymous ? urlParams : { ...urlParams, school: '' }
+  const scope = status === 'checking' ? null : status === 'error' ? 'unknown' : (mySchool ?? 'all')
+  const q = useGroupBuyList(params, scope)
   const notice = (useLocation().state as { notice?: string } | null)?.notice
   const items = uniqueById(q.data?.pages.flatMap((p) => p.items) ?? [])
   // FR-014: 정렬을 뺀 조건(검색어·카테고리·기본이 아닌 상태)이 하나라도 걸려 있으면 '결과 없음'
@@ -26,7 +29,8 @@ export default function ListPage() {
     <Layout>
       <h1>공구 목록</h1>
       {notice && <p role="status">{notice}</p>}
-      {mySchool !== null ? <p>우리 학교 · {mySchool}</p> : <SchoolSearch selected={params.school} onSelect={(school) => setParams({ school })} />}
+      {mySchool !== null && <p>우리 학교 · {mySchool}</p>}
+      {anonymous && <SchoolSearch selected={params.school} onSelect={(school) => setParams({ school })} />}
       <ListFilters params={params} qInput={qInput} onQ={setQInput} onChange={setParams} />
       <StateView
         state={state}

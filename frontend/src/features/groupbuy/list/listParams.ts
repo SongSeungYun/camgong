@@ -24,7 +24,7 @@ export function parseListParams(sp: URLSearchParams): ListParams {
   const status = sp.get('status') ?? ''
   const category = sp.get('category') ?? ''
   const sort = sp.get('sort')
-  const school = (sp.get('school') ?? '').trim()
+  const school = (sp.get('school') ?? '').trim().toLowerCase() // 학교 키는 소문자
   return {
     status: isKnownStatus(status) ? status : DEFAULTS.status,
     category: isKnownCategory(category) ? category : null,

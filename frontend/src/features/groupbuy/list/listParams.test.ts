@@ -45,6 +45,7 @@ describe('listParams', () => {
   })
   test('009: school은 앞뒤 공백을 지운 학교 키, 253자 초과면 무시', () => {
     expect(parse('school=%20snu.ac.kr%20').school).toBe('snu.ac.kr')
+    expect(parse('school=SNU.AC.KR').school).toBe('snu.ac.kr')
     expect(parse(`school=${'a'.repeat(254)}`).school).toBe('')
     expect(serializeListParams({ status: 'OPEN', category: null, q: '', sort: 'latest', school: 'snu.ac.kr' }).toString()).toBe('school=snu.ac.kr')
   })

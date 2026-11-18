@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Button } from '../../../shared/ui'
 import { fetchSchools } from '../api'
@@ -25,11 +25,20 @@ export function SchoolSearch({ selected, onSelect }: { selected: string; onSelec
     return () => clearTimeout(t)
   }, [text])
 
-  const q = useQuery({ queryKey: ['schools', term], queryFn: () => fetchSchools(term), enabled: term !== '', staleTime: 60_000, retry: false })
+  const q = useQuery({ queryKey: ['schools', term], queryFn: () => fetchSchools(term), enabled: term !== '', staleTime: 60_000, retry: false, placeholderData: keepPreviousData })
   const searching = open && term !== ''
   const items = searching ? (q.data?.items ?? []) : []
   const showList = items.length > 0
   const optionId = (i: number) => `${id}-opt-${i}`
+  const status = searching && q.isError
+    ? '학교 후보를 불러오지 못했어요. 다시 입력해 주세요.'
+    : searching && q.isSuccess && items.length === 0
+      ? '맞는 학교가 없어요.'
+      : showList
+        ? `학교 후보 ${items.length}개`
+        : selected
+          ? `선택한 학교: ${selected}`
+          : ''
 
   const close = () => {
     setOpen(false)
@@ -98,11 +107,10 @@ export function SchoolSearch({ selected, onSelect }: { selected: string; onSelec
           ))}
         </ul>
       )}
-      {searching && q.isSuccess && items.length === 0 && <p role="status">맞는 학교가 없어요.</p>}
-      {searching && q.isError && <p role="alert">학교 후보를 불러오지 못했어요. 다시 입력해 주세요.</p>}
+      {/* 늘 붙어 있는 상태 영역: 내용만 바꿔야 화면 읽기 프로그램이 놓치지 않는다 */}
+      <p role="status" data-testid="school-status">{status}</p>
       {selected && (
         <p>
-          <span>선택한 학교: {selected}</span>{' '}
           <Button
             variant="secondary"
             onClick={() => {
