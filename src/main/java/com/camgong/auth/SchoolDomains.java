@@ -17,6 +17,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class SchoolDomains {
 
+    /** member.school / group_buy.school 컬럼 길이. 키가 이보다 길면 가입 확인에서 저장하지 못한다. */
+    private static final int MAX_LENGTH = 253;
     private static final Pattern DOMAIN = Pattern.compile("[a-z0-9-]+(\\.[a-z0-9-]+)+");
     private static final Pattern AC_KR = Pattern.compile("(?:[a-z0-9-]+\\.)*([a-z0-9-]+)\\.ac\\.kr");
 
@@ -72,7 +74,7 @@ public class SchoolDomains {
 
     private static String domain(String raw) {
         String d = Keys.normalize(raw);
-        if (!DOMAIN.matcher(d).matches()) {
+        if (!DOMAIN.matcher(d).matches() || d.length() > MAX_LENGTH) {
             throw invalid("도메인 형식이 아니다: '" + raw + "'");
         }
         return d;

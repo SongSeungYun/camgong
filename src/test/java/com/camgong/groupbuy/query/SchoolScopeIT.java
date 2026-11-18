@@ -148,6 +148,45 @@ class SchoolScopeIT extends IntegrationTestBase {
     }
 
     @Test
+    void searchPagesInsideTheSchoolMatchTheNationwideOrder() throws Exception {
+        // 두 학교 공구를 번갈아 열어 id 가 섞이게 한다. 로그인 검색을 2건씩 끝까지 넘긴 결과 = 내 학교 일치 공구의 id 역순
+        java.util.List<Long> mine = new java.util.ArrayList<>(java.util.List.of(a1, a2));
+        for (int i = 0; i < 7; i++) {
+            mine.add(groupBuy().title("우리 공통 " + i).insert(jdbc));
+            groupBuy().organizer(OTHER_ORGANIZER).title("저쪽 공통 " + i).insert(jdbc);
+        }
+        java.util.List<Long> expected = mine.stream().filter(id -> id > b3).sorted(java.util.Comparator.reverseOrder()).toList();
+
+        java.util.List<Long> seen = new java.util.ArrayList<>();
+        String cursor = null;
+        do {
+            String body = list("?q=" + "공통" + "&size=2"
+                    + (cursor == null ? "" : "&cursor=" + cursor), PARTICIPANT).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            java.util.List<Integer> ids = JsonPath.read(body, "$.items[*].id");
+            ids.forEach(id -> seen.add(id.longValue()));
+            cursor = JsonPath.read(body, "$.nextCursor");
+        } while (cursor != null);
+        assertThat(seen).containsExactlyElementsOf(expected);
+    }
+
+    @Test
+    void aSchoolScopedLatestListOrdersBySchoolFirstSoTheSchoolIndexIsUsed() throws Exception {
+        // 결과 순서는 같지만, ORDER BY id 만 쓰면 검색어·커서가 붙은 쿼리가 PRIMARY 역방향으로 다른 학교 행까지 훑는다(관제탑 EXPLAIN).
+        com.camgong.support.QueryCountInspector.reset();
+        list("?q=" + "우리" + "&cursor="
+                + PageCursor.latest(Long.MAX_VALUE).encode(), PARTICIPANT).andExpect(status().isOk());
+        // Hibernate 는 select 목록에 있는 열을 위치로 쓴다: 10 = school, 1 = id
+        assertThat(com.camgong.support.QueryCountInspector.statements()).anySatisfy(sql ->
+                assertThat(sql).contains("gb1_0.school from group_buy").endsWith("order by 10 desc,1 desc limit ?"));
+
+        com.camgong.support.QueryCountInspector.reset();
+        anonymous("?q=" + "우리").andExpect(status().isOk());
+        assertThat(com.camgong.support.QueryCountInspector.statements()).anySatisfy(sql ->
+                assertThat(sql).contains("from group_buy").endsWith("order by 1 desc limit ?"));
+    }
+
+    @Test
     void schoolLongerThan253CharactersIs400() throws Exception {
         anonymous("?school=" + "a".repeat(254)).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("school"));

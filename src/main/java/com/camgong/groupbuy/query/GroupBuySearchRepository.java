@@ -62,7 +62,10 @@ public class GroupBuySearchRepository {
         }
         cq.where(where.toArray(Predicate[]::new));
         cq.orderBy(switch (q.sort()) {
-            case LATEST -> List.of(cb.desc(g.get("id")));
+            // 학교로 거를 때는 정렬에 school 을 앞세운다(결과 순서는 같다). id 만 쓰면 검색어·커서가 붙은 쿼리에서 옵티마이저가
+            // PRIMARY 역방향 범위를 골라 다른 학교 행까지 수천 행을 읽는다. 이렇게 하면 (school, status, id) 역방향 범위가 된다.
+            case LATEST -> q.school() != null ? List.of(cb.desc(g.get("school")), cb.desc(g.get("id")))
+                    : List.of(cb.desc(g.get("id")));
             case DEADLINE -> List.of(cb.asc(g.get("deadline")), cb.asc(g.get("id")));
         });
         return em.createQuery(cq).setMaxResults(q.size() + 1).getResultList();

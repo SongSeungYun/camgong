@@ -102,4 +102,13 @@ class SchoolDomainsTest {
     void malformedConfigFailsAtStartup(String spec) {
         assertThatThrownBy(() -> new SchoolDomains(spec)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void keysAndDomainsLongerThanTheSchoolColumnFailAtStartup() {
+        String longest = "a".repeat(249) + ".edu";                 // 253자: 컬럼에 들어간다
+        String tooLong = "a".repeat(250) + ".edu";                 // 254자
+        assertThat(new SchoolDomains(longest + "=" + longest).schoolOf("x@" + longest)).contains(longest);
+        assertThatThrownBy(() -> new SchoolDomains(tooLong + "=b.edu")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new SchoolDomains("b.edu=" + tooLong)).isInstanceOf(IllegalArgumentException.class);
+    }
 }

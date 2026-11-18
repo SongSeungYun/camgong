@@ -14,7 +14,7 @@ case $SCENARIO in
   mixed) TOTAL=200; ORG=9 ;;     # 계속 열려 있도록 크게 잡는다(24 면 금방 모집 완료되어 빠른 409 만 남는다)
 esac
 
-mysql_exec() { docker exec -i $DB mysql -uroot -ppw camgong "$@" 2>/dev/null; }
+mysql_exec() { docker exec -i $DB mysql --default-character-set=utf8mb4 -uroot -ppw camgong "$@" 2>/dev/null; }
 
 docker rm -f $DB >/dev/null 2>&1 || true
 docker run -d --name $DB -p $DBPORT:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=camgong mysql:8.4 >/dev/null

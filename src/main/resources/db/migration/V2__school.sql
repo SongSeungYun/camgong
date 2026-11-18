@@ -5,10 +5,14 @@ ALTER TABLE member
     ADD COLUMN school VARCHAR(253) NOT NULL,
     ADD CONSTRAINT chk_member_school CHECK (school <> '');
 
--- 인덱스는 로그인 목록(학교로 거름)의 EXPLAIN 으로 정했다: 최신순·검색은 (school, id) 역방향, 마감 임박순은 (school, status, deadline).
--- 학교 검색(/api/schools)의 DISTINCT 도 (school, status, deadline) 커버링 스캔이다. 비로그인 전국 목록은 기존 PK·(status, deadline) 그대로다.
+-- 인덱스는 로그인 목록(학교로 거름)의 EXPLAIN 으로 정했다(공구 1만 건, 학교 20개와 학교 1개 두 경우). 학교로 거를 때 목록은 ORDER BY school DESC, id DESC 다.
+--   최신순(첫 쪽·다음 쪽, 검색어 유무): (school, status, id) 역방향. 상태가 등호라 정렬이 인덱스 순서와 같다. 학교 20개일 때 검색어 없는 다음 쪽은
+--     옵티마이저가 (school, status, deadline) + filesort(그 학교 모집 중 약 320행)를 고르기도 한다.
+--   마감 임박순: (school, status, deadline).
+--   학교 검색(/api/schools)의 DISTINCT: (school, status, deadline) 커버링 스캔.
+--   비로그인 전국 목록은 기존 PRIMARY·(status, deadline) 그대로다.
 ALTER TABLE group_buy
     ADD COLUMN school VARCHAR(253) NOT NULL,
     ADD CONSTRAINT chk_group_buy_school CHECK (school <> ''),
-    ADD KEY idx_group_buy_school_id (school, id),
+    ADD KEY idx_group_buy_school_status_id (school, status, id),
     ADD KEY idx_group_buy_school_status_deadline (school, status, deadline);

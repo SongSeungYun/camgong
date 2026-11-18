@@ -6,6 +6,7 @@ import { check } from 'k6';
 
 const BASE = __ENV.BASE_URL || 'http://localhost:8080';
 const MEMBER_SCHOOL = __ENV.MEMBER_SCHOOL || 's01.ac.kr';
+const FAR_CURSOR = 'eyJzIjoibGF0ZXN0IiwiaSI6MTAwMDAwMDAwMH0';   // {"s":"latest","i":1000000000}
 
 export const options = {
   vus: Number(__ENV.VUS || 5),
@@ -20,6 +21,8 @@ export const options = {
     'http_req_duration{name:member_search_common}': ['p(95)<50'],
     'http_req_duration{name:member_search_rare}': ['p(95)<50'],
     'http_req_duration{name:member_list_deadline}': ['p(95)<50'],
+    'http_req_duration{name:member_search_common_p2}': ['p(95)<50'],
+    'http_req_duration{name:member_search_rare_p2}': ['p(95)<50'],
   },
 };
 
@@ -39,5 +42,16 @@ export default function () {
       ['member_' + name + ' 200']: (r) => r.status === 200,
       ['member_' + name + ' 자기 학교만']: (r) => r.status === 200 && r.json('items').every((i) => i.school === MEMBER_SCHOOL),
     });
+  }
+  // 로그인 검색 2쪽(검색어 + 커서): 흔한 단어는 1쪽의 nextCursor, 드문 단어는 결과가 없어 아주 큰 id 의 커서로 같은 쿼리 모양을 만든다.
+  const common = http.get(BASE + '/api/groupbuys?q=' + encodeURIComponent('햇반'), member);
+  const next = common.status === 200 ? common.json('nextCursor') : null;
+  const pages = [
+    ['member_search_common_p2', '/api/groupbuys?q=' + encodeURIComponent('햇반') + '&cursor=' + next],
+    ['member_search_rare_p2', '/api/groupbuys?q=' + encodeURIComponent('희귀템') + '&cursor=' + FAR_CURSOR],
+  ];
+  for (const [name, path] of pages) {
+    const res = http.get(BASE + path, Object.assign({ tags: { name } }, member));
+    check(res, { [name + ' 200']: (r) => r.status === 200 });
   }
 }

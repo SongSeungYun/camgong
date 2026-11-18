@@ -1,5 +1,6 @@
 -- 조회 부하 시드: 공구를 @N 건 넣는다. 앱을 한 번 띄워 Flyway 마이그레이션이 적용된 DB 에서 쓴다.
---   (echo "SET @N=10000, @SCHOOLS=20;"; cat load/seed-browse.sql) | docker exec -i <mysql 컨테이너> mysql -uroot -ppw camgong
+--   (echo "SET @N=10000, @SCHOOLS=20;"; cat load/seed-browse.sql) | docker exec -i <mysql 컨테이너> mysql --default-character-set=utf8mb4 -uroot -ppw camgong
+--   (문자셋을 빼면 한글 제목이 깨져 들어가 검색 측정이 의미 없어진다)
 -- 학교(009): 개설자 회원 1~@SCHOOLS 가 각자 s01.ac.kr, s02.ac.kr … 학교다. 공구는 연속 20건 묶음 단위로 학교를 돌아가며 연다
 -- (상태·카테고리·제목은 n % 20·8·6 이라, 학교를 n % @SCHOOLS 로 고르면 학교마다 상태가 한쪽으로 쏠린다). 학교마다 약 @N/@SCHOOLS 건.
 -- 로그인 목록 측정용 세션: 회원 1(s01.ac.kr)의 쿠키 값은 "bench-session-1" 이다.
