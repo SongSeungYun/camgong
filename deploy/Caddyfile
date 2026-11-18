@@ -1,0 +1,23 @@
+# DOMAIN 이 실제 도메인이면 Let's Encrypt 인증서를, localhost 면 Caddy 내부 인증서를 쓴다.
+{$DOMAIN} {
+	encode
+
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	# 해시가 붙은 빌드 자산. 없는 파일은 index.html 이 아니라 404(배포 전 탭이 지워진 자산을 HTML 로 받지 않게).
+	handle /assets/* {
+		root * /srv
+		file_server
+	}
+
+	handle {
+		root * /srv
+		# index.html, sw.js 등은 매번 재검증한다: 배포 뒤 낡은 index.html 이 지워진 자산을 가리키지 않게.
+		header Cache-Control "no-cache"
+		# SPA 폴백: /verify, /groupbuys/3 같은 깊은 경로도 index.html 로(인증 메일 링크가 /verify?token=).
+		try_files {path} /index.html
+		file_server
+	}
+}
