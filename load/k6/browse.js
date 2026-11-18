@@ -37,7 +37,7 @@ export default function () {
     const mine = http.get(BASE + path, Object.assign({ tags: { name: 'member_' + name } }, member));
     check(mine, {
       ['member_' + name + ' 200']: (r) => r.status === 200,
-      ['member_' + name + ' 자기 학교만']: (r) => r.json('items').every((i) => i.school === MEMBER_SCHOOL),
+      ['member_' + name + ' 자기 학교만']: (r) => r.status === 200 && r.json('items').every((i) => i.school === MEMBER_SCHOOL),
     });
   }
 }

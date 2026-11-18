@@ -40,7 +40,7 @@ class SchoolDomainsTest {
             "a@g.skku.edu, skku.edu",
             "a@mail.g.skku.edu, skku.edu",
             "a@G.SKKU.EDU, skku.edu"})
-    void groupedDomainsAndTheirSubdomainsShareTheGroupsFirstDomain(String email, String school) {
+    void groupedDomainsAndTheirSubdomainsShareTheGroupsKey(String email, String school) {
         assertThat(withExtra.schoolOf(email)).contains(school);
         assertThat(acKrOnly.schoolOf(email)).isEmpty();
     }
@@ -95,7 +95,10 @@ class SchoolDomainsTest {
             "skku=skku.edu",
             "skku.edu=skku",
             "skku.edu=skku.edu.",
-            "skku.edu=sk ku.edu"})
+            "skku.edu=sk ku.edu",
+            "x.edu=ac.kr",                            // 모든 ac.kr 학교가 한 묶음이 된다
+            "x.edu=AC.KR",
+            "a.edu=x.edu;x.edu=y.edu"})               // 키가 다른 묶음의 도메인
     void malformedConfigFailsAtStartup(String spec) {
         assertThatThrownBy(() -> new SchoolDomains(spec)).isInstanceOf(IllegalArgumentException.class);
     }

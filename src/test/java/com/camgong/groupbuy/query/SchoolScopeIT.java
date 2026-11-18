@@ -115,6 +115,17 @@ class SchoolScopeIT extends IntegrationTestBase {
     }
 
     @Test
+    void anInvalidOrExpiredSessionCookieGetsTheNationwideListNot401() throws Exception {
+        mockMvc.perform(get("/api/groupbuys").cookie(new jakarta.servlet.http.Cookie("camgong_session", "forged")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items", hasSize(5)));
+        list("", PARTICIPANT).andExpect(jsonPath("$.items", hasSize(2)));
+        clock.advance(java.time.Duration.ofDays(15));   // as() 가 만든 세션이 14일 만료를 넘긴다
+        // 시드 마감(7일)이 지나 PENDING_CLOSE 로 보인다. 만료된 세션은 비로그인이라 전국 5건이다(학교로 거르면 2건)
+        mockMvc.perform(get("/api/groupbuys?status=PENDING_CLOSE").cookie(new jakarta.servlet.http.Cookie("camgong_session",
+                "test-session-" + PARTICIPANT))).andExpect(status().isOk()).andExpect(jsonPath("$.items", hasSize(5)));
+    }
+
+    @Test
     void anonymousSchoolFilterCombinesWithCategoryWordsAndSort() throws Exception {
         anonymous("?school=" + OTHER + "&category=DAILY").andExpect(jsonPath("$.items[*].id", containsInAnyOrder(ids(b2))));
         anonymous("?school=" + OTHER + "&q=과자").andExpect(jsonPath("$.items[*].id", containsInAnyOrder(ids(b3))));

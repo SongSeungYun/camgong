@@ -59,6 +59,7 @@ class SchoolSearchIT extends IntegrationTestBase {
         search("%").andExpect(jsonPath("$.items", hasSize(0)));
         search("_").andExpect(jsonPath("$.items", hasSize(0)));
         search("s_u").andExpect(jsonPath("$.items", hasSize(0)));
+        search("\\").andExpect(status().isOk()).andExpect(jsonPath("$.items", hasSize(0)));
     }
 
     @Test

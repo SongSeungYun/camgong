@@ -44,9 +44,19 @@ public class SchoolDomains {
             }
             for (String raw : group.substring(eq + 1).split(",", -1)) {
                 String domain = domain(raw);
+                if (domain.equals("ac.kr")) {
+                    throw invalid("ac.kr 자체는 묶을 수 없다(모든 ac.kr 학교가 한 학교가 된다)");
+                }
                 if (grouped.putIfAbsent(domain, school) != null && !grouped.get(domain).equals(school)) {
                     throw invalid("도메인이 두 묶음에 있다: " + domain);
                 }
+            }
+        }
+        // 키가 다른 묶음의 도메인이면 그 도메인 학생과 이 묶음 학생이 같은 학교 키를 받는다.
+        for (String key : keys) {
+            String owner = grouped.get(key);
+            if (owner != null && !owner.equals(key)) {
+                throw invalid("키 " + key + " 가 다른 묶음(" + owner + ")의 도메인이다");
             }
         }
         // 다른 묶음의 도메인이 점 경계로 겹치면(skku.edu 와 g.skku.edu) 어느 학교인지가 설정 순서에 달라진다.
