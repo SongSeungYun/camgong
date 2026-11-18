@@ -97,6 +97,19 @@
 - Gmail SMTP는 587 포트를 쓴다. 클라우드가 바깥으로 나가는 메일 포트를 막는지는 업체별로 확인한다(확인 못 함).
 - 결정되면 `Dockerfile`·`compose.yaml`·`Caddyfile`은 작업 세션이 만들고 관제탑이 검수한다. 시크릿은 서버의 `.env`에만 둔다.
 
+### 7.1 운영 절차 (`deploy/`, 2026-11-19 백엔드 세션 초안 반영)
+
+1. 서버: Docker 설치, 방화벽은 22·80·443만 연다. DNS A 레코드를 서버 IP로 먼저 잡는다(Caddy 인증서 발급 전에).
+2. `git clone` → `cd deploy && cp .env.example .env` → 값 채우기 → `chmod 600 .env`. `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`은 compose가 `DOMAIN`으로 만든다.
+3. `docker compose up -d --build`. `docker compose logs backend`에서 Flyway 적용과 `Started`를 본 뒤 아래 §6 순서로 확인한다.
+4. 업데이트: `git pull && docker compose up -d --build`. 2GB 서버에서 백엔드·프론트 빌드를 같이 돌리면 메모리가 빠듯할 수 있다. swap을 켜거나 이미지를 서버 밖에서 빌드한다(확인 못 함).
+5. 백업: crontab에 `0 4 * * * /경로/deploy/backup.sh`. 서버 밖 보관과 오래된 파일 정리는 아직 TODO다. **서버 밖 보관 전에는 서버가 사라지면 백업도 사라진다.**
+6. 복구: `gunzip -c <파일> | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot camgong'`
+7. `docker compose down -v`는 쓰지 않는다. 볼륨(`mysql-data`, `caddy-data`)이 지워진다.
+8. `DB_USER`/`DB_PASSWORD`/`MYSQL_ROOT_PASSWORD`는 볼륨을 처음 만들 때만 쓰인다. 나중에 `.env`를 바꿔도 DB 계정은 바뀌지 않는다.
+
+로컬 확인(백엔드 세션, `DOMAIN=localhost`): 목록 200, 깊은 경로 index.html, 없는 자산 404, http→https 308, 다른 Origin 403, 백업 파일 복구까지 됐다. 메모리는 백엔드 약 480MiB, MySQL 약 485MiB, Caddy 15MiB(16GB 맥 기준, 실서버 확인 못 함). 실제 SMTP 발송은 확인 못 함.
+
 ## 8. README 문구 초안 (사용자가 넣는다)
 
 `<!-- TODO(사용자) ... -->` 자리에 넣을 문구다. `[ ]`는 사용자가 채운다(관제탑이 지어내지 않는다). design-plan 단계 0에 남은 기록은 "기숙사생 지인 의견 '쓸만하다'"뿐이다.
