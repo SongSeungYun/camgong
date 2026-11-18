@@ -1,12 +1,12 @@
 # 배포 체크리스트 (2026-11-05 작성, 값 미정)
 
-공개 배포 조건은 `docs/architecture.md` 6.5에 있다: 002 병합, SMTP, `ALLOWED_EMAIL_DOMAINS`, `ALLOWED_ORIGINS`. 이 문서는 그 조건을 채우는 데 필요한 항목을 코드(`src/main/resources/application*.yml`, `frontend/`)와 대조해 모은 것이다. **값은 비워 둔다. 저장소가 공개라 시크릿은 환경변수로만 준다.**
+공개 배포 조건은 `docs/architecture.md` 6.5에 있다: 002 병합, SMTP, 허용 대학 도메인(009부터 `EXTRA_SCHOOL_DOMAINS`, 아래 1.1·1.2), `ALLOWED_ORIGINS`. 이 문서는 그 조건을 채우는 데 필요한 항목을 코드(`src/main/resources/application*.yml`, `frontend/`)와 대조해 모은 것이다. **값은 비워 둔다. 저장소가 공개라 시크릿은 환경변수로만 준다.**
 
 ## 1. 사용자가 정할 값
 
 | 값 | 쓰이는 곳 | 상태 |
 |----|-----------|------|
-| 학교 이메일 도메인 | `ALLOWED_EMAIL_DOMAINS` | 미정. 조사와 추천은 아래 1.1. 첫 학교 이름이 필요하다 |
+| 대학 이메일 도메인 | `EXTRA_SCHOOL_DOMAINS`(009) | **결정(2026-11-19): 전국 대학.** `ac.kr` 메일은 설정 없이 모두 가입된다. `ac.kr`이 아닌 국내 대학(예: `skku.edu`)만 `키=도메인,도메인;…` 형식으로 넣는다. 키는 한 번 쓰면 바꾸지 않는다. 스펙 `specs/009-school-scope` |
 | SMTP 계정(호스트·포트·계정·비밀번호) | `SPRING_MAIL_*` | **Gmail로 결정**(2026-11-18, 아래 2.1). 계정·앱 비밀번호는 사용자가 서버 환경변수로만 넣는다 |
 | 개인정보 동의 안내문과 버전 | 프론트 `frontend/src/pages/VerifyPage.tsx`의 `CONSENT_VERSION`(지금 `'v1'`), 안내문 본문 | 초안 `docs/consent-v1.md`(사용자 확인 대기). 버전은 서버에서 20자 이하 |
 | 배포 대상과 도메인 | `ALLOWED_ORIGINS`, `VERIFY_LINK_BASE_URL`, 쿠키 Secure | 관제탑 추천은 아래 7(사용자 확인 대기) |
@@ -38,7 +38,7 @@
 |------|--------------|----------|------|
 | `DB_URL` | `jdbc:mysql://localhost:3306/camgong?useAffectedRows=true` | **반드시 설정** | `useAffectedRows=true`를 빼면 안 된다. 기동 시 `DatabaseSettingsCheck`가 검사한다 |
 | `DB_USER` / `DB_PASSWORD` | `root` / `pw` | **반드시 설정** | 기본값은 로컬용이다. 운영에서 빠뜨리면 로컬 기본값으로 붙으려다 실패한다 |
-| `ALLOWED_EMAIL_DOMAINS` | `school.ac.kr` | **반드시 설정** | 기본값은 예시 도메인 |
+| `EXTRA_SCHOOL_DOMAINS` | 빈 값 | 필요할 때만 | 009부터. 빈 값이면 `ac.kr` 규칙만 쓴다. 예: `skku.edu=skku.edu,g.skku.edu`. 형식이 틀리거나 묶음끼리 도메인이 겹치면 기동이 실패한다. 옛 `ALLOWED_EMAIL_DOMAINS`는 009부터 **무시된다**(넣어도 학교가 제한되지 않는다) |
 | `MAIL_SENDER` | `smtp` | 기본값 유지 | `logging`은 local/test/benchmark용. 운영에서 쓰면 메일이 안 나간다 |
 | `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` / `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | 없음 | **반드시 설정** | 보내는 주소는 `spring.mail.username`이다. 465(SMTPS)면 `SPRING_MAIL_PROTOCOL=smtps`. 587이면 STARTTLS 설정(`SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true` 등)이 메일 업체에 따라 필요하다(확인 못 함) |
 | `VERIFY_LINK_BASE_URL` | `http://localhost:5173/verify?token=` | **반드시 설정** | 빠뜨리면 인증 메일 링크가 localhost를 가리킨다. 예: `https://<도메인>/verify?token=` |
