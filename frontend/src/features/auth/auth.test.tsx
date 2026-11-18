@@ -124,7 +124,7 @@ describe('가입·인증 (변경 B2: 가입은 이메일만, 이름·비밀번�
     expect(screen.queryByLabelText('표시 이름')).toBeNull()
     expect(screen.queryByLabelText('비밀번호')).toBeNull()
     expect(screen.queryByRole('checkbox')).toBeNull()
-    screen.getByText(/학교 이메일만/)
+    screen.getByText('대학 메일(ac.kr 등)로만 가입할 수 있어요.')
     await signupAs()
     await screen.findByRole('heading', { name: /인증 메일을 보냈어요/ })
     const resend = screen.getByRole('button', { name: /인증 메일 다시 보내기/ }) as HTMLButtonElement
@@ -162,6 +162,15 @@ describe('가입·인증 (변경 B2: 가입은 이메일만, 이름·비밀번�
     await userEvent.click(within(screen.getByRole('main')).getByRole('button', { name: '로그아웃' }))
     await screen.findByLabelText('표시 이름')
     expect(router.state.location.pathname).toBe('/verify')
+  })
+
+  test('009: 인증 때 학교 판정이 실패하면(errors[token]) 그 문구를 보여준다', async () => {
+    const token = await newToken()
+    server.use(http.post('/api/auth/verify', () => HttpResponse.json({ title: 'Bad Request', status: 400, errors: [{ field: 'token', message: '이 메일로는 더 이상 가입할 수 없습니다.' }] }, { status: 400 })))
+    renderApp(`/verify?token=${token}`)
+    await screen.findByLabelText('표시 이름')
+    await fillVerify()
+    await screen.findByText('이 메일로는 더 이상 가입할 수 없습니다.')
   })
 
   test('이미 가입된 이메일이면 안내와 로그인 링크', async () => {

@@ -36,7 +36,7 @@ export default function SignupPage() {
       <h1>가입</h1>
       <form noValidate onSubmit={handleSubmit((f) => { setTopErrors([]); setAlready(false); m.mutate(f) })}>
         <TextField label="이메일" type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
-        <p>학교 이메일만 가입할 수 있어요.</p>
+        <p>대학 메일(ac.kr 등)로만 가입할 수 있어요.</p>
         <p>이름과 비밀번호는 메일의 링크를 열었을 때 정해요.</p>
         {topErrors.map((t) => <p key={t} role="alert">{t}</p>)}
         {already && <p><Link to="/login">로그인하러 가기</Link></p>}
