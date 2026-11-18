@@ -8,6 +8,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -73,7 +74,13 @@ public class WithdrawService {
         }
         login.completeSuccess(emailKey);
 
-        tx.executeWithoutResult(s -> anonymise(memberId, emailKey, now));
+        // 탈퇴의 notification 삭제(recipient 인덱스 → PK)와 NotificationCleanup(created_at 인덱스 → PK)은 잠금 순서가 반대라 드물게
+        // 교착한다. 한 번만 다시 한다(새 트랜잭션이라 잠금도 처음부터 다시 잡는다).
+        try {
+            tx.executeWithoutResult(s -> anonymise(memberId, emailKey, now));
+        } catch (PessimisticLockingFailureException e) {     // 교착(1213)·잠금 대기 초과(1205) 둘 다
+            tx.executeWithoutResult(s -> anonymise(memberId, emailKey, now));
+        }
         // 세션은 커밋 뒤에 지운다. 트랜잭션 안(회원 행 X 잠금을 쥔 채)에서 지우면 같은 회원의 세션 행을 넣는 문장과 교착할 수 있다:
         // INSERT … ON DUPLICATE KEY UPDATE(테스트 도우미 as())로는 재현됐고, 실제 로그인의 단순 INSERT 로는 900회 경쟁에서 재현되지 않았다.
         // 지우기 전에 남은 세션이나 그 사이 들어온 세션은 AuthFilter 가 탈퇴한 회원이라 받지 않고 지운다. 이 삭제가 실패해도 탈퇴는 이미 커밋됐으므로 204 로 끝내고 경고만 남긴다. 남은 행은 SessionCleanup 이 14일 TTL 로 지운다.
@@ -93,7 +100,7 @@ public class WithdrawService {
      * 첫 문장이 회원 행 FOR UPDATE 다. 그 뒤의 일반 SELECT 는 잠금을 받은 뒤에 스냅샷을 잡으므로, 잠금을 기다리는 동안 커밋된 새 참여·개설
      * (그쪽은 같은 행을 FOR SHARE 로 잡는다)이 보인다. 막는 조건은 잠금 읽기로 하지 않는다(FOR SHARE 면 006 체크표 읽기와 교착할 수 있다).
      */
-    private void anonymise(long memberId, String emailKey, Instant now) {
+    void anonymise(long memberId, String emailKey, Instant now) {
         boolean active = jdbc.sql("SELECT withdrawn_at IS NULL FROM member WHERE id = :id FOR UPDATE")
                 .param("id", memberId).query(Boolean.class).optional().orElse(false);
         if (!active) {

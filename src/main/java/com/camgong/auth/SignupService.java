@@ -193,17 +193,19 @@ public class SignupService {
     }
 
     /**
-     * "탈퇴한 회원"(010): 모든 공백(유니코드 공백, 가운데 공백 포함)을 지워 비교한다. "탈퇴한회원", "탈퇴한　회원"도 사칭이다.
-     * 한글을 자모로 풀어 쓴 글자(NFD)도 같아 보이므로 NFC 로 모은 뒤 비교한다.
+     * "탈퇴한 회원"(010): 화면에서 같아 보이는 이름은 모두 사칭이다. NFC 로 모은 뒤(자모로 풀어 쓴 한글) 공백(유니코드·가운데 포함),
+     * 보이지 않는 글자(Keys.isInvisible), 결합 표시(Mn: 변형 선택자, U+034F 등)를 모두 지우고 비교한다.
+     * 결합 표시는 이 판정에서만 지운다: Keys.isInvisible 로 넓히면 "❤️" 같은 이름이 깨진다.
      */
     private static boolean isReservedName(String displayName) {
-        String composed = java.text.Normalizer.normalize(displayName, java.text.Normalizer.Form.NFC);
-        return withoutSpaces(composed).equals(withoutSpaces(Member.WITHDRAWN_NAME));
+        return looks(displayName).equals(looks(Member.WITHDRAWN_NAME));
     }
 
-    private static String withoutSpaces(String value) {
+    private static String looks(String value) {
         StringBuilder out = new StringBuilder();
-        value.codePoints().filter(c -> !Keys.isSpace(c)).forEach(out::appendCodePoint);
+        java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFC).codePoints()
+                .filter(c -> !Keys.isSpace(c) && !Keys.isInvisible(c) && Character.getType(c) != Character.NON_SPACING_MARK)
+                .forEach(out::appendCodePoint);
         return out.toString();
     }
 

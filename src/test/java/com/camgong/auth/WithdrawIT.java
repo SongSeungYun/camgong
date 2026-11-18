@@ -224,7 +224,8 @@ class WithdrawIT extends IntegrationTestBase {
     @Test
     void theReservedNameCannotBeTakenAtSignup() throws Exception {
         for (String name : List.of(WITHDRAWN, "  탈퇴한 회원\u3000", "탈퇴한회원", "탈퇴한  회원", "탈퇴한\u3000회원",
-                "탈\u00A0퇴한 회 원", java.text.Normalizer.normalize(WITHDRAWN, java.text.Normalizer.Form.NFD))) {
+                "탈\u00A0퇴한 회 원", java.text.Normalizer.normalize(WITHDRAWN, java.text.Normalizer.Form.NFD),
+                "탈퇴한 회원\uFE0F", "탈퇴한\u034F 회원", "탈\uDB40\uDD00퇴한 회원", "탈퇴한 회원\u200B")) {
             mail.clear();
             jdbc.update("DELETE FROM pending_signup");
             mockMvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)

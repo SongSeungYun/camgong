@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
+import jakarta.servlet.http.Cookie;
+
 import com.camgong.support.Concurrent;
 import com.camgong.support.GroupBuyBodies;
 import com.camgong.support.IntegrationTestBase;
@@ -37,20 +39,35 @@ class WithdrawRaceIT extends IntegrationTestBase {
         Thread.sleep(ThreadLocalRandom.current().nextInt(12));
     }
 
+    /**
+     * 경쟁하는 요청은 이 세션 쿠키를 직접 보낸다. as() 는 요청 때 세션 행을 upsert 하는데, 그 FK 검사가 회원 행 공유 잠금을 기다려
+     * 스레드가 테스트 도우미 안에서 막힌다(그러면 FOR SHARE 를 빼도 AuthFilter 가 401 을 줘 테스트가 통과한다). 그래서 잠금·출발 전에 넣는다.
+     */
+    private Cookie session(long member) {
+        jdbc.update("INSERT INTO login_session (token_hash, member_id, created_at, last_used_at) VALUES (SHA2(?, 256), ?, ?, ?)",
+                "race-" + member, member, java.time.LocalDateTime.ofInstant(clock.instant(), java.time.ZoneOffset.UTC),
+                java.time.LocalDateTime.ofInstant(clock.instant(), java.time.ZoneOffset.UTC));
+        return cookie(member);
+    }
+
+    private static Cookie cookie(long member) {
+        return new Cookie("camgong_session", "race-" + member);
+    }
+
     private int withdraw(long member) throws Exception {
-        return mockMvc.perform(post("/api/auth/withdraw").with(as(member)).contentType(MediaType.APPLICATION_JSON)
+        return mockMvc.perform(post("/api/auth/withdraw").cookie(cookie(member)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"password\":\"password1\"}")).andReturn().getResponse().getStatus();
     }
 
     private int join(long member, long groupBuyId) throws Exception {
-        return mockMvc.perform(post("/api/groupbuys/" + groupBuyId + "/participations").with(as(member))
+        return mockMvc.perform(post("/api/groupbuys/" + groupBuyId + "/participations").cookie(cookie(member))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":1,\"expectedUnitPrice\":1200}"))
                 .andReturn().getResponse().getStatus();
     }
 
     private int open(long member, int n) throws Exception {
         Map<String, Object> body = GroupBuyBodies.with(GroupBuyBodies.valid(), "title", "경쟁 " + n);
-        return mockMvc.perform(post("/api/groupbuys").with(as(member)).contentType(MediaType.APPLICATION_JSON)
+        return mockMvc.perform(post("/api/groupbuys").cookie(cookie(member)).contentType(MediaType.APPLICATION_JSON)
                 .content(GroupBuyBodies.json(body))).andReturn().getResponse().getStatus();
     }
 
@@ -70,6 +87,7 @@ class WithdrawRaceIT extends IntegrationTestBase {
         for (int i = 0; i < REPEAT; i++) {
             long member = 1000 + i;
             seedLoginMember(member, "r" + member + "@school.ac.kr", "경쟁" + member, "password1");
+            session(member);
             List<Callable<Integer>> calls = List.of(() -> withdraw(member), () -> {
                 jitter();
                 return join(member, groupBuyId);
@@ -91,6 +109,7 @@ class WithdrawRaceIT extends IntegrationTestBase {
             long member = 2000 + i;
             int n = i;
             seedLoginMember(member, "o" + member + "@school.ac.kr", "개설경쟁" + member, "password1");
+            session(member);
             List<Callable<Integer>> calls = List.of(() -> withdraw(member), () -> {
                 jitter();
                 return open(member, n);
@@ -111,8 +130,9 @@ class WithdrawRaceIT extends IntegrationTestBase {
             long member = 3000 + i;
             String email = "l" + member + "@school.ac.kr";
             seedLoginMember(member, email, "로그인경쟁" + member, "password1");
+            session(member);
             List<Callable<org.springframework.mock.web.MockHttpServletResponse>> calls = List.of(
-                    () -> mockMvc.perform(post("/api/auth/withdraw").with(as(member)).contentType(MediaType.APPLICATION_JSON)
+                    () -> mockMvc.perform(post("/api/auth/withdraw").cookie(cookie(member)).contentType(MediaType.APPLICATION_JSON)
                             .content("{\"password\":\"password1\"}")).andReturn().getResponse(),
                     () -> {
                         jitter();
@@ -137,6 +157,7 @@ class WithdrawRaceIT extends IntegrationTestBase {
     void aJoinArrivingWhileAWithdrawalHoldsTheMemberRowWaitsAndIsRejected() throws Exception {
         long groupBuyId = groupBuy().quantities(100, 9).insert(jdbc);
         seedLoginMember(30, "x30@school.ac.kr", "기다림", "password1");
+        session(30);
         try (var c = dataSource.getConnection()) {
             c.setAutoCommit(false);
             c.createStatement().executeQuery("SELECT id FROM member WHERE id = 30 FOR UPDATE").close();
@@ -155,11 +176,35 @@ class WithdrawRaceIT extends IntegrationTestBase {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM participation WHERE member_id = 30", Integer.class)).isZero();
     }
 
+    /** 탈퇴가 회원 행을 잡고 있는 동안 온 새 개설은 기다렸다가, 탈퇴가 커밋되면 401 이다(개설 쪽 FOR SHARE). */
+    @Test
+    void aNewGroupBuyArrivingWhileAWithdrawalHoldsTheMemberRowWaitsAndIsRejected() throws Exception {
+        seedLoginMember(32, "x32@school.ac.kr", "개설기다림", "password1");
+        session(32);
+        try (var c = dataSource.getConnection()) {
+            c.setAutoCommit(false);
+            c.createStatement().executeQuery("SELECT id FROM member WHERE id = 32 FOR UPDATE").close();
+            c.createStatement().executeUpdate("UPDATE member SET withdrawn_at = NOW(6) WHERE id = 32");
+            CompletableFuture<Integer> opening = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return open(32, 0);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            });
+            awaitLockWait(5000);
+            c.commit();
+            assertThat(opening.get()).isEqualTo(401);
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM group_buy WHERE organizer_id = 32", Integer.class)).isZero();
+    }
+
     /** 새 참여가 회원 행을 공유 잠금으로 잡고 참여 행을 넣는 동안 온 탈퇴는 기다렸다가, 그 참여를 보고 409 다(잠금 뒤 스냅샷). */
     @Test
     void aWithdrawalArrivingWhileAJoinHoldsTheMemberRowSeesTheJoin() throws Exception {
         long groupBuyId = groupBuy().quantities(100, 9).insert(jdbc);
         seedLoginMember(31, "x31@school.ac.kr", "참여중", "password1");
+        session(31);
         try (var c = dataSource.getConnection()) {
             c.setAutoCommit(false);
             c.createStatement().executeQuery("SELECT withdrawn_at FROM member WHERE id = 31 FOR SHARE").close();

@@ -40,7 +40,12 @@ class AuthFilter extends OncePerRequestFilter {
             sessions.resolveSession(raw).ifPresent(session -> members.findById(session.memberId()).ifPresent(m -> {
                 if (m.isWithdrawn()) {
                     // 탈퇴 커밋 뒤 삭제에서 빠진 세션(동시 로그인 등): 받지 않고 지운다. 계속 쓰이면 TTL 정리에도 걸리지 않는다.
-                    sessions.revoke(raw);
+                    // 지우기는 최선 노력이다: 탈퇴의 member_id 기준 삭제와 잠금 순서가 반대라 교착에 질 수 있다. 져도 이 요청은 비로그인이다.
+                    try {
+                        sessions.revoke(raw);
+                    } catch (org.springframework.dao.DataAccessException e) {
+                        // 남은 행은 다음 요청이나 SessionCleanup(TTL)이 지운다
+                    }
                     return;
                 }
                 var principal = new CurrentMember(m.getId(), m.getName(), m.getSchool());

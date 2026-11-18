@@ -1,7 +1,9 @@
 package com.camgong.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -24,6 +26,19 @@ class WithdrawSessionCleanupFailureIT extends IntegrationTestBase {
 
     @MockitoSpyBean
     WithdrawService withdrawService;
+
+    @Test
+    void aDeadlockInTheWithdrawTransactionIsRetriedOnce() throws Exception {
+        seedLoginMember(21, "d@school.ac.kr", "교착", "password1");
+        doThrow(new org.springframework.dao.CannotAcquireLockException("Deadlock found"))
+                .doCallRealMethod().when(withdrawService).anonymise(anyLong(), anyString(), any());
+
+        mockMvc.perform(post("/api/auth/withdraw").with(as(21)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"password\":\"password1\"}")).andExpect(status().isNoContent());
+
+        assertThat(jdbc.queryForObject("SELECT withdrawn_at IS NOT NULL FROM member WHERE id = 21", Boolean.class)).isTrue();
+        org.mockito.Mockito.verify(withdrawService, org.mockito.Mockito.times(2)).anonymise(anyLong(), anyString(), any());
+    }
 
     @Test
     void aFailedSessionDeleteAfterCommitStillAnswers204AndLogs(CapturedOutput output) throws Exception {
