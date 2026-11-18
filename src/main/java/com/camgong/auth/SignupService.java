@@ -192,9 +192,13 @@ public class SignupService {
         }
     }
 
-    /** "탈퇴한 회원"(010): 모든 공백(유니코드 공백, 가운데 공백 포함)을 지워 비교한다. "탈퇴한회원", "탈퇴한　회원"도 사칭이다. */
+    /**
+     * "탈퇴한 회원"(010): 모든 공백(유니코드 공백, 가운데 공백 포함)을 지워 비교한다. "탈퇴한회원", "탈퇴한　회원"도 사칭이다.
+     * 한글을 자모로 풀어 쓴 글자(NFD)도 같아 보이므로 NFC 로 모은 뒤 비교한다.
+     */
     private static boolean isReservedName(String displayName) {
-        return withoutSpaces(displayName).equals(withoutSpaces(Member.WITHDRAWN_NAME));
+        String composed = java.text.Normalizer.normalize(displayName, java.text.Normalizer.Form.NFC);
+        return withoutSpaces(composed).equals(withoutSpaces(Member.WITHDRAWN_NAME));
     }
 
     private static String withoutSpaces(String value) {

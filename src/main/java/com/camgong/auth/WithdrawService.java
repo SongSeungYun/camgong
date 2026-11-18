@@ -74,14 +74,19 @@ public class WithdrawService {
         login.completeSuccess(emailKey);
 
         tx.executeWithoutResult(s -> anonymise(memberId, emailKey, now));
-        // 세션은 커밋 뒤에 지운다. 트랜잭션 안(회원 행 X 잠금을 쥔 채)에서 지우면 같은 회원의 동시 로그인이 넣는 세션 행(FK 로 회원 행
-        // 공유 잠금)과 교착한다(WithdrawRaceIT 에서 재현). 지우기 전에 남은 세션이나 그 사이 들어온 세션은 AuthFilter 가 탈퇴한 회원이라
-        // 받지 않는다. 이 삭제가 실패해도 탈퇴는 이미 커밋됐으므로 204 로 끝내고 경고만 남긴다. 남은 행은 SessionCleanup 이 14일 TTL 로 지운다.
+        // 세션은 커밋 뒤에 지운다. 트랜잭션 안(회원 행 X 잠금을 쥔 채)에서 지우면 같은 회원의 세션 행을 넣는 문장과 교착할 수 있다:
+        // INSERT … ON DUPLICATE KEY UPDATE(테스트 도우미 as())로는 재현됐고, 실제 로그인의 단순 INSERT 로는 900회 경쟁에서 재현되지 않았다.
+        // 지우기 전에 남은 세션이나 그 사이 들어온 세션은 AuthFilter 가 탈퇴한 회원이라 받지 않고 지운다. 이 삭제가 실패해도 탈퇴는 이미 커밋됐으므로 204 로 끝내고 경고만 남긴다. 남은 행은 SessionCleanup 이 14일 TTL 로 지운다.
         try {
-            jdbc.sql("DELETE FROM login_session WHERE member_id = :id").param("id", memberId).update();
+            deleteSessions(memberId);
         } catch (RuntimeException e) {
             log.warn("withdraw-session-cleanup-failed memberId={} reason={}", memberId, e.getClass().getSimpleName());
         }
+    }
+
+    /** 커밋 뒤 세션 삭제. 실패해도 탈퇴가 204 로 끝나는지 테스트가 가로채는 지점이다. */
+    void deleteSessions(long memberId) {
+        jdbc.sql("DELETE FROM login_session WHERE member_id = :id").param("id", memberId).update();
     }
 
     /**

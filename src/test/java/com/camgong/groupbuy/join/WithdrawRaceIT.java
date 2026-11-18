@@ -104,6 +104,34 @@ class WithdrawRaceIT extends IntegrationTestBase {
                 outcomes.stream().filter(o::equals).count()).toList());
     }
 
+    /** 같은 회원의 로그인과 탈퇴를 동시에: 어떤 순서든 500 이 없고 탈퇴는 204, 로그인으로 받은 세션도 쓸 수 없다(AuthFilter). */
+    @Test
+    void loginRacingWithdrawalNeverFailsAndItsSessionIsUnusable() throws Exception {
+        for (int i = 0; i < REPEAT; i++) {
+            long member = 3000 + i;
+            String email = "l" + member + "@school.ac.kr";
+            seedLoginMember(member, email, "로그인경쟁" + member, "password1");
+            List<Callable<org.springframework.mock.web.MockHttpServletResponse>> calls = List.of(
+                    () -> mockMvc.perform(post("/api/auth/withdraw").with(as(member)).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"password\":\"password1\"}")).andReturn().getResponse(),
+                    () -> {
+                        jitter();
+                        return mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"email\":\"" + email + "\",\"password\":\"password1\"}")).andReturn().getResponse();
+                    });
+            var r = Concurrent.all(calls);
+            assertThat(r.get(0).getStatus()).as("탈퇴, 반복 %d", i).isEqualTo(204);
+            assertThat(r.get(1).getStatus()).as("로그인, 반복 %d", i).isIn(200, 401);
+            String cookie = r.get(1).getHeader("Set-Cookie");
+            if (cookie != null && cookie.startsWith("camgong_session=")) {
+                String raw = cookie.substring("camgong_session=".length(), cookie.indexOf(';'));
+                assertThat(mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/me")
+                        .cookie(new jakarta.servlet.http.Cookie("camgong_session", raw))).andReturn().getResponse().getStatus())
+                        .isEqualTo(401);
+            }
+        }
+    }
+
     /** 탈퇴가 회원 행을 잡고 있는 동안 온 새 참여는 기다렸다가, 탈퇴가 커밋되면 401 이다(참여 쪽 FOR SHARE). */
     @Test
     void aJoinArrivingWhileAWithdrawalHoldsTheMemberRowWaitsAndIsRejected() throws Exception {

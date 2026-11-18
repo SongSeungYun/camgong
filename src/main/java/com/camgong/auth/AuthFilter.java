@@ -37,8 +37,12 @@ class AuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String raw = sessionCookie(request);
         if (raw != null) {
-            sessions.resolveSession(raw).ifPresent(session -> members.findById(session.memberId())
-                    .filter(m -> !m.isWithdrawn()).ifPresent(m -> {
+            sessions.resolveSession(raw).ifPresent(session -> members.findById(session.memberId()).ifPresent(m -> {
+                if (m.isWithdrawn()) {
+                    // 탈퇴 커밋 뒤 삭제에서 빠진 세션(동시 로그인 등): 받지 않고 지운다. 계속 쓰이면 TTL 정리에도 걸리지 않는다.
+                    sessions.revoke(raw);
+                    return;
+                }
                 var principal = new CurrentMember(m.getId(), m.getName(), m.getSchool());
                 SecurityContextHolder.getContext()
                         .setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, List.of()));

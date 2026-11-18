@@ -120,8 +120,9 @@ class WithdrawIT extends IntegrationTestBase {
                 + "VALUES (SHA2('left-over', 256), ?, ?, ?)", ME, utc(START), utc(START));
         mockMvc.perform(get("/api/auth/me").cookie(new Cookie("camgong_session", "left-over")))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(get("/api/notifications").cookie(new Cookie("camgong_session", "left-over")))
-                .andExpect(status().isUnauthorized());
+        // 받지 않은 세션은 지운다(계속 쓰여도 TTL 정리에서 빠지지 않게)
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM login_session WHERE token_hash = SHA2('left-over', 256)",
+                Integer.class)).isZero();
         // 로그인이 회원을 읽은 뒤 탈퇴가 커밋되고 그 다음 세션이 들어간 경쟁: as() 는 세션 행을 새로 만든다
         mockMvc.perform(get("/api/auth/me").with(as(ME))).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/groupbuys/1").with(as(ME))).andExpect(status().isUnauthorized());
@@ -223,7 +224,7 @@ class WithdrawIT extends IntegrationTestBase {
     @Test
     void theReservedNameCannotBeTakenAtSignup() throws Exception {
         for (String name : List.of(WITHDRAWN, "  탈퇴한 회원\u3000", "탈퇴한회원", "탈퇴한  회원", "탈퇴한\u3000회원",
-                "탈\u00A0퇴한 회 원")) {
+                "탈\u00A0퇴한 회 원", java.text.Normalizer.normalize(WITHDRAWN, java.text.Normalizer.Form.NFD))) {
             mail.clear();
             jdbc.update("DELETE FROM pending_signup");
             mockMvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
