@@ -14,5 +14,6 @@ class SecretsInToStringTest {
         assertThat(verify).doesNotContain("very-secret-pw").doesNotContain("tok-123456").contains("홍길동");
         String authenticated = new Authenticated(new AuthResponse(new MemberView(1L, "홍", "school.ac.kr")), "raw-session-token").toString();
         assertThat(authenticated).doesNotContain("raw-session-token");
+        assertThat(new WithdrawRequest("very-secret-pw")).hasToString("WithdrawRequest[password=***]");
     }
 }
