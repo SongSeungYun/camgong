@@ -253,6 +253,7 @@ describe('탈퇴 (010)', () => {
   test('T018: 목 탈퇴는 그 회원이 연 공구(상태 무관)의 설명만 비운다', async () => {
     asOutsider([
       makeGroupBuy({ id: 3, title: '완료된 내 공구', organizerId: 3, status: 'COMPLETED', description: '010-1234-5678로 입금', participations: [{ memberId: 3, quantity: 2 }, { memberId: 1, quantity: 2 }] }),
+      makeGroupBuy({ id: 4, title: '실패한 내 공구', organizerId: 3, status: 'FAILED', description: '계좌 110-123', participations: [{ memberId: 3, quantity: 1 }] }),
       makeGroupBuy({ id: 5, title: '남의 공구', organizerId: 1, status: 'COMPLETED', description: '남의 설명', participations: [{ memberId: 1, quantity: 2 }, { memberId: 3, quantity: 2 }] }),
     ])
     renderApp('/me')
@@ -261,6 +262,7 @@ describe('탈퇴 (010)', () => {
     await userEvent.keyboard('{Enter}')
     await screen.findByText('탈퇴했어요.')
     expect(mockState.groupBuys.find((g) => g.id === 3)!.description).toBeNull()
+    expect(mockState.groupBuys.find((g) => g.id === 4)!.description).toBeNull()
     expect(mockState.groupBuys.find((g) => g.id === 5)!.description).toBe('남의 설명')
   })
 
@@ -271,6 +273,6 @@ describe('탈퇴 (010)', () => {
     renderApp('/groupbuys/3')
     await screen.findByRole('heading', { name: '완료된 공구', level: 1 })
     screen.getByText('햇반 210g')
-    expect(document.querySelector('article')!.textContent).not.toContain('null')
+    expect(document.querySelector('article [class*=desc]')).toBeNull() // 빈 설명 문단도 그리지 않는다
   })
 })

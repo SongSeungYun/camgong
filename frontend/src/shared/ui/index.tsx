@@ -34,11 +34,9 @@ interface FieldProps {
   label: string
   /** 필드 옆에 보이는 오류(서버 errors[].message 포함) */
   error?: string
-  /** 필드 아래 늘 보이는 안내. aria-describedby로 연결된다 */
-  hint?: string
 }
 
-function Field({ label, error, hint, children, id }: FieldProps & { children: (a: { id: string; 'aria-invalid': boolean; 'aria-describedby'?: string }) => ReactNode; id: string }) {
+function Field({ label, error, hint, children, id }: FieldProps & { hint?: string; children: (a: { id: string; 'aria-invalid': boolean; 'aria-describedby'?: string }) => ReactNode; id: string }) {
   const errId = `${id}-err`
   const hintId = `${id}-hint`
   const describedBy = [error && errId, hint && hintId].filter(Boolean).join(' ') || undefined
@@ -66,7 +64,8 @@ export function SelectField({ label, error, children, ...rest }: FieldProps & Co
   return <Field id={id} label={label} error={error}>{(a) => <select {...rest} {...a}>{children}</select>}</Field>
 }
 
-export function TextAreaField({ label, error, hint, ...rest }: FieldProps & ComponentProps<'textarea'>) {
+/** hint: 필드 아래 늘 보이는 안내. aria-describedby로 연결된다 */
+export function TextAreaField({ label, error, hint, ...rest }: FieldProps & { hint?: string } & ComponentProps<'textarea'>) {
   const id = useId()
   return <Field id={id} label={label} error={error} hint={hint}>{(a) => <textarea {...rest} {...a} />}</Field>
 }
