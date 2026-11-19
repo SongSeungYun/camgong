@@ -4,6 +4,7 @@ import type { MyRole } from '../features/groupbuy/api'
 import { GroupBuyCard } from '../features/groupbuy/list/GroupBuyCard'
 import s from '../features/groupbuy/list/GroupBuyCard.module.css'
 import { useMyGroupBuys } from '../features/groupbuy/mine/useMyGroupBuys'
+import { WithdrawSection } from '../features/auth/WithdrawSection'
 import { Button, Layout, StateView } from '../shared/ui'
 
 const TABS: { role: MyRole; param: string | null; label: string; empty: string }[] = [
@@ -54,6 +55,7 @@ export default function MyPage() {
         )}
       </StateView>
       </div>
+      <WithdrawSection />
     </Layout>
   )
 }

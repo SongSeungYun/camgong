@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ComponentProps, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ComponentProps, type ReactNode, type RefObject } from 'react'
 import { isKnownStatus, type KnownStatus } from '../api/types'
 import s from './ui.module.css'
 
@@ -36,12 +36,15 @@ interface FieldProps {
   error?: string
 }
 
-function Field({ label, error, children, id }: FieldProps & { children: (a: { id: string; 'aria-invalid': boolean; 'aria-describedby'?: string }) => ReactNode; id: string }) {
+function Field({ label, error, hint, children, id }: FieldProps & { hint?: string; children: (a: { id: string; 'aria-invalid': boolean; 'aria-describedby'?: string }) => ReactNode; id: string }) {
   const errId = `${id}-err`
+  const hintId = `${id}-hint`
+  const describedBy = [error && errId, hint && hintId].filter(Boolean).join(' ') || undefined
   return (
     <div className={s.field}>
       <label htmlFor={id}>{label}</label>
-      {children({ id, 'aria-invalid': !!error, 'aria-describedby': error ? errId : undefined })}
+      {children({ id, 'aria-invalid': !!error, 'aria-describedby': describedBy })}
+      {hint && <p id={hintId}>{hint}</p>}
       {error && (
         <p id={errId} className={s.error} role="alert">
           {error}
@@ -61,9 +64,10 @@ export function SelectField({ label, error, children, ...rest }: FieldProps & Co
   return <Field id={id} label={label} error={error}>{(a) => <select {...rest} {...a}>{children}</select>}</Field>
 }
 
-export function TextAreaField({ label, error, ...rest }: FieldProps & ComponentProps<'textarea'>) {
+/** hint: 필드 아래 늘 보이는 안내. aria-describedby로 연결된다 */
+export function TextAreaField({ label, error, hint, ...rest }: FieldProps & { hint?: string } & ComponentProps<'textarea'>) {
   const id = useId()
-  return <Field id={id} label={label} error={error}>{(a) => <textarea {...rest} {...a} />}</Field>
+  return <Field id={id} label={label} error={error} hint={hint}>{(a) => <textarea {...rest} {...a} />}</Field>
 }
 
 const STATUS_LABELS: Record<KnownStatus, string> = {
@@ -111,19 +115,27 @@ export function StateView({ state, children, emptyText = '표시할 내용이 �
 interface ConfirmDialogProps {
   open: boolean
   title: string
-  message?: string
+  /** 설명(aria-describedby). 글이면 문단 하나, 여러 문단이면 노드로 */
+  message?: ReactNode
   confirmLabel?: string
   cancelLabel?: string
   pending?: boolean
   onConfirm: () => void
   onCancel: () => void
+  /** 안내와 버튼 사이에 넣을 내용(예: 비밀번호 입력). 첫 포커스는 그 안의 첫 입력으로 간다 */
+  children?: ReactNode
+  /** 닫힌 뒤 포커스를 돌려줄 요소. 없으면 열 때 포커스가 있던 요소(Safari처럼 클릭해도 버튼에 포커스가 안 가면 본문) */
+  returnFocus?: RefObject<HTMLElement | null>
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 /** 열리면 포커스가 안으로 가고, Tab은 안에서만 돌며, Esc는 취소, 닫으면 열기 전 요소로 포커스가 돌아온다. */
-export function ConfirmDialog({ open, title, message, confirmLabel = '확인', cancelLabel = '취소', pending, onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, message, confirmLabel = '확인', cancelLabel = '취소', pending, onConfirm, onCancel, children, returnFocus }: ConfirmDialogProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const descId = useId()
+  const returnRef = useRef(returnFocus)
+  returnRef.current = returnFocus
   const cancelRef = useRef(onCancel)
   cancelRef.current = onCancel
   const pendingRef = useRef(pending)
@@ -131,7 +143,9 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '확인', c
 
   useEffect(() => {
     if (!open) return
-    const opener = document.activeElement as HTMLElement | null
+    const active = document.activeElement as HTMLElement | null
+    // 클릭해도 버튼에 포커스가 가지 않는 브라우저(Safari·iOS)에선 activeElement가 body다. 그건 돌아갈 곳이 아니다
+    const opener = returnRef.current?.current ?? (active && active !== document.body ? active : null)
     const node = ref.current!
     const items = () => Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE))
     // 취소(첫 버튼)에 먼저 포커스: 실수로 Enter를 눌러도 되돌릴 수 없는 확인이 실행되지 않는다
@@ -173,9 +187,10 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '확인', c
   if (!open) return null
   return (
     <div className={s.backdrop}>
-      <div ref={ref} className={s.dialog} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
+      <div ref={ref} className={s.dialog} role="dialog" aria-modal="true" aria-label={title} aria-describedby={message ? descId : undefined} tabIndex={-1}>
         <h2>{title}</h2>
-        {message && <p>{message}</p>}
+        {message && <div id={descId}>{typeof message === 'string' ? <p>{message}</p> : message}</div>}
+        {children}
         <div className={s.actions}>
           <Button variant="secondary" onClick={onCancel} disabled={pending}>{cancelLabel}</Button>
           <Button onClick={onConfirm} pending={pending}>{confirmLabel}</Button>

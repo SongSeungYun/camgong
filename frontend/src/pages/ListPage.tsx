@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { uniqueById } from '../shared/lib/uniqueById'
 import { useSession } from '../features/auth/session'
 import { GroupBuyCard } from '../features/groupbuy/list/GroupBuyCard'
@@ -22,7 +22,18 @@ export default function ListPage() {
   const params = anonymous ? urlParams : { ...urlParams, school: '' }
   const scope = status === 'checking' ? null : status === 'error' ? 'unknown' : (mySchool ?? 'all')
   const q = useGroupBuyList(params, scope)
-  const notice = (useLocation().state as { notice?: string } | null)?.notice
+  // 이동해 온 안내(공구 취소·탈퇴): 한 번 보여주고 기록(state)에서 지운다(새로고침·뒤로 가기에 다시 뜨지 않게).
+  // 처음부터 글이 든 status는 낭독이 불안정해 안내로 포커스를 옮긴다
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [notice] = useState(() => (location.state as { notice?: string } | null)?.notice)
+  const noticeRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    if (!notice) return
+    noticeRef.current?.focus()
+    void navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 처음 한 번만
+  }, [])
   const loaded = uniqueById(q.data?.pages.flatMap((p) => p.items) ?? [])
   // 검수 4: 화면이 아는 범위와 서버가 쓴 범위가 다르면(다른 탭에서 로그인·로그아웃, 세션 만료·탈퇴) 그 목록을 버리고 로그인을 다시 확인한다.
   // 기대 학교: 로그인이면 내 학교, 비로그인이고 학교를 골랐으면 그 학교. 비로그인 전국 목록은 확인할 기준이 없다.
@@ -50,7 +61,7 @@ export default function ListPage() {
   return (
     <Layout>
       <h1>공구 목록</h1>
-      {notice && <p role="status">{notice}</p>}
+      {notice && <p role="status" tabIndex={-1} ref={noticeRef}>{notice}</p>}
       {mySchool !== null && <p>우리 학교 · {mySchool}</p>}
       {anonymous && <SchoolSearch selected={params.school} onSelect={(school) => setParams({ school })} />}
       <ListFilters params={params} qInput={qInput} onQ={setQInput} onChange={setParams} />

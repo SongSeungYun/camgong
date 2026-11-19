@@ -59,5 +59,5 @@ mockState.reset()
 
 export const currentMember = () => {
   if (mockState.sessionExpired) mockState.sessionMemberId = null
-  return mockState.members.find((m) => m.id === mockState.sessionMemberId) ?? null
+  return mockState.members.find((m) => m.id === mockState.sessionMemberId && !m.withdrawn) ?? null
 }

@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { verify } from '../features/auth/api'
+import { ConsentText } from '../features/auth/ConsentText'
 import { ResendBox } from '../features/auth/ResendBox'
 import { useSession } from '../features/auth/session'
 import { useState } from 'react'
@@ -81,13 +82,13 @@ export default function VerifyPage() {
         <p>2~20자. 다른 사람에게 보이는 이름이에요.</p>
         <TextField label="비밀번호" type="password" autoComplete="new-password" error={errors.password?.message} {...register('password')} />
         <p>8자 이상(72바이트 이하).</p>
+        <details>
+          <summary>자세히 보기</summary>
+          <ConsentText />
+        </details>
         <label>
           <input type="checkbox" {...register('consent')} /> 개인정보 수집·이용에 동의해요.
         </label>
-        <details>
-          <summary>안내문 보기</summary>
-          <p>수집하는 항목: 이메일, 표시 이름, 비밀번호(암호화해 저장해요). 이용 목적: 가입 확인과 공동구매 서비스 이용. 보관: 탈퇴할 때까지.</p>
-        </details>
         {errors.consent?.message && <p role="alert">{errors.consent.message}</p>}
         {topErrors.map((t) => <p key={t} role="alert">{t}</p>)}
         {already && <p><Link to="/login">로그인하러 가기</Link></p>}

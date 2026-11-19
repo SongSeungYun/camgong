@@ -6,6 +6,8 @@ export interface SeedMember {
   email: string
   password: string // 목 전용 가짜 값. 실제 계정이 아니다.
   school: string
+  /** 010: 탈퇴하면 true. 이름은 "탈퇴한 회원", 이메일·비밀번호는 지운다 */
+  withdrawn?: boolean
 }
 
 export const SEED_MEMBERS: SeedMember[] = [

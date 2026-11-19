@@ -19,6 +19,8 @@ interface Session {
   /** status가 error일 때 me를 다시 확인한다 */
   retry: () => void
   logout: () => Promise<void>
+  /** 서버 세션이 이미 끝났을 때(탈퇴 성공) 화면 세션과 캐시만 비운다. 만료 안내는 켜지 않는다 */
+  forget: () => void
 }
 
 const Ctx = createContext<Session | null>(null)
@@ -80,6 +82,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
         clear()
       },
+      forget: () => clear(),
     }),
     [state, clear, checkMe],
   )

@@ -196,8 +196,8 @@ describe('가입·인증 (변경 B2: 가입은 이메일만, 이름·비밀번�
 
   test('9. 동의 안내문을 볼 수 있다', async () => {
     renderApp(`/verify?token=${await newToken()}`)
-    await userEvent.click(await screen.findByText('안내문 보기'))
-    screen.getByText(/수집하는 항목/)
+    await userEvent.click(await screen.findByText('자세히 보기')) // 010: docs/consent-v1.md 본문
+    screen.getByText('캠공은 같은 학교 학생끼리 공동구매를 하기 위해 아래 정보를 받습니다.')
   })
 
   test('9. 필드 오류는 각 입력란 옆에 한 번에 보이고 입력값이 유지되며, 같은 링크로 고쳐 다시 제출하면 성공한다', async () => {
