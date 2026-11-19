@@ -202,6 +202,7 @@ class VerifyEmailIT extends IntegrationTestBase {
                 new Case("displayName", verify(token, "\u00A0\u00A0")),          // 줄바꿈 없는 공백만
                 new Case("displayName", verify(token, "\u200B\u200B")),          // 폭 없는 공백만
                 new Case("displayName", verify(token, "홍\u200B길동")),            // 보이지 않는 글자가 섞임
+                new Case("displayName", verify(token, "홍길동\uFFF0")),            // 미할당 기본 무시 글자(010 T020)
                 new Case("displayName", verify(token, "\uD83D\uDE00")),             // 이모지 한 글자(UTF-16 2단위)
                 new Case("displayName", verify(token, "\uD83D\uDE00".repeat(21))),
                 new Case("displayName", verify(token, "홍길동\u3164")),            // 한글 채움 문자(빈칸처럼 보임)

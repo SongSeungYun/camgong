@@ -224,11 +224,20 @@ class WithdrawIT extends IntegrationTestBase {
         assertThat(statuses).containsExactlyInAnyOrder(204, 401);
     }
 
+    /** "탈퇴한 회원"을 자모로 풀어 쓰고 첫 음절의 초성·중성 사이에 mark 를 끼운다(NFC 가 이 음절을 합치지 못한다). */
+    private static String splitJamo(String mark) {
+        String nfd = java.text.Normalizer.normalize(WITHDRAWN, java.text.Normalizer.Form.NFD);
+        return nfd.charAt(0) + mark + nfd.substring(1);
+    }
+
     @Test
     void theReservedNameCannotBeTakenAtSignup() throws Exception {
         for (String name : List.of(WITHDRAWN, "  탈퇴한 회원\u3000", "탈퇴한회원", "탈퇴한  회원", "탈퇴한\u3000회원",
                 "탈\u00A0퇴한 회 원", java.text.Normalizer.normalize(WITHDRAWN, java.text.Normalizer.Form.NFD),
-                "탈퇴한 회원\uFE0F", "탈퇴한\u034F 회원", "탈\uDB40\uDD00퇴한 회원", "탈퇴한 회원\u200B")) {
+                "탈퇴한 회원\uFE0F", "탈퇴한\u034F 회원", "탈\uDB40\uDD00퇴한 회원", "탈퇴한 회원\u200B",
+                // 010 T020: 미할당 기본 무시 글자, 풀어 쓴 자모 사이에 끼운 결합 표시(걸러낸 뒤에야 한 글자로 합쳐진다)
+                "탈퇴한 회원\uFFF0", "탈퇴한 회원\u2065", "탈퇴한 회원\uDB40\uDC02", "탈퇴한 회원\uDB40\uDC80",
+                "탈퇴한 회원\uDB40\uDDF0", splitJamo("\u034F"), splitJamo("\uFE00"))) {
             mail.clear();
             jdbc.update("DELETE FROM pending_signup");
             mockMvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)

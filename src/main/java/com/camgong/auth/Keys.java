@@ -36,7 +36,17 @@ public final class Keys {
     public static boolean isInvisible(int codePoint) {
         int type = Character.getType(codePoint);
         return type == Character.FORMAT || type == Character.CONTROL
-                || codePoint == 0x115F || codePoint == 0x1160 || codePoint == 0x3164 || codePoint == 0xFFA0 || codePoint == 0x2800;
+                || codePoint == 0x115F || codePoint == 0x1160 || codePoint == 0x3164 || codePoint == 0xFFA0 || codePoint == 0x2800
+                || type == Character.UNASSIGNED && isDefaultIgnorableBlock(codePoint);
+    }
+
+    /**
+     * 아직 배정되지 않은 기본 무시 칸(Default_Ignorable_Code_Point 의 미할당 부분). 글꼴이 없어도 화면에 아무것도 그리지 않는다.
+     * 미할당 전체(UNASSIGNED)로 넓히지 않는다: JDK 보다 새 이모지가 거부되고, 그 밖의 미할당 칸은 상자로 보여 사칭에 못 쓴다.
+     * 이 칸에 나중에 글자가 배정되면 FORMAT·NON_SPACING_MARK 가 되어 위 조건이나 예약 이름 판정이 잡는다.
+     */
+    private static boolean isDefaultIgnorableBlock(int codePoint) {
+        return codePoint == 0x2065 || codePoint >= 0xFFF0 && codePoint <= 0xFFF8 || codePoint >= 0xE0000 && codePoint <= 0xE0FFF;
     }
 
     /** 글자 수(코드 포인트 수). 이모지처럼 UTF-16 두 단위인 글자도 한 글자로 센다(DB VARCHAR 와 같은 기준). */
