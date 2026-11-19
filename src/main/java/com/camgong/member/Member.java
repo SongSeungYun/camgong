@@ -14,6 +14,9 @@ import jakarta.persistence.Table;
 @Table(name = "member")
 public class Member {
 
+    /** 탈퇴한 회원이 모든 화면에 보이는 이름(010). 가입 때 이 이름은 쓸 수 없다. */
+    public static final String WITHDRAWN_NAME = "탈퇴한 회원";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -36,6 +39,9 @@ public class Member {
 
     /** 학교 키(009). 가입 확인 때 메일 도메인으로 정하고 바뀌지 않는다. */
     private String school;
+
+    /** 탈퇴 시각(010). 있으면 이 회원의 세션은 없는 것으로 다룬다. */
+    private Instant withdrawnAt;
 
     protected Member() {
     }
@@ -71,5 +77,13 @@ public class Member {
 
     public String getSchool() {
         return school;
+    }
+
+    public String getEmailKey() {
+        return emailKey;
+    }
+
+    public boolean isWithdrawn() {
+        return withdrawnAt != null;
     }
 }

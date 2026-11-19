@@ -102,4 +102,30 @@ class PrivacyIT extends IntegrationTestBase {
         assertThat(jdbc.queryForObject("SELECT password_hash FROM member WHERE email_key = ?", String.class, email))
                 .matches(bcrypt);
     }
+
+    /** 010 T016: 가입 경합의 UNIQUE 위반(MySQL 메시지 'Duplicate entry <값>')이 로그에 이메일·표시 이름을 남기지 않는다. */
+    @Test
+    void uniqueViolationsDuringSignupDoNotLogTheEmailOrDisplayName(CapturedOutput output) throws Exception {
+        // 경합에서 먼저 끝난 가입을 직접 넣는다: 이름이 같은 회원, 이메일이 같은 회원.
+        jdbc.update("INSERT INTO member (name, display_name_key, email, email_key, password_hash, consent_at, "
+                + "consent_version, created_at, school) VALUES ('경합이름', '경합이름', 'winner.raced@school.ac.kr', "
+                + "'winner.raced@school.ac.kr', 'x', NOW(), 'v1', NOW(), 'school.ac.kr')");
+
+        mockMvc.perform(postJson("/api/auth/signup", signup("loser.raced@school.ac.kr")));
+        String link = mail.sent().get(mail.sent().size() - 1).verifyLink();
+        String nameToken = link.substring(link.indexOf("token=") + "token=".length());
+        call(postJson("/api/auth/verify", verify(nameToken, "경합이름", "racing-pw-123")));      // 409 DISPLAY_NAME_TAKEN
+
+        mockMvc.perform(postJson("/api/auth/signup", signup("dup.raced@school.ac.kr")));
+        link = mail.sent().get(mail.sent().size() - 1).verifyLink();
+        String emailToken = link.substring(link.indexOf("token=") + "token=".length());
+        jdbc.update("UPDATE member SET email = 'dup.raced@school.ac.kr', email_key = 'dup.raced@school.ac.kr' "
+                + "WHERE email_key = 'winner.raced@school.ac.kr'");
+        call(postJson("/api/auth/verify", verify(emailToken, "다른이름", "racing-pw-123")));      // 409 ALREADY_REGISTERED
+
+        assertThat(bodies).anySatisfy(b -> assertThat(b).contains("DISPLAY_NAME_TAKEN"))
+                .anySatisfy(b -> assertThat(b).contains("ALREADY_REGISTERED"));
+        String logs = String.join("\n", output.getAll().lines().filter(l -> !l.contains("LoggingMailSender")).toList());
+        assertThat(logs).doesNotContain("경합이름").doesNotContain("raced@school.ac.kr").doesNotContain("Duplicate entry");
+    }
 }

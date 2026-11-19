@@ -164,6 +164,8 @@ public class SignupService {
             errors.add(new ApiException.Field("displayName", "표시 이름을 입력해 주세요."));
         } else if (Keys.length(displayName) < 2 || Keys.length(displayName) > 20) {
             errors.add(new ApiException.Field("displayName", "표시 이름은 2~20자여야 합니다."));
+        } else if (isReservedName(displayName)) {
+            errors.add(new ApiException.Field("displayName", "쓸 수 없는 이름입니다."));
         } else if (Keys.hasInvisible(displayName)) {
             errors.add(new ApiException.Field("displayName", "보이지 않는 글자는 이름에 쓸 수 없습니다."));
         } else if (Keys.length(Keys.normalize(displayName)) > 20) {
@@ -188,6 +190,23 @@ public class SignupService {
         if (!errors.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.", errors);
         }
+    }
+
+    /**
+     * "탈퇴한 회원"(010): 화면에서 같아 보이는 이름은 모두 사칭이다. NFC 로 모은 뒤(자모로 풀어 쓴 한글) 공백(유니코드·가운데 포함),
+     * 보이지 않는 글자(Keys.isInvisible), 결합 표시(Mn: 변형 선택자, U+034F 등)를 모두 지우고 비교한다.
+     * 결합 표시는 이 판정에서만 지운다: Keys.isInvisible 로 넓히면 "❤️" 같은 이름이 깨진다.
+     */
+    private static boolean isReservedName(String displayName) {
+        return looks(displayName).equals(looks(Member.WITHDRAWN_NAME));
+    }
+
+    private static String looks(String value) {
+        StringBuilder out = new StringBuilder();
+        java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFC).codePoints()
+                .filter(c -> !Keys.isSpace(c) && !Keys.isInvisible(c) && Character.getType(c) != Character.NON_SPACING_MARK)
+                .forEach(out::appendCodePoint);
+        return out.toString();
     }
 
     /** 인증 메일 재발송. 표시 이름·비밀번호는 그대로 두고 새 토큰만 건다. */

@@ -18,7 +18,8 @@ mysql_exec() { docker exec -i $DB mysql --default-character-set=utf8mb4 -uroot -
 
 docker rm -f $DB >/dev/null 2>&1 || true
 docker run -d --name $DB -p $DBPORT:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=camgong mysql:8.4 >/dev/null
-until docker exec $DB mysqladmin ping -uroot -ppw --silent 2>/dev/null; do sleep 2; done
+# TCP 로 확인한다: 초기화 중의 임시 서버는 소켓만 열어서 소켓 ping 은 초기화가 끝나기 전에 성공한다
+until docker exec $DB mysqladmin ping -h 127.0.0.1 -uroot -ppw --silent 2>/dev/null; do sleep 2; done
 
 start_app() {
   DB_URL="jdbc:mysql://localhost:$DBPORT/camgong?useAffectedRows=true" nohup java -Xms512m -Xmx512m -jar "$JAR" \

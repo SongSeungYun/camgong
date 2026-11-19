@@ -20,8 +20,11 @@ class AuthController {
     private final SignupService signupService;
     private final LoginService loginService;
     private final SessionService sessions;
+    private final WithdrawService withdrawService;
 
-    AuthController(SignupService signupService, LoginService loginService, SessionService sessions) {
+    AuthController(SignupService signupService, LoginService loginService, SessionService sessions,
+            WithdrawService withdrawService) {
+        this.withdrawService = withdrawService;
         this.signupService = signupService;
         this.loginService = loginService;
         this.sessions = sessions;
@@ -57,6 +60,15 @@ class AuthController {
     @PostMapping("/logout")
     ResponseEntity<Void> logout(@CookieValue(name = SessionService.COOKIE_NAME, required = false) String rawToken) {
         sessions.revoke(rawToken);
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, sessions.clearCookie().toString())
+                .build();
+    }
+
+    /** 탈퇴(010). 성공하면 이 쿠키도 지운다(다른 세션은 서비스가 모두 지운다). */
+    @PostMapping("/withdraw")
+    ResponseEntity<Void> withdraw(CurrentMember me, @RequestBody WithdrawRequest request) {
+        withdrawService.withdraw(me.id(), request.password());
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, sessions.clearCookie().toString())
                 .build();

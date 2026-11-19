@@ -28,10 +28,11 @@ class NotificationWriter {
     /** 연달아 이만큼 행을 포기하면 이 사건의 나머지를 포기한다. 한 행만 계속 실패하는 경우(독 행)는 격리되어 나머지가 계속 처리된다. */
     private static final int GIVE_UPS_BEFORE_ABORT = 2;
 
+    /** 탈퇴한 회원에게는 쓰지 않는다(010): 받는 사람 행을 읽어 거른다. 탈퇴와 겹치면 INSERT … SELECT 의 공유 잠금이 탈퇴 커밋을 기다린다. */
     private static final String INSERT = """
             INSERT INTO notification (event_id, recipient_id, type, group_buy_id, group_buy_title, changed_fields, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE id = id""";
+            SELECT ?, ?, ?, ?, ?, ?, ? FROM member m WHERE m.id = ? AND m.withdrawn_at IS NULL
+            ON DUPLICATE KEY UPDATE notification.id = notification.id""";
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
@@ -131,5 +132,6 @@ class NotificationWriter {
         ps.setString(5, r.groupBuyTitle());
         ps.setString(6, r.changedFields());
         ps.setObject(7, LocalDateTime.ofInstant(r.createdAt(), ZoneOffset.UTC));   // Timestamp 는 JVM↔접속 시간대 변환을 타므로 쓰지 않는다
+        ps.setLong(8, r.recipientId());
     }
 }

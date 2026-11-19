@@ -112,7 +112,7 @@ public class LoginService {
         jdbc.sql("DELETE FROM login_attempt WHERE email_key = :key").param("key", emailKey).update();
     }
 
-    private ApiException locked(String emailKey, Instant now) {
+    ApiException locked(String emailKey, Instant now) {
         Instant until = lockedUntil(emailKey).filter(t -> t.isAfter(now)).orElse(now);
         return new ApiException(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_LOCKED",
                 "로그인 시도가 너무 많습니다. 잠시 뒤에 다시 시도해 주세요.").retryAt(until, now);

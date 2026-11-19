@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.camgong.auth.ActiveMember;
 import com.camgong.common.ApiException;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCancelled;
 import com.camgong.groupbuy.GroupBuyEvents.GroupBuyChanged;
@@ -28,10 +29,12 @@ public class GroupBuyService {
     private final Clock clock;
     private final ApplicationEventPublisher events;
     private final GroupBuyCompletion completion;
+    private final ActiveMember activeMember;
 
     public GroupBuyService(GroupBuyRepository groupBuys,
             ParticipationRepository participations, CreateGuard createGuard, Clock clock,
-            ApplicationEventPublisher events, GroupBuyCompletion completion) {
+            ApplicationEventPublisher events, GroupBuyCompletion completion, ActiveMember activeMember) {
+        this.activeMember = activeMember;
         this.completion = completion;
         this.groupBuys = groupBuys;
         this.participations = participations;
@@ -42,6 +45,7 @@ public class GroupBuyService {
 
     @Transactional
     public GroupBuyResponse create(Long memberId, String school, GroupBuyRequest r) {
+        activeMember.lockShared(memberId);              // 첫 문장: 동시에 온 탈퇴와 직렬화한다(010)
         Instant now = Instant.now(clock);
 
         // 검증은 가드보다 먼저: 실패한 요청이 가드를 소모하면 같은 본문 재전송이 400 이 아닌 409 가 된다.
