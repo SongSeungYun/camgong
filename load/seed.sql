@@ -7,10 +7,10 @@ DELETE FROM participation;
 DELETE FROM group_buy;
 DELETE FROM member;
 
-INSERT INTO member (id, name, display_name_key, email, email_key, password_hash, consent_at, consent_version, created_at)
+INSERT INTO member (id, name, display_name_key, email, email_key, password_hash, consent_at, consent_version, created_at, school)
 WITH RECURSIVE seq (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < 101)
 SELECT n, CONCAT('벤치회원', n), CONCAT('벤치회원', n), CONCAT('b', n, '@school.ac.kr'), CONCAT('b', n, '@school.ac.kr'), 'x',
-       UTC_TIMESTAMP(6), 'v1', UTC_TIMESTAMP(6)
+       UTC_TIMESTAMP(6), 'v1', UTC_TIMESTAMP(6), 'school.ac.kr'
 FROM seq;
 
 INSERT INTO login_session (token_hash, member_id, created_at, last_used_at)

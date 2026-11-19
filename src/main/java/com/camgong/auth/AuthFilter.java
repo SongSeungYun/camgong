@@ -35,7 +35,7 @@ class AuthFilter extends OncePerRequestFilter {
         String raw = sessionCookie(request);
         if (raw != null) {
             sessions.resolveSession(raw).ifPresent(session -> members.findById(session.memberId()).ifPresent(m -> {
-                var principal = new CurrentMember(m.getId(), m.getName());
+                var principal = new CurrentMember(m.getId(), m.getName(), m.getSchool());
                 SecurityContextHolder.getContext()
                         .setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, List.of()));
                 // 서버의 14일 슬라이딩에 쿠키 수명도 맞춘다. 갱신된 요청에서만 다시 내려 쓰기가 늘지 않게 한다.

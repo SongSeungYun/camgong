@@ -74,11 +74,13 @@ public final class GroupBuySeed {
     }
 
     public long insert(JdbcTemplate jdbc) {
+        // 공구의 학교는 개설자의 학교다(009).
         jdbc.update("INSERT INTO group_buy (organizer_id, title, description, item_name, unit_price, total_quantity, "
-                + "secured_quantity, deadline, category, item_url, open_chat_url, status, version, created_at, updated_at) "
-                + "VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'https://example.com/item', 'https://open.kakao.com/o/abc', ?, 0, ?, ?)",
+                + "secured_quantity, deadline, category, item_url, open_chat_url, status, version, created_at, updated_at, school) "
+                + "VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'https://example.com/item', 'https://open.kakao.com/o/abc', ?, 0, ?, ?, "
+                + "(SELECT school FROM member WHERE id = ?))",
                 organizerId, title, itemName, unitPrice, total, secured, utc(deadline), category, status, utc(createdAt),
-                utc(createdAt));
+                utc(createdAt), organizerId);
         return jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 

@@ -265,8 +265,8 @@ class VerifyEmailIT extends IntegrationTestBase {
         requestSignup("new@school.ac.kr");
         String token = lastToken();
         jdbc.update("INSERT INTO member (name, display_name_key, email, email_key, password_hash, consent_at, "
-                + "consent_version, created_at) VALUES ('선점자', '선점자', 'new@school.ac.kr', 'new@school.ac.kr', "
-                + "'x', NOW(), 'v1', NOW())");
+                + "consent_version, created_at, school) VALUES ('선점자', '선점자', 'new@school.ac.kr', 'new@school.ac.kr', "
+                + "'x', NOW(), 'v1', NOW(), 'school.ac.kr')");
 
         verifyToken(verify(token)).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("ALREADY_REGISTERED"));
@@ -280,8 +280,8 @@ class VerifyEmailIT extends IntegrationTestBase {
         requestSignup("display_name_key@school.ac.kr");
         String token = lastToken();
         jdbc.update("INSERT INTO member (name, display_name_key, email, email_key, password_hash, consent_at, "
-                + "consent_version, created_at) VALUES ('선점자', '선점자', 'display_name_key@school.ac.kr', "
-                + "'display_name_key@school.ac.kr', 'x', NOW(), 'v1', NOW())");
+                + "consent_version, created_at, school) VALUES ('선점자', '선점자', 'display_name_key@school.ac.kr', "
+                + "'display_name_key@school.ac.kr', 'x', NOW(), 'v1', NOW(), 'school.ac.kr')");
 
         verifyToken(verify(token)).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("ALREADY_REGISTERED"));

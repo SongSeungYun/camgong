@@ -29,7 +29,7 @@ public class GroupBuyController {
     ResponseEntity<GroupBuyResponse> create(
             CurrentMember me,
             @Valid @RequestBody GroupBuyRequest request) {
-        GroupBuyResponse created = service.create(me.id(), request);
+        GroupBuyResponse created = service.create(me.id(), me.school(), request);
         return ResponseEntity.created(URI.create("/api/groupbuys/" + created.id())).body(created);
     }
 
