@@ -5,7 +5,7 @@
 
 ## GET /api/groupbuys — 목록
 
-**인증**: 불필요(로그인 없이 누구나). 헤더가 있어도 쓰지 않는다.
+**인증**: 불필요(로그인 없이 누구나). 세션이 있으면 쓴다: 로그인한 회원의 목록·검색은 회원의 학교 공구로만 좁힌다. 비로그인은 전국 공구이고 `school`로 한 학교를 고를 수 있다. 자세한 규칙은 [009 school-api.md](../../009-school-scope/contracts/school-api.md).
 
 **쿼리 파라미터**
 
@@ -17,6 +17,7 @@
 | `sort` | `latest`, `deadline` | `latest` | 최신순(개설 시각 늦은 순) / 마감 임박순(마감 시각 이른 순) |
 | `cursor` | 문자열 | 없음 | 이전 응답의 `nextCursor`. 같은 `sort`·필터로만 유효 |
 | `size` | 1~50 | 20 | 한 번에 받을 개수 |
+| `school` | 학교 키(예: `snu.ac.kr`), 253자 이하 | 없음 | 비로그인일 때만 쓴다. 로그인했으면 무시하고 회원의 학교로 거른다(009) |
 
 **성공** `200 OK`
 
@@ -32,7 +33,8 @@
       "securedQuantity": 9,
       "totalQuantity": 24,
       "deadline": "2026-11-01T18:00:00+09:00",
-      "status": "OPEN"
+      "status": "OPEN",
+      "school": "snu.ac.kr"
     }
   ],
   "nextCursor": "eyJ..."
@@ -41,11 +43,11 @@
 
 - 다음 페이지가 없으면 `nextCursor`는 `null`이다. 전체 건수는 주지 않는다.
 - 결과가 없으면 `items: []`이다(오류가 아니다). 검색 결과 없음과 빈 목록의 안내 구분은 화면이 `q` 유무로 한다.
-- 카드에는 개설자 정보와 구매처 링크가 없다.
+- 카드에는 개설자 정보와 구매처 링크가 없다. `school`은 공구의 학교 키다(009).
 
 | 상태 | 조건 |
 |------|------|
-| 400 | 지원하지 않는 `status`·`category`·`sort`, `size` 범위 밖, `q`가 50자 초과, 커서가 잘못되었거나 `sort`와 맞지 않음 |
+| 400 | 지원하지 않는 `status`·`category`·`sort`, `size` 범위 밖, `q`가 50자 초과, `school`이 253자 초과(로그인해도 검사, 009), 커서가 잘못되었거나 `sort`와 맞지 않음 |
 
 ## GET /api/groupbuys/{id} — 상세
 
@@ -73,7 +75,8 @@
   "myParticipation": { "quantity": 6, "amount": 7200, "paidConfirmedAt": null, "receivedConfirmedAt": null },
   "openChatUrl": null,
   "participants": null,
-  "createdAt": "2026-10-25T07:30:00+09:00"
+  "createdAt": "2026-10-25T07:30:00+09:00",
+  "school": "snu.ac.kr"
 }
 ```
 
@@ -82,11 +85,13 @@
 - `openChatUrl`: data-model.md 공개 규칙. 숨기면 `null`.
 - `participants`: 개설자에게만 `[{ "memberId": 1, "name": "홍길동", "quantity": 9 }, ...]`, 그 외에는 `null`.
 - 001의 최소 상세 `GET`을 이 응답이 대체한다(경로 동일, 필드 확장). `organizerId` 대신 `organizerName`·`isOrganizer`를 쓴다.
+- `school`: 공구의 학교 키(009).
+- 탈퇴한 회원: `organizerName`·`participants[].name`은 "탈퇴한 회원"이고, 탈퇴한 회원이 연 공구의 `description`은 `null`이다([010 withdraw-api.md](../../010-withdraw/contracts/withdraw-api.md)).
 
 | 상태 | 조건 |
 |------|------|
 | 401 | 회원 식별 실패 |
-| 404 | 공구가 없거나 취소됨 |
+| 404 | 공구가 없거나 취소됨, 또는 다른 학교 공구(본문은 없는 공구와 같다, 009) |
 
 ## GET /api/me/groupbuys — 내 활동
 
@@ -97,7 +102,7 @@
 | `role` | `organizer`, `participant` | 필수 | `organizer`: 내가 연 공구, `participant`: 내가 참여한 공구(내가 연 공구 포함) |
 | `cursor`, `size` | 목록과 같다 | | 정렬은 공구 개설 시각이 늦은 순 고정 |
 
-**성공** `200 OK`: `items`의 항목은 목록 카드와 같고 `role=participant`일 때 `myQuantity`가 추가된다. `nextCursor`는 목록과 같다. 취소된 공구는 나오지 않는다.
+**성공** `200 OK`: `items`의 항목은 목록 카드에서 `school`을 뺀 것과 같고(009: 내 활동은 늘 내 학교 공구뿐이다) `role=participant`일 때 `myQuantity`가 추가된다. `nextCursor`는 목록과 같다. 취소된 공구는 나오지 않는다.
 
 | 상태 | 조건 |
 |------|------|

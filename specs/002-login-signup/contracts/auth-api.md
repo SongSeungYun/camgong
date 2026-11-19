@@ -1,6 +1,8 @@
 # API Contract: 가입·로그인·로그아웃
 
 > 초안: 추천안 기준(2026-10-26 확정, [research.md](../research.md) 결정 1·3·7·9). 2026-10-28 변경 B2(안 2, 결정 13): 신청은 이메일만, 이름·비밀번호·동의는 `verify`에서 받는다. 오류 코드 이름은 오류 코드 표 정리(cross-check-2 Y3) 때 확정한다.
+>
+> 이후 변경: 학교 범위는 [009 school-api.md](../../009-school-scope/contracts/school-api.md), 탈퇴는 [010 withdraw-api.md](../../010-withdraw/contracts/withdraw-api.md)가 기준이다. 아래에는 바뀐 응답·오류만 옮겨 적었다.
 
 기본 경로 `/api/auth`. 요청·응답은 JSON. 오류 본문은 001과 같은 `ProblemDetail` + `errors[]`. 인증은 쿠키 `camgong_session`(`HttpOnly`, `SameSite=Lax`, 운영에서 `Secure`)이며 이 기능이 적용되면 `X-Member-Id` 헤더는 어떤 요청도 인증하지 않는다(FR-014).
 
@@ -10,7 +12,7 @@
 
 | 필드 | 규칙 |
 |------|------|
-| `email` | 필수, 이메일 형식, 허용 학교 도메인(앞뒤 공백·대소문자 무시) |
+| `email` | 필수, 이메일 형식, 대학 메일 도메인(`ac.kr` 또는 운영자 추가 목록, 009)(앞뒤 공백·대소문자 무시) |
 
 본문은 `{ "email": "student@school.ac.kr" }` 하나다. 비밀번호·표시 이름·동의는 신청에서 받지 않는다(받으면 남이 먼저 내 이메일로 신청해 비밀번호를 정해 둘 수 있다).
 
@@ -24,7 +26,7 @@
 
 | 상태 | title | 조건 |
 |------|-------|------|
-| 400 | | 이메일 형식·필수 오류, 허용되지 않은 도메인 (`errors`에 필드) |
+| 400 | | 이메일 형식·필수 오류, 허용되지 않은 도메인 (`errors`에 필드). 대학 메일이 아니면 `errors[email]` "대학 메일로만 가입할 수 있습니다."(009) |
 | 409 | `ALREADY_REGISTERED` | 이미 인증을 마친 이메일 |
 | 429 | `TOO_MANY_REQUESTS` | 메일 한도(1분 간격, 24시간 5회). `Retry-After` 헤더와 `retryAt` 본문 속성 |
 
@@ -57,12 +59,16 @@
 **성공** `200 OK` + `Set-Cookie` — 가입이 완료되고 로그인된 상태다.
 
 ```json
-{ "member": { "id": 12, "displayName": "홍길동" } }
+{ "member": { "id": 12, "displayName": "홍길동", "school": "snu.ac.kr" } }
 ```
+
+`school`은 회원의 학교 키다. 가입을 마칠 때 메일 도메인으로 정해지고 바뀌지 않는다(009).
 
 | 상태 | title | 조건 |
 |------|-------|------|
 | 400 | | 본문 검증 오류(표시 이름 2~20자·공백만 불가·보이지 않는 글자 불가, 비밀번호 8자 이상·72바이트 이하, 동의 `true`가 아님, 필수 누락). `errors[]`에 필드. 토큰은 소진되지 않는다 |
+| 400 | | 예약어 표시 이름 "탈퇴한 회원"(공백·보이지 않는 글자·결합 표시를 지우면 같아지는 이름 포함, 판정 규칙은 010). `errors[displayName]` "쓸 수 없는 이름입니다."(010). 토큰은 소진되지 않는다 |
+| 400 | | 신청 뒤 운영자가 추가 목록에서 그 도메인을 뺌. `errors[token]` "이 메일로는 더 이상 가입할 수 없습니다."(009). 토큰 조회 다음, 본문 검증 전에 판정하고 토큰은 소진되지 않는다 |
 | 409 | `DISPLAY_NAME_TAKEN` | 인증 시점에 이름이 이미 쓰이고 있음. 토큰은 유효한 채로 남고 `displayName`을 바꿔 다시 `POST`하면 가입이 완료된다 |
 | 409 | `ALREADY_REGISTERED` | 그 사이 같은 이메일이 이미 `member`에 있음(드문 경합). 롤백되어 토큰은 유효한 채로 남는다 |
 | 410 | `TOKEN_EXPIRED` | 24시간이 지남 |
@@ -78,7 +84,7 @@
 | 상태 | title | 조건 |
 |------|-------|------|
 | 401 | `INVALID_CREDENTIALS` | 정보가 틀림 (이메일 또는 비밀번호 어느 쪽인지, 계정이 있는지 알려주지 않음) |
-| (없음) | | 인증을 마치지 않은 계정은 가입 신청만 있는 상태이므로 `member`에 없다 → 존재하지 않는 계정과 **똑같이 `401 INVALID_CREDENTIALS`**로 답한다(tasks 표 b, 2026-10-27 사용자 확인 대기). `EMAIL_NOT_VERIFIED`는 쓰지 않는다. "인증이 필요하면 가입 때 받은 메일을 확인하라"는 안내는 프론트 로그인 화면의 고정 문구 |
+| (없음) | | 인증을 마치지 않은 계정은 가입 신청만 있는 상태이므로 `member`에 없다 → 존재하지 않는 계정과 **똑같이 `401 INVALID_CREDENTIALS`**로 답한다(tasks 표 b, 2026-10-27 사용자 확인 대기). `EMAIL_NOT_VERIFIED`는 쓰지 않는다. "인증이 필요하면 가입 때 받은 메일을 확인하라"는 안내는 프론트 로그인 화면의 고정 문구. 탈퇴한 계정도 없는 계정과 똑같이 `401 INVALID_CREDENTIALS`다(010) |
 | 429 | `LOGIN_LOCKED` | 연속 5회 실패. `Retry-After`와 `retryAt` 포함. 없는 이메일도 같은 규칙으로 잠긴다 |
 
 ## POST /api/auth/logout — 로그아웃
@@ -87,7 +93,11 @@
 
 ## GET /api/auth/me — 현재 회원
 
-**성공** `200 OK` `{ "member": { "id": 12, "displayName": "홍길동" } }`. 로그인하지 않았으면 `401 UNAUTHENTICATED`. 프론트가 시작할 때 로그인 여부를 아는 용도다.
+**성공** `200 OK` `{ "member": { "id": 12, "displayName": "홍길동", "school": "snu.ac.kr" } }`. 로그인하지 않았으면 `401 UNAUTHENTICATED`. 프론트가 시작할 때 로그인 여부를 아는 용도다.
+
+## POST /api/auth/withdraw — 탈퇴
+
+010에서 더했다. 본문·응답·오류는 [010 withdraw-api.md](../../010-withdraw/contracts/withdraw-api.md)를 따른다.
 
 ## CSRF 방어 (2026-10-27 확정)
 
@@ -95,7 +105,7 @@
 
 ## 보호된 모든 엔드포인트
 
-로그인이 필요한 엔드포인트(공구 상세, 개설, 수정, 취소, 참여, 수량 변경, 참여 취소, 내 활동, 알림, 체크표)는 세션이 없거나 만료되면 `401 UNAUTHENTICATED`를 돌려주고, 프론트가 로그인 화면으로 보낸다. 공구 목록(`GET /api/groupbuys`)은 공개다.
+로그인이 필요한 엔드포인트(공구 상세, 개설, 수정, 취소, 참여, 수량 변경, 참여 취소, 내 활동, 알림, 체크표, 탈퇴)는 세션이 없거나 만료되면 `401 UNAUTHENTICATED`를 돌려주고, 프론트가 로그인 화면으로 보낸다. 탈퇴한 회원의 세션도 없는 세션과 같다(010). 공구 목록(`GET /api/groupbuys`)과 학교 검색(`GET /api/schools`)은 공개다. 목록은 세션이 있으면 회원의 학교로 거른다(009).
 
 다른 회원에게 보이는 회원 정보는 `displayName`뿐이다. 이메일과 비밀번호는 어떤 응답에도 없다.
 
@@ -103,7 +113,7 @@
 
 | 키 | 기본값 | 뜻 |
 |----|--------|-----|
-| `camgong.auth.allowed-email-domains` | (사용자 제공) | 허용 학교 이메일 도메인 목록 |
+| `camgong.auth.extra-school-domains` | 빈 값 (`EXTRA_SCHOOL_DOMAINS`) | `ac.kr` 밖 대학이나 여러 도메인을 한 학교로 묶을 때만 쓴다. 형식 `키=도메인,도메인;키=도메인`. `ac.kr` 메일은 설정 없이 받는다. 옛 `allowed-email-domains`를 대신한다(009) |
 | `camgong.auth.session-ttl` | `14d` | 슬라이딩 유지 기간 |
 | `camgong.auth.session-touch-interval` | `10m` | `last_used_at` 갱신 최소 간격 |
 | `camgong.auth.verify-token-ttl` | `24h` | 인증 링크 유효 시간 |

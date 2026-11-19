@@ -6,7 +6,7 @@
 
 | 화면 | 주소(앱 라우트) | 호출 | 인증 | 계약 |
 |------|------------------|------|------|------|
-| S03 목록 | `/` | `GET /api/groupbuys?status&category&q&sort&cursor&size` | 불필요 | 003 |
+| S03 목록 | `/` | `GET /api/groupbuys?status&category&q&sort&school&cursor&size`. `school`은 비로그인일 때만 보낸다(로그인하면 서버가 무시하고 회원 학교로 거른다). 비로그인은 학교 검색 `GET /api/schools?q`(자동완성)로 후보를 골라 `school`을 정하고 주소 쿼리에도 남긴다. 카드의 `school`은 비로그인일 때만 "학교 · snu.ac.kr"로 보인다. 로그인하면 학교 검색 대신 "우리 학교 · {회원 school}" 머리말 | 불필요(세션이 있으면 서버가 쓴다) | 003, 009 |
 | S01 가입 | `/signup` | `POST /api/auth/signup` `{ email }`, `POST /api/auth/signup/resend` (이메일만 받는다, 변경 B2) | 불필요 | 002 |
 | 인증 확인 | `/verify?token=…` | `POST /api/auth/verify` `{ token, displayName, password, consent, consentVersion }` (화면이 열리면 이름·비밀번호·동의 폼을 보여주고 제출 버튼으로만 전송) | 불필요 | 002 |
 | S02 로그인 | `/login` | `POST /api/auth/login`, `POST /api/auth/logout`, 시작 시 `GET /api/auth/me` | — | 002 |
@@ -14,7 +14,7 @@
 | S05 개설 | `/groupbuys/new` | `POST /api/groupbuys` | 필수 | 001 |
 | S06 수정 | `/groupbuys/:id/edit` | `GET /api/groupbuys/{id}`, `PUT /api/groupbuys/{id}`, `POST /api/groupbuys/{id}/cancel` | 필수(개설자) | 001 |
 | S07 참여 | 상세 안 시트/폼 | `POST /api/groupbuys/{id}/participations`, `PUT …/participations/me`, `DELETE …/participations/me` | 필수 | 004 |
-| S08 내 활동 | `/me` | `GET /api/me/groupbuys?role=organizer|participant&cursor&size` | 필수 | 003 |
+| S08 내 활동 | `/me` | `GET /api/me/groupbuys?role=organizer|participant&cursor&size`. 아래 탈퇴 영역과 확인 대화상자에서 `POST /api/auth/withdraw` `{ password }` | 필수 | 003, 010 |
 | S09 체크표 | `/groupbuys/:id/check` | `GET …/check-sheet?filter`, `PUT …/participations/{memberId}/payment`, `PUT …/receipt` | 필수(개설자) | 006 |
 | S10 알림함 | `/notifications` | `GET /api/notifications`, `PUT /api/notifications/{id}/read`; 헤더 배지 `GET /api/notifications/unread-count` | 필수 | 007 |
 
@@ -34,10 +34,10 @@
 |------|---------------------------|----------------|
 | 400 | (필드 오류 `errors[]`) | 해당 폼 필드 옆에 모두 표시. 매핑 안 되는 것은 폼 상단. 입력값 유지. 인증 화면의 본문 오류는 토큰을 소진하지 않으므로 고쳐서 다시 제출할 수 있다 |
 | 401 | `UNAUTHENTICATED` / (없음) | 세션 비우고 로그인으로. "로그인이 필요해요. 입력하던 내용은 저장되지 않아요." (폼에서 발생한 경우) |
-| 401 | `INVALID_CREDENTIALS` | "이메일 또는 비밀번호가 맞지 않아요." (어느 쪽인지 알리지 않음). 인증 전 계정의 로그인도 같은 응답이다(002 확정 2026-10-27, `EMAIL_NOT_VERIFIED` 없음). 로그인 화면은 이 문구 아래에 **고정 안내** "가입했는데 아직 인증 전이라면 인증 메일 다시 받기"와 재발송 진입을 항상 둔다 |
+| 401 | `INVALID_CREDENTIALS` | "이메일 또는 비밀번호가 맞지 않아요." (어느 쪽인지 알리지 않음). 인증 전 계정과 탈퇴한 계정(010)의 로그인도 같은 응답이다(002 확정 2026-10-27, `EMAIL_NOT_VERIFIED` 없음). 로그인 화면은 이 문구 아래에 **고정 안내** "가입했는데 아직 인증 전이라면 인증 메일 다시 받기"와 재발송 진입을 항상 둔다 |
 | 403 | `ORGANIZER_NOT_ALLOWED` | "개설자는 직접 참여할 수 없어요. 수량은 공구 수정에서 바꿔요." |
 | 403 | `ORGANIZER_ONLY` | "개설자만 쓸 수 있어요." 상세로 |
-| 404 | (공구·참여 없음/취소) | "찾을 수 없는 공구예요." + 목록으로 (FR-023) |
+| 404 | (공구·참여 없음/취소) | "찾을 수 없는 공구예요." + 목록으로 (FR-023). 다른 학교 공구의 상세·참여도 같은 404다(009) |
 | 404 | `PARTICIPATION_NOT_FOUND` | "참여 내역이 없어요." 상세 새로고침 (체크 PUT에서도 같다) |
 | 400 | `INVALID_TARGET` | "개설자는 체크 대상이 아니에요." (체크표는 개설자 행을 보여주지 않으므로 정상 흐름에서는 나오지 않음) |
 | 409 | `NOT_JOINABLE` / `DEADLINE_PASSED` | "마감 시간이 지나서 참여할 수 없어요." + 최신 상세 다시 불러옴 |
@@ -54,8 +54,13 @@
 | 409 | `DISPLAY_NAME_TAKEN` | "이미 쓰이는 이름이에요. 다른 이름을 입력해 주세요." (인증 화면의 이름 입력란 오류로 표시. 토큰은 유효하므로 이름만 바꿔 다시 제출) |
 | 409 / 410 | `TOKEN_USED` / `TOKEN_EXPIRED` | "이미 쓴 링크예요." / "링크가 만료됐어요." + 가입 화면 링크 (만료는 인증 메일을 다시 받을 수 있다는 재발송 안내) |
 | 400 | `INVALID_TOKEN` | "올바르지 않은 링크예요." + 가입 화면 링크 |
+| 400 | (가입 신청 `errors[email]`) | 이메일 칸 옆에 서버 문구 "대학 메일로만 가입할 수 있습니다." (ac.kr도 추가 목록도 아닌 도메인, 009). 가입 화면에는 "대학 메일(ac.kr 등)로만 가입할 수 있어요." 고정 안내가 있다 |
+| 400 | (인증 `errors[token]`) | 토큰 오류 화면처럼 폼을 닫고 서버 문구 "이 메일로는 더 이상 가입할 수 없습니다." + 가입 화면 링크. 재발송 안내는 없다 (신청 뒤 운영자가 추가 목록에서 도메인을 뺌, 009. 다시 제출해도 같은 결과라 폼을 남기지 않는다, 010 T031) |
+| 400 | (인증 `errors[displayName]` 예약어) | 이름 칸 옆에 서버 문구 "쓸 수 없는 이름입니다." ("탈퇴한 회원"과 같아 보이는 이름, 010). 토큰은 유효하므로 이름만 바꿔 다시 제출 |
+| 400 | `INVALID_PASSWORD` (탈퇴) | 대화상자 비밀번호 칸 옆에 `errors[password]` 문구 "비밀번호가 맞지 않습니다."를 보이고 칸을 비운 뒤 포커스. 로그인 실패 횟수에 들어간다(010). 누락 400도 같은 칸에 표시 |
+| 409 | `ACTIVE_GROUPBUY` (+`blockers`) | 대화상자를 닫고 탈퇴 영역에 "진행 중인 공구가 있어 탈퇴할 수 없어요." + `blockers` 목록. 항목마다 제목을 상세(`/groupbuys/{groupBuyId}`)로 링크하고 안내를 붙인다. 위에서부터 먼저 맞는 것: `status=PENDING_CLOSE`면 "확정된 뒤 다시 시도하세요"(개설자여도 이것), `role=ORGANIZER`면 "공구를 취소하세요", `role=PARTICIPANT`면 "참여를 취소하세요", 그 밖은 "공구 상세에서 확인하세요" (010) |
 | 429 | `TOO_MANY_REQUESTS` (+`retryAt`, `Retry-After`) | "잠시 뒤에 다시 시도해 주세요." (남은 시간 표시) |
-| 429 | `LOGIN_LOCKED` (+`retryAt`) | "로그인 시도가 너무 많아요. 잠시 뒤 다시 시도해 주세요." |
+| 429 | `LOGIN_LOCKED` (+`retryAt`) | "로그인 시도가 너무 많아요. 잠시 뒤 다시 시도해 주세요." (남은 시간 표시). 탈퇴에서도 같은 잠금이 걸리며 대화상자 안에 같은 문구를 보인다(010) |
 | 5xx / 네트워크 | — | "잠시 문제가 생겼어요. 다시 시도해 주세요." + 다시 시도 버튼. 입력값 유지. 서버 정보 노출 안 함 |
 | 그 외 | 알 수 없는 코드 | 상태 코드 기준 일반 문구 (화면이 멈추지 않음) |
 
@@ -75,3 +80,5 @@
 | 입금·수령 체크 | 체크표(요약 포함) |
 | 알림 읽음 | 알림함, 읽지 않은 수 |
 | 로그아웃·401 | 전부 비움 |
+| 화면 세션의 회원이 바뀜(다른 회원 로그인, 다른 탭 로그인 뒤 me 재확인) | 조회 캐시 전부 비움(mutation은 남김). 개인 쿼리 키에 회원 id가 없기 때문이다. 비로그인 401만으로는 비우지 않는다 (010 T028) |
+| 탈퇴 | 전부 비움. `/`로 이동해 "탈퇴했어요." 안내를 띄운 뒤 세션 `forget` → `queryClient.clear()` (만료 안내는 켜지 않는다, 010) |
