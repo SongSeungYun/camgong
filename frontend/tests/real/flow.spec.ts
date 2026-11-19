@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { ORIGIN } from '../../playwright.real.config'
 
 // 실제 백엔드 기준 통합 확인(목 아님). 메일은 안 나가므로 백엔드 로그의 verification link에서 토큰을 읽는다.
 const LOG = process.env.BACKEND_LOG!
@@ -73,7 +74,7 @@ test('실서버: 가입 → 개설 → 참여 → 체크표 → 알림, 취소·
   await shot(page, '2-detail-organizer')
 
   // 참여자: 다른 컨텍스트
-  const ctx = await browser.newContext({ viewport: info.project.use.viewport, extraHTTPHeaders: { Origin: 'http://localhost:5173' } })
+  const ctx = await browser.newContext({ viewport: info.project.use.viewport, extraHTTPHeaders: { Origin: ORIGIN } })
   const p2 = await ctx.newPage()
   await register(p2, `p${tag}${info.project.name.slice(-3)}@school.ac.kr`, `참여${tag}`)
   await p2.goto(`/groupbuys/${id}`)
@@ -166,7 +167,7 @@ async function apiRegister(api: APIRequestContext, email: string, name: string) 
   expect(res.status()).toBe(200)
 }
 const newUser = async (browser: import('@playwright/test').Browser, vp: { width: number; height: number } | null | undefined, who: string, n: string) => {
-  const ctx = await browser.newContext({ viewport: vp, extraHTTPHeaders: { Origin: 'http://localhost:5173' } })
+  const ctx = await browser.newContext({ viewport: vp, extraHTTPHeaders: { Origin: ORIGIN } })
   await apiRegister(ctx.request, `${who}${tag}${n}@school.ac.kr`, `${who}${tag}${n}`)
   return { ctx, page: await ctx.newPage() }
 }

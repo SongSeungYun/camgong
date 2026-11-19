@@ -5,6 +5,8 @@ spring:
         session_factory:
           statement_inspector: com.camgong.support.QueryCountInspector
 camgong:
+  auth:
+    extra-school-domains: skku.edu=skku.edu,g.skku.edu;sogang.ac.kr=sogang.ac.kr,sg.ac.kr   # 009 묶음 예시(SignupDomainIT)
   scheduler:
     close:
       enabled: false      # 테스트는 서비스를 직접 호출한다. 스케줄러 연결은 CloseSchedulerWiringTest 가 켠다

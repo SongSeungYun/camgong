@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("camgong.auth")
 public record AuthProperties(
-        List<String> allowedEmailDomains,
+        String extraSchoolDomains,
         Duration sessionTtl,
         Duration sessionTouchInterval,
         Duration verifyTokenTtl,

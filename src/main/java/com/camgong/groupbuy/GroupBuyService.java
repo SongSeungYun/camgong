@@ -41,7 +41,7 @@ public class GroupBuyService {
     }
 
     @Transactional
-    public GroupBuyResponse create(Long memberId, GroupBuyRequest r) {
+    public GroupBuyResponse create(Long memberId, String school, GroupBuyRequest r) {
         Instant now = Instant.now(clock);
 
         // 검증은 가드보다 먼저: 실패한 요청이 가드를 소모하면 같은 본문 재전송이 400 이 아닌 409 가 된다.
@@ -54,7 +54,7 @@ public class GroupBuyService {
 
         GroupBuy groupBuy = groupBuys.save(new GroupBuy(memberId, r.title(), r.description(), r.itemName(),
                 r.unitPrice(), r.totalQuantity(), r.organizerQuantity(), r.deadline().toInstant(), r.category(),
-                r.itemUrl(), r.openChatUrl(), now));
+                r.itemUrl(), r.openChatUrl(), school, now));
         participations.save(new Participation(groupBuy.getId(), memberId, r.organizerQuantity(), now));
 
         // 개설자 본인에게 돌려주므로 오픈채팅 링크는 항상 값을 준다.

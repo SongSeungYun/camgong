@@ -69,7 +69,7 @@ public class LoginService {
         }
         completeSuccess(emailKey);
         Member member = found.get();
-        return new Authenticated(new AuthResponse(new MemberView(member.getId(), member.getName())),
+        return new Authenticated(new AuthResponse(MemberView.of(member)),
                 sessions.issue(member.getId()));
     }
 

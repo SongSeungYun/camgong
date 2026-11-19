@@ -134,21 +134,31 @@ public abstract class IntegrationTestBase {
         }
     }
 
-    /** 시드 회원: 이메일 m{id}@school.ac.kr, 비밀번호 해시는 로그인할 수 없는 더미. */
+    /** 시드 회원들의 기본 학교. */
+    public static final String SCHOOL = "school.ac.kr";
+
+    /** 시드 회원: 이메일 m{id}@school.ac.kr(학교 school.ac.kr), 비밀번호 해시는 로그인할 수 없는 더미. */
     protected void seedMember(long id, String name) {
-        jdbc.update("INSERT INTO member (id, name, display_name_key, email, email_key, password_hash, "
-                + "consent_at, consent_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, name, name.toLowerCase(), "m" + id + "@school.ac.kr", "m" + id + "@school.ac.kr",
-                "$2a$04$dummydummydummydummydummydummydummydummydummydummydummy", LocalDateTime.ofInstant(START, ZoneOffset.UTC),
-                "v1", LocalDateTime.ofInstant(START, ZoneOffset.UTC));
+        seedMember(id, name, SCHOOL);
     }
 
-    /** 실제 비밀번호로 로그인할 수 있는 회원. 이메일 키는 소문자 정규화 값이다. */
-    protected void seedLoginMember(long id, String email, String name, String password) {
+    /** 다른 학교 시드 회원: 이메일 m{id}@{school}. */
+    protected void seedMember(long id, String name, String school) {
         jdbc.update("INSERT INTO member (id, name, display_name_key, email, email_key, password_hash, "
-                + "consent_at, consent_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, name, name.toLowerCase(), email, email.trim().toLowerCase(), encoder.encode(password),
-                LocalDateTime.ofInstant(START, ZoneOffset.UTC), "v1", LocalDateTime.ofInstant(START, ZoneOffset.UTC));
+                + "consent_at, consent_version, created_at, school) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, name, name.toLowerCase(), "m" + id + "@" + school, "m" + id + "@" + school,
+                "$2a$04$dummydummydummydummydummydummydummydummydummydummydummy", LocalDateTime.ofInstant(START, ZoneOffset.UTC),
+                "v1", LocalDateTime.ofInstant(START, ZoneOffset.UTC), school);
+    }
+
+    /** 실제 비밀번호로 로그인할 수 있는 회원. 이메일 키는 소문자 정규화 값이고 학교는 이메일 도메인 그대로다. */
+    protected void seedLoginMember(long id, String email, String name, String password) {
+        String key = email.trim().toLowerCase();
+        jdbc.update("INSERT INTO member (id, name, display_name_key, email, email_key, password_hash, "
+                + "consent_at, consent_version, created_at, school) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, name, name.toLowerCase(), email, key, encoder.encode(password),
+                LocalDateTime.ofInstant(START, ZoneOffset.UTC), "v1", LocalDateTime.ofInstant(START, ZoneOffset.UTC),
+                key.substring(key.indexOf('@') + 1));
     }
 
     /** 개설자(1)가 기본 본문으로 공구를 열고 id 를 돌려준다. 같은 본문은 10초 가드에 걸리므로 테스트당 한 번만 쓴다. */

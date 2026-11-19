@@ -19,9 +19,12 @@ public interface GroupBuyRepository extends JpaRepository<GroupBuy, Long> {
     @Query("select g from GroupBuy g where g.id = :id")
     Optional<GroupBuy> findByIdForUpdate(@Param("id") Long id);
 
-    /** 상세용: 공구와 개설자 이름을 한 번에 읽는다(research 결정 7 의 1번 쿼리). */
-    @Query("select g from GroupBuy g join fetch g.organizer where g.id = :id and g.status <> com.camgong.groupbuy.GroupBuyStatus.CANCELLED")
-    Optional<GroupBuy> findDetailById(@Param("id") Long id);
+    /**
+     * 상세용: 공구와 개설자 이름을 한 번에 읽는다(research 결정 7 의 1번 쿼리). 요청한 회원과 학교가 다른 공구는 없는 공구처럼 비어 있다(009).
+     */
+    @Query("select g from GroupBuy g join fetch g.organizer where g.id = :id and g.status <> com.camgong.groupbuy.GroupBuyStatus.CANCELLED "
+            + "and g.school = (select m.school from Member m where m.id = :memberId)")
+    Optional<GroupBuy> findDetailById(@Param("id") Long id, @Param("memberId") Long memberId);
 
     /** 마감 확정 후보 id(락 없음). 마감이 이른 순. excluded 는 이번 실행에서 이미 시도한 id(실패·건너뜀이 앞쪽을 막지 않게 한다). 실제 확정은 건별 선점이 조건을 다시 확인한다. */
     @Query("select g.id from GroupBuy g where g.status = com.camgong.groupbuy.GroupBuyStatus.OPEN "
@@ -38,6 +41,11 @@ public interface GroupBuyRepository extends JpaRepository<GroupBuy, Long> {
     @Query(value = "SELECT * FROM group_buy WHERE id = :id AND status = 'OPEN' AND deadline <= :cutoff "
             + "AND secured_quantity < total_quantity FOR UPDATE SKIP LOCKED", nativeQuery = true)
     Optional<GroupBuy> claimForClose(@Param("id") Long id, @Param("cutoff") Instant cutoff);
+
+    /** 학교 검색(009): 취소되지 않은 공구가 있는 학교 키 가운데 패턴에 맞는 것, 사전순. 패턴의 이스케이프 문자는 역슬래시다(escapeLike). */
+    @Query("select distinct g.school from GroupBuy g where g.status <> com.camgong.groupbuy.GroupBuyStatus.CANCELLED "
+            + "and g.school like :pattern escape '\\' order by g.school")
+    List<String> findSchools(@Param("pattern") String pattern, Limit limit);
 
     /** 이벤트에 담을 제목 스냅샷. 값으로 읽어 영속성 컨텍스트의 엔티티 상태와 무관하다. */
     @Query("select g.title from GroupBuy g where g.id = :id")

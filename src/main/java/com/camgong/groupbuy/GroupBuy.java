@@ -73,14 +73,18 @@ public class GroupBuy {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    /** 개설자의 학교(009). 개설 때 복사하고 바뀌지 않는다. */
+    private String school;
+
     protected GroupBuy() {
     }
 
     /** 새 공구는 항상 OPEN. 확보 수량은 개설자 수량으로 시작한다. */
     public GroupBuy(Long organizerId, String title, String description, String itemName, int unitPrice,
             int totalQuantity, int securedQuantity, Instant deadline, GroupBuyCategory category,
-            String itemUrl, String openChatUrl, Instant now) {
+            String itemUrl, String openChatUrl, String school, Instant now) {
         this.organizerId = organizerId;
+        this.school = school;
         this.title = title;
         this.description = description;
         this.itemName = itemName;
@@ -225,6 +229,10 @@ public class GroupBuy {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getSchool() {
+        return school;
     }
 
     public Instant getUpdatedAt() {

@@ -1,6 +1,7 @@
 package com.camgong.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -15,9 +16,19 @@ class SchemaIT extends IntegrationTestBase {
 
     @Test
     void schemaComesFromFlywayMigrationsNotFromSqlInit() {
-        // 빈 DB 에 V1 이 적용되었고(그 뒤 validate 통과), 기동 때마다 다시 도는 schema.sql 은 더 없다
+        // 빈 DB 에 V1·V2 가 차례로 적용되었고(그 뒤 validate 통과), 기동 때마다 다시 도는 schema.sql 은 더 없다
         assertThat(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank", String.class))
-                .containsExactly("1");
+                .containsExactly("1", "2");
         assertThat(new ClassPathResource("schema.sql").exists()).isFalse();
+    }
+
+    @Test
+    void schoolCannotBeEmpty() {
+        // V2 의 CHECK: 행이 있는 DB 에 V2 를 적용하면 '' 로 채워지는 대신 실패하게 하는 장치이기도 하다
+        assertThatThrownBy(() -> jdbc.update("UPDATE member SET school = '' WHERE id = 1"))
+                .hasMessageContaining("chk_member_school");
+        long id = com.camgong.support.GroupBuySeed.groupBuy().insert(jdbc);
+        assertThatThrownBy(() -> jdbc.update("UPDATE group_buy SET school = '' WHERE id = ?", id))
+                .hasMessageContaining("chk_group_buy_school");
     }
 }

@@ -29,7 +29,8 @@ public record GroupBuyDetail(
         MyParticipationView myParticipation,
         String openChatUrl,
         List<ParticipantView> participants,
-        OffsetDateTime createdAt) {
+        OffsetDateTime createdAt,
+        String school) {
 
     static GroupBuyDetail of(GroupBuy g, DisplayStatus status, String organizerName, boolean isOrganizer,
             int participantCount, MyParticipationView mine, String openChatUrl, List<ParticipantView> participants) {
@@ -37,6 +38,6 @@ public record GroupBuyDetail(
                 g.getItemUrl(), g.getUnitPrice(), g.getTotalQuantity(), g.getSecuredQuantity(),
                 g.getTotalQuantity() - g.getSecuredQuantity(), GroupBuyQueryService.toOffset(g.getDeadline()), status,
                 organizerName, isOrganizer, participantCount, mine, openChatUrl, participants,
-                GroupBuyQueryService.toOffset(g.getCreatedAt()));
+                GroupBuyQueryService.toOffset(g.getCreatedAt()), g.getSchool());
     }
 }
