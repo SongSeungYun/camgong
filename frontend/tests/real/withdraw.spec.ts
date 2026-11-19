@@ -26,9 +26,9 @@ async function user(browser: Browser, info: TestInfo, email: string, name: strin
   return { ctx, page: await ctx.newPage(), api: ctx.request }
 }
 const deadline = () => new Date(Date.now() + 3 * 86_400_000 + 9 * 3_600_000).toISOString().slice(0, 10) + 'T18:00:00+09:00'
-async function open(api: APIRequestContext, title: string, total = 10, mine = 3) {
+async function open(api: APIRequestContext, title: string, total = 10, mine = 3, description: string | null = null) {
   const r = await api.post('/api/groupbuys', {
-    data: { title, description: null, category: 'FOOD', itemName: '햇반', itemUrl: 'https://example.com/i', unitPrice: 1200, totalQuantity: total, organizerQuantity: mine, deadline: deadline(), openChatUrl: 'https://open.kakao.com/o/x' },
+    data: { title, description, category: 'FOOD', itemName: '햇반', itemUrl: 'https://example.com/i', unitPrice: 1200, totalQuantity: total, organizerQuantity: mine, deadline: deadline(), openChatUrl: 'https://open.kakao.com/o/x' },
   })
   expect(r.status()).toBe(201)
   return ((await r.json()) as { id: number }).id
@@ -118,6 +118,30 @@ test('실서버 010: 틀린 비밀번호 → 맞는 비밀번호로 탈퇴, 다�
   await o.ctx.close()
   await q.ctx.close()
   await other.close()
+})
+
+test('실서버 010 T019: 탈퇴한 개설자의 완료 공구를 참여자가 열면 설명이 없고 나머지는 남는다', async ({ browser }, info) => {
+  const v = info.project.name.slice(-3)
+  const o = await user(browser, info, `wd${tag}${v}@school.ac.kr`, `설개${tag}${v}`)
+  const p = await user(browser, info, `we${tag}${v}@school.ac.kr`, `설참${tag}${v}`)
+  const desc = `입금은 010-0000-${tag.slice(-4)}로`
+  const id = await open(o.api, `설명공구${tag}${v}`, 4, 2, desc)
+  expect((await p.api.post(`/api/groupbuys/${id}/participations`, { data: { quantity: 2, expectedUnitPrice: 1200 } })).status()).toBe(201) // 모집 완료
+  await p.page.goto(`/groupbuys/${id}`)
+  await expect(p.page.getByText(desc)).toBeVisible() // 탈퇴 전에는 보인다
+
+  await withdrawUi(o.page, 'password1234')
+  await expect(o.page.getByText('탈퇴했어요.')).toBeVisible()
+
+  await p.page.reload()
+  await expect(p.page.getByRole('heading', { name: `설명공구${tag}${v}`, level: 1 })).toBeVisible()
+  await expect(p.page.getByText(desc)).toHaveCount(0)
+  await expect(p.page.getByText('개설자 탈퇴한 회원')).toBeVisible()
+  await expect(p.page.getByText('햇반')).toBeVisible() // 상품명은 남는다
+  await expect(p.page.getByRole('link', { name: /오픈채팅/ })).toBeVisible() // 오픈채팅 링크도 남는다(완료 공구 참여자)
+
+  await o.ctx.close()
+  await p.ctx.close()
 })
 
 test('실서버 010: 인증 화면의 동의문 본문을 펼쳐 볼 수 있다', async ({ page }) => {
