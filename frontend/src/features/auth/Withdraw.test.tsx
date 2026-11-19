@@ -238,7 +238,9 @@ describe('탈퇴 (010)', () => {
     renderApp('/me')
     const region = await screen.findByRole('region', { name: '탈퇴' })
     const erased = '이메일·표시 이름·비밀번호, 내 알림, 내가 연 공구의 설명'
-    const kept = '함께한 공구의 수량과 입금·수령 기록, 내가 연 공구의 제목·상품명·상품 링크·오픈채팅 링크'
+    const kept = '함께한 공구의 수량과 입금·수령 기록, 내가 연 공구의 제목·상품명·상품 링크·오픈채팅 링크, 소속 학교, 가입·탈퇴 시각, 동의 시각·버전'
+    const how = '모집 중인 공구는 참여를 취소하거나 내가 연 공구를 취소하면 되고, 마감 확정을 기다리는 공구는 확정된 뒤에 할 수 있어요'
+    expect(region.textContent).toContain(how) // T030
     expect(region.textContent).toContain(erased)
     expect(region.textContent).toContain(kept)
     const dialog = await openDialog()
