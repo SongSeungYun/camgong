@@ -16,5 +16,7 @@ docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -
 mv "$out.tmp" "$out"
 echo "$out"
 
-# TODO: 서버 밖(객체 저장소 등)으로 보낸다. 서버가 사라지면 이 디렉터리도 같이 사라진다.
-# TODO: 오래된 파일 정리(지금은 쌓이기만 한다).
+# 7일이 지난 덤프를 지운다(010 결정 5-1: 탈퇴 전 값이 백업에 남는 기간). 새 덤프가 성공한 뒤에만 지운다(set -e).
+find "$dir" -name 'camgong-*.sql.gz' -mtime +6 -delete
+
+# TODO: 서버 밖(객체 저장소 등)으로 보낸다. 서버가 사라지면 이 디렉터리도 같이 사라진다. 밖의 사본에도 같은 7일 규칙을 건다.
