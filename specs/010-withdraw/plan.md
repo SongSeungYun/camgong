@@ -40,7 +40,17 @@
 - **트랜잭션 안**: ① `member … FOR UPDATE` ② `withdrawn_at IS NULL`이 아니면 401(동시에 두 번 온 탈퇴) ③ 막는 조건 확인(일반 SELECT, 잠금 읽기 금지. `FOR SHARE`면 006 체크표 읽기와 교착할 수 있다) ④ 익명화와 삭제(결정 5).
 - 탈퇴 트랜잭션은 첫 문장으로 `SELECT … FROM member WHERE id = ? FOR UPDATE`를 실행한다. 이 잠금 다음에 막는 조건을 읽으므로, 잠금을 기다리는 동안 커밋된 참여가 보인다(InnoDB 스냅샷은 첫 일반 SELECT에서 잡힌다).
 - 참여(004 참여·수량 변경은 제외하고 **새 참여만**)와 개설(001)은 트랜잭션 첫 문장으로 `SELECT withdrawn_at FROM member WHERE id = ? FOR SHARE`를 실행한다. `withdrawn_at`이 있으면 401(로그인 풀림과 같은 응답)로 거부한다.
-- 잠금 순서는 항상 member → group_buy다. 탈퇴는 group_buy를 잠그지 않으므로 교착이 없다.
+- 잠금 순서는 항상 member → group_buy다.
+- 2026-11-19 재검수 뒤로는 탈퇴가 설명을 비우느라(결정 5) 자기가 연 공구 행에 X 잠금을 잡는다. organizer 인덱스의 next-key와 gap 잠금도 함께 잡는다. 이 행들은 모두 종료 상태다. 이유는 셋이다.
+  - OPEN이 하나라도 있으면 그 전에 409로 끝난다.
+  - 종료 상태는 OPEN으로 되돌아가지 않는다.
+  - 새 개설은 회원 행 `FOR SHARE`에서 막힌다.
+- 경로별로 교착이 없는 이유는 아래와 같다(백엔드 세션이 `performance_schema.data_locks`로 확인, 965fc4d).
+  - 001 수정·취소: group_buy를 잠근 뒤 바로 409로 끝나고, member를 기다리지 않는다.
+  - 005 마감: OPEN 행만 `SKIP LOCKED`로 잡는다.
+  - 006 체크: group_buy S → participation X → 참여자 member S 순서라 방향이 반대다. 하지만 개설자 본인은 체크 대상이 될 수 없어서 고리가 생기지 않는다.
+  - 007 알림: group_buy를 잡지 않는다.
+- 부작용: 탈퇴하는 동안 organizer gap에 들어가는 회원의 새 개설이 잠깐 기다린다.
 - 004 경합 측정(마지막 수량 경쟁)에는 회원별로 서로 다른 행의 공유 잠금이 하나 더해질 뿐이다. 측정을 다시 돌려 차이를 기록한다(확인 대상).
 - 수량 변경·참여 취소는 이미 있는 참여 행만 다루므로 잠그지 않는다. 탈퇴 뒤에는 세션이 없어 요청이 401로 끝난다.
 

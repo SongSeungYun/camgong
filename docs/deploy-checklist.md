@@ -103,7 +103,7 @@
 2. `git clone` → `cd deploy && cp .env.example .env` → 값 채우기 → `chmod 600 .env`. `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`은 compose가 `DOMAIN`으로 만든다.
 3. `docker compose up -d --build`. `docker compose logs backend`에서 Flyway 적용과 `Started`를 본 뒤 아래 §6 순서로 확인한다.
 4. 업데이트: `git pull && docker compose up -d --build`. 2GB 서버에서 백엔드·프론트 빌드를 같이 돌리면 메모리가 빠듯할 수 있다. swap을 켜거나 이미지를 서버 밖에서 빌드한다(확인 못 함).
-5. 백업: crontab에 `0 4 * * * /경로/deploy/backup.sh`. 7일이 지난 덤프는 스크립트가 지운다(010 T017). 서버 밖 보관은 아직 TODO이고, 두게 되면 같은 7일 수명 규칙을 건다. **서버 밖 보관 전에는 서버가 사라지면 백업도 사라진다.** MySQL binlog는 compose에서 끈다(탈퇴 전 값이 30일 남기 때문, 010 plan 결정 5-1).
+5. 백업: crontab에 `0 4 * * * /경로/deploy/backup.sh`. 7일이 지난 덤프는 스크립트가 지운다(010 T017). 서버 밖 보관은 아직 TODO이고, 두게 되면 같은 7일 수명 규칙을 건다. **서버 밖 보관 전에는 서버가 사라지면 백업도 사라진다.** MySQL binlog는 compose에서 끈다(탈퇴 전 값이 30일 남기 때문, 010 plan 결정 5-1). binlog를 켠 채 돌던 볼륨이면 이미 남은 `binlog.*`는 끈 뒤에도 지워지지 않는다. 끄기 전에 `RESET BINARY LOGS AND GTIDS`를 한 번 실행한다. 새 볼륨으로 시작하면 필요 없다.
 6. 복구: `gunzip -c <파일> | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot camgong'`. **복구하면 백업 시점 뒤의 탈퇴가 되살아난다.** `docker compose logs backend`에서 백업 시점 뒤 탈퇴 성공 로그의 `memberId`를 찾아 같은 익명화를 다시 한다. 방법(앱 기능 없이 SQL로 할지)은 아직 정하지 않았다. 서버째 잃으면 로그도 없다(확인 못 함).
 6-1. Gmail 보낸편지함(서비스 계정): SMTP로 보낸 인증 메일이 자동 저장된다. 그 계정의 Apps Script에 하루 한 번 도는 트리거를 두고, `in:sent older_than:6d`로 찾은 메일을 Gmail 고급 서비스 `Gmail.Users.Messages.remove`로 영구 삭제한다. 휴지통으로 옮기면 30일 남으므로 그렇게 하지 않는다. 만들어 보지 않았다(확인 못 함).
 6-2. 개인정보 처리방침: 배포 전에 만들어 공개한다. 보호책임자 연락처는 서비스 Gmail로 한다(2026-11-19 사용자 선택 "동의문엔 빼고 처리방침엔 서비스 메일"). 비밀번호를 잊은 회원이 이 메일로 탈퇴를 요청하면 그 학교 메일 주소로 확인 메일을 보내고, 답장을 받은 뒤 처리한다. 처리 방법은 6번과 같이 아직 정하지 않았다.
