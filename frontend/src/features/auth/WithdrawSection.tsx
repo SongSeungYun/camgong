@@ -11,6 +11,14 @@ import { useSession } from './session'
 const hint = (b: WithdrawBlocker) =>
   b.status === 'PENDING_CLOSE' ? '확정된 뒤 다시 시도하세요' : b.role === 'ORGANIZER' ? '공구를 취소하세요' : b.role === 'PARTICIPANT' ? '참여를 취소하세요' : '공구 상세에서 확인하세요'
 
+/** 지우는 것·남는 것. docs/consent-v1.md "보관 기간"과 같은 내용이어야 한다(탈퇴 영역과 대화상자 둘 다) */
+const Facts = () => (
+  <>
+    <p>탈퇴하면 이메일·표시 이름·비밀번호, 내 알림, 내가 연 공구의 설명을 바로 지워요. 백업과 인증 메일 발송 기록에서는 7일 안에 지워져요.</p>
+    <p>다른 참여자의 기록을 지키기 위해 함께한 공구의 수량과 입금·수령 기록, 내가 연 공구의 제목·상품명·상품 링크·오픈채팅 링크, 소속 학교, 가입·탈퇴 시각은 "탈퇴한 회원"으로 남아요.</p>
+  </>
+)
+
 /** 010 내 활동의 탈퇴 영역. 비밀번호를 다시 받고 되돌릴 수 없음을 확인받는다. 비밀번호는 이 컴포넌트 상태에만 있다. */
 export function WithdrawSection() {
   const id = useId()
@@ -72,7 +80,8 @@ export function WithdrawSection() {
   return (
     <section aria-labelledby={`${id}-h`}>
       <h2 id={`${id}-h`}>탈퇴</h2>
-      <p>탈퇴하면 이름·이메일·비밀번호가 지워지고 되돌릴 수 없어요. 함께한 공구의 수량과 입금·수령 기록은 "탈퇴한 회원"으로 남아요.</p>
+      <Facts />
+      <p>탈퇴는 되돌릴 수 없어요.</p>
       <p>모집 중이거나 확정을 기다리는 공구가 있으면 탈퇴할 수 없어요.</p>
       <Button ref={openerRef} variant="secondary" onClick={() => { setBlockers(null); setOpen(true) }}>탈퇴</Button>
       {blockers && (
@@ -90,7 +99,12 @@ export function WithdrawSection() {
       <ConfirmDialog
         open={open}
         title="탈퇴할까요?"
-        message="되돌릴 수 없어요. 탈퇴하려면 비밀번호를 다시 입력해 주세요."
+        message={
+          <>
+            <p>되돌릴 수 없어요. 탈퇴하려면 비밀번호를 다시 입력해 주세요.</p>
+            <Facts />
+          </>
+        }
         confirmLabel="탈퇴하기"
         cancelLabel="돌아가기"
         pending={m.isPending}

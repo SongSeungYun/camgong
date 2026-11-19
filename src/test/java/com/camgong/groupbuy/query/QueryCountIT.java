@@ -27,7 +27,7 @@ class QueryCountIT extends IntegrationTestBase {
         for (int i = 0; i < n - 1; i++) {
             long member = 100 + i;
             jdbc.update("INSERT INTO member (id, name, display_name_key, email, email_key, password_hash, consent_at, "
-                    + "consent_version, created_at) VALUES (?, ?, ?, ?, ?, 'x', ?, 'v1', ?)", member, "참여" + member,
+                    + "consent_version, created_at, school) VALUES (?, ?, ?, ?, ?, 'x', ?, 'v1', ?, 'school.ac.kr')", member, "참여" + member,
                     "참여" + member, "p" + member + "@school.ac.kr", "p" + member + "@school.ac.kr",
                     LocalDateTime.ofInstant(START, ZoneOffset.UTC), LocalDateTime.ofInstant(START, ZoneOffset.UTC));
             jdbc.update("INSERT INTO participation (group_buy_id, member_id, quantity, created_at) VALUES (?, ?, 1, ?)",

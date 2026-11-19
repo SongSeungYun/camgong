@@ -4,7 +4,7 @@ import java.time.OffsetDateTime;
 
 import com.camgong.groupbuy.GroupBuyCategory;
 
-/** 목록 카드. 개설자 정보와 구매처 링크는 넣지 않는다(상세에서만 로그인 회원에게 보인다). */
+/** 목록 카드. 개설자 정보와 구매처 링크는 넣지 않는다(상세에서만 로그인 회원에게 보인다). school 은 공구의 학교 키(009). */
 public record GroupBuySummary(
         Long id,
         String title,
@@ -14,5 +14,6 @@ public record GroupBuySummary(
         int securedQuantity,
         int totalQuantity,
         OffsetDateTime deadline,
-        DisplayStatus status) {
+        DisplayStatus status,
+        String school) {
 }

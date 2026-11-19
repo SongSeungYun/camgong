@@ -97,3 +97,14 @@ test('검수 7: 공백뿐인 비밀번호로는 가입(인증)할 수 없다', a
     fieldErrors: [{ field: 'password' }],
   })
 })
+
+test('계약 931d416: 예약 이름은 NFC 뒤 공백·보이지 않는 글자·결합 표시(Mn)를 지워 판정하고, 보이지 않는 글자 검사보다 먼저', async () => {
+  await post('/api/auth/signup', { email: 'r@school.ac.kr' })
+  const token = mockState.pending[0]!.token
+  for (const displayName of ['탈퇴한 회원'.normalize('NFD'), '탈퇴한 회원\ufe0f', '탈퇴한\u034f 회원', '탈퇴한\t회원', '탈퇴한\u200b회원']) {
+    expect(await err(post('/api/auth/verify', { token, displayName, password: 'password1234', consent: true, consentVersion: 'v1' }))).toMatchObject({
+      status: 400,
+      fieldErrors: [{ field: 'displayName', message: '쓸 수 없는 이름입니다.' }],
+    })
+  }
+})

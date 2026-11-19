@@ -45,7 +45,7 @@ export function GroupBuyForm({ submitLabel, defaultValues = EMPTY_VALUES, notes,
     <form noValidate onSubmit={submit}>
       <TextField label="제목" error={errors.title?.message} {...register('title')} />
       <p>100자 이하</p>
-      <TextAreaField label="설명" rows={4} error={errors.description?.message} {...register('description')} />
+      <TextAreaField label="설명" rows={4} hint="전화번호·계좌번호는 적지 마세요. 입금 안내는 오픈채팅에서 해요." error={errors.description?.message} {...register('description')} />
       <SelectField label="카테고리" error={errors.category?.message} {...register('category')}>
         <option value="">선택해 주세요</option>
         {(Object.keys(CATEGORY_LABELS) as KnownCategory[]).map((c) => (

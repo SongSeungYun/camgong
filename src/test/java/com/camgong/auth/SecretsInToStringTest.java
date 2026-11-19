@@ -12,7 +12,7 @@ class SecretsInToStringTest {
         assertThat(new LoginRequest("a@school.ac.kr", "very-secret-pw")).hasToString("LoginRequest[email=a@school.ac.kr, password=***]");
         String verify = new VerifyRequest("tok-123456", "홍길동", "very-secret-pw", true, "v1").toString();
         assertThat(verify).doesNotContain("very-secret-pw").doesNotContain("tok-123456").contains("홍길동");
-        String authenticated = new Authenticated(new AuthResponse(new MemberView(1L, "홍")), "raw-session-token").toString();
+        String authenticated = new Authenticated(new AuthResponse(new MemberView(1L, "홍", "school.ac.kr")), "raw-session-token").toString();
         assertThat(authenticated).doesNotContain("raw-session-token");
     }
 }

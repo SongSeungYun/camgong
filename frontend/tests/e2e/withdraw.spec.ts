@@ -66,3 +66,17 @@ test('비밀번호가 틀리면 대화상자 안에 오류, 맞으면 탈퇴하�
   await page.getByRole('button', { name: '로그인', exact: true }).click()
   await expect(page.getByText('이메일 또는 비밀번호가 맞지 않아요.')).toBeVisible()
 })
+
+test('T018: 안내가 길어진 대화상자도 낮은 화면(가로 폰·키보드)에서 안을 스크롤해 버튼까지 닿는다', async ({ page }) => {
+  await page.setViewportSize({ width: page.viewportSize()!.width, height: 360 })
+  await login(page, 'organizer@school.ac.kr')
+  await clientNavigate(page, '/me')
+  await page.getByRole('region', { name: '탈퇴' }).getByRole('button', { name: '탈퇴' }).click()
+  const dialog = page.getByRole('dialog', { name: '탈퇴할까요?' })
+  const box = (await dialog.boundingBox())!
+  expect(box.y).toBeGreaterThanOrEqual(0)
+  expect(box.y + box.height).toBeLessThanOrEqual(360)
+  const confirm = dialog.getByRole('button', { name: '탈퇴하기' })
+  await confirm.scrollIntoViewIfNeeded()
+  await expect(confirm).toBeInViewport()
+})

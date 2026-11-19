@@ -21,18 +21,23 @@ class AuthWebConfig implements WebMvcConfigurer {
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(new HandlerMethodArgumentResolver() {
+            /** CurrentMember(로그인 필수) 또는 Optional&lt;CurrentMember&gt;(로그인 선택: 비로그인이면 빈 값). */
             @Override
             public boolean supportsParameter(MethodParameter parameter) {
-                return CurrentMember.class.equals(parameter.getParameterType());
+                return CurrentMember.class.equals(parameter.nestedIfOptional().getNestedParameterType());
             }
 
             @Override
             public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
                     NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
                 Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                CurrentMember member = auth != null && auth.getPrincipal() instanceof CurrentMember m ? m : null;
+                if (parameter.getParameterType() == java.util.Optional.class) {
+                    return java.util.Optional.ofNullable(member);
+                }
                 // 보호된 경로는 필터 체인이 먼저 401 로 막는다. 공개 경로가 이것을 받아도 500 이 아니라 401 이 되게 한다.
-                if (auth != null && auth.getPrincipal() instanceof CurrentMember m) {
-                    return m;
+                if (member != null) {
+                    return member;
                 }
                 throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "로그인이 필요합니다.");
             }

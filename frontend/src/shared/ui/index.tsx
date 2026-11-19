@@ -36,12 +36,15 @@ interface FieldProps {
   error?: string
 }
 
-function Field({ label, error, children, id }: FieldProps & { children: (a: { id: string; 'aria-invalid': boolean; 'aria-describedby'?: string }) => ReactNode; id: string }) {
+function Field({ label, error, hint, children, id }: FieldProps & { hint?: string; children: (a: { id: string; 'aria-invalid': boolean; 'aria-describedby'?: string }) => ReactNode; id: string }) {
   const errId = `${id}-err`
+  const hintId = `${id}-hint`
+  const describedBy = [error && errId, hint && hintId].filter(Boolean).join(' ') || undefined
   return (
     <div className={s.field}>
       <label htmlFor={id}>{label}</label>
-      {children({ id, 'aria-invalid': !!error, 'aria-describedby': error ? errId : undefined })}
+      {children({ id, 'aria-invalid': !!error, 'aria-describedby': describedBy })}
+      {hint && <p id={hintId}>{hint}</p>}
       {error && (
         <p id={errId} className={s.error} role="alert">
           {error}
@@ -61,9 +64,10 @@ export function SelectField({ label, error, children, ...rest }: FieldProps & Co
   return <Field id={id} label={label} error={error}>{(a) => <select {...rest} {...a}>{children}</select>}</Field>
 }
 
-export function TextAreaField({ label, error, ...rest }: FieldProps & ComponentProps<'textarea'>) {
+/** hint: 필드 아래 늘 보이는 안내. aria-describedby로 연결된다 */
+export function TextAreaField({ label, error, hint, ...rest }: FieldProps & { hint?: string } & ComponentProps<'textarea'>) {
   const id = useId()
-  return <Field id={id} label={label} error={error}>{(a) => <textarea {...rest} {...a} />}</Field>
+  return <Field id={id} label={label} error={error} hint={hint}>{(a) => <textarea {...rest} {...a} />}</Field>
 }
 
 const STATUS_LABELS: Record<KnownStatus, string> = {
@@ -111,7 +115,8 @@ export function StateView({ state, children, emptyText = '표시할 내용이 �
 interface ConfirmDialogProps {
   open: boolean
   title: string
-  message?: string
+  /** 설명(aria-describedby). 글이면 문단 하나, 여러 문단이면 노드로 */
+  message?: ReactNode
   confirmLabel?: string
   cancelLabel?: string
   pending?: boolean
@@ -184,7 +189,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = '확인', c
     <div className={s.backdrop}>
       <div ref={ref} className={s.dialog} role="dialog" aria-modal="true" aria-label={title} aria-describedby={message ? descId : undefined} tabIndex={-1}>
         <h2>{title}</h2>
-        {message && <p id={descId}>{message}</p>}
+        {message && <div id={descId}>{typeof message === 'string' ? <p>{message}</p> : message}</div>}
         {children}
         <div className={s.actions}>
           <Button variant="secondary" onClick={onCancel} disabled={pending}>{cancelLabel}</Button>

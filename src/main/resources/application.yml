@@ -37,8 +37,10 @@ spring:
 
 camgong:
   auth:
-    # 운영 도메인은 환경변수로만 준다. 저장소에 넣지 않는다.
-    allowed-email-domains: ${ALLOWED_EMAIL_DOMAINS:school.ac.kr}
+    # 가입은 ac.kr 메일이면 받는다(학교 키 <이름>.ac.kr). ac.kr 밖 대학이나 여러 도메인을 한 학교로 묶을 때만 여기에 쓴다.
+    # 형식: 키=도메인,도메인;키=도메인. 키가 그 학교의 학교 키이고 한 번 쓰면 바꾸지 않는다. ac.kr 학교를 묶을 때는 키를 ac.kr 판정 키와 같게 적는다.
+    # 예: skku.edu=skku.edu,g.skku.edu;sogang.ac.kr=sogang.ac.kr,sg.ac.kr
+    extra-school-domains: ${EXTRA_SCHOOL_DOMAINS:}
     session-ttl: 14d
     session-touch-interval: 10m
     verify-token-ttl: 24h

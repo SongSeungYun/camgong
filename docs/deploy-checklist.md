@@ -1,12 +1,12 @@
 # 배포 체크리스트 (2026-11-05 작성, 값 미정)
 
-공개 배포 조건은 `docs/architecture.md` 6.5에 있다: 002 병합, SMTP, `ALLOWED_EMAIL_DOMAINS`, `ALLOWED_ORIGINS`. 이 문서는 그 조건을 채우는 데 필요한 항목을 코드(`src/main/resources/application*.yml`, `frontend/`)와 대조해 모은 것이다. **값은 비워 둔다. 저장소가 공개라 시크릿은 환경변수로만 준다.**
+공개 배포 조건은 `docs/architecture.md` 6.5에 있다: 002 병합, SMTP, 허용 대학 도메인(009부터 `EXTRA_SCHOOL_DOMAINS`, 아래 1.1·1.2), `ALLOWED_ORIGINS`. 이 문서는 그 조건을 채우는 데 필요한 항목을 코드(`src/main/resources/application*.yml`, `frontend/`)와 대조해 모은 것이다. **값은 비워 둔다. 저장소가 공개라 시크릿은 환경변수로만 준다.**
 
 ## 1. 사용자가 정할 값
 
 | 값 | 쓰이는 곳 | 상태 |
 |----|-----------|------|
-| 학교 이메일 도메인 | `ALLOWED_EMAIL_DOMAINS` | 미정. 조사와 추천은 아래 1.1. 첫 학교 이름이 필요하다 |
+| 대학 이메일 도메인 | `EXTRA_SCHOOL_DOMAINS`(009) | **결정(2026-11-19): 전국 대학.** `ac.kr` 메일은 설정 없이 모두 가입된다. `ac.kr`이 아닌 국내 대학(예: `skku.edu`)만 `키=도메인,도메인;…` 형식으로 넣는다. 키는 한 번 쓰면 바꾸지 않는다. 스펙 `specs/009-school-scope` |
 | SMTP 계정(호스트·포트·계정·비밀번호) | `SPRING_MAIL_*` | **Gmail로 결정**(2026-11-18, 아래 2.1). 계정·앱 비밀번호는 사용자가 서버 환경변수로만 넣는다 |
 | 개인정보 동의 안내문과 버전 | 프론트 `frontend/src/pages/VerifyPage.tsx`의 `CONSENT_VERSION`(지금 `'v1'`), 안내문 본문 | 초안 `docs/consent-v1.md`(사용자 확인 대기). 버전은 서버에서 20자 이하 |
 | 배포 대상과 도메인 | `ALLOWED_ORIGINS`, `VERIFY_LINK_BASE_URL`, 쿠키 Secure | 관제탑 추천은 아래 7(사용자 확인 대기) |
@@ -38,7 +38,7 @@
 |------|--------------|----------|------|
 | `DB_URL` | `jdbc:mysql://localhost:3306/camgong?useAffectedRows=true` | **반드시 설정** | `useAffectedRows=true`를 빼면 안 된다. 기동 시 `DatabaseSettingsCheck`가 검사한다 |
 | `DB_USER` / `DB_PASSWORD` | `root` / `pw` | **반드시 설정** | 기본값은 로컬용이다. 운영에서 빠뜨리면 로컬 기본값으로 붙으려다 실패한다 |
-| `ALLOWED_EMAIL_DOMAINS` | `school.ac.kr` | **반드시 설정** | 기본값은 예시 도메인 |
+| `EXTRA_SCHOOL_DOMAINS` | 빈 값 | 필요할 때만 | 009부터. 빈 값이면 `ac.kr` 규칙만 쓴다. 예: `skku.edu=skku.edu,g.skku.edu`. 형식이 틀리거나 묶음끼리 도메인이 겹치면 기동이 실패한다. 옛 `ALLOWED_EMAIL_DOMAINS`는 009부터 **무시된다**(넣어도 학교가 제한되지 않는다) |
 | `MAIL_SENDER` | `smtp` | 기본값 유지 | `logging`은 local/test/benchmark용. 운영에서 쓰면 메일이 안 나간다 |
 | `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` / `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | 없음 | **반드시 설정** | 보내는 주소는 `spring.mail.username`이다. 465(SMTPS)면 `SPRING_MAIL_PROTOCOL=smtps`. 587이면 STARTTLS 설정(`SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true` 등)이 메일 업체에 따라 필요하다(확인 못 함) |
 | `VERIFY_LINK_BASE_URL` | `http://localhost:5173/verify?token=` | **반드시 설정** | 빠뜨리면 인증 메일 링크가 localhost를 가리킨다. 예: `https://<도메인>/verify?token=` |
@@ -93,7 +93,7 @@
 - **서버 한 대 + Docker Compose**: MySQL 8.4, 백엔드 jar, Caddy 세 개를 한 서버에 둔다. Caddy가 HTTPS 인증서를 자동으로 받고, 프론트 정적 파일을 서빙하며 `/api`를 백엔드로 넘긴다. 같은 출처라 쿠키·Origin 문제가 없다. SPA 폴백도 Caddy `try_files` 한 줄이다.
 - **서버**: AWS Lightsail 서울 리전, 메모리 2GB 플랜. Spring Boot와 MySQL을 한 대에 올리면 1GB는 빠듯하다. 0원을 원하면 Oracle Cloud 무료 VM도 후보지만 가입·유휴 회수 문제가 있다는 얘기가 있어 1순위로 두지 않았다. 가격은 가입 때 확인한다(확인 못 함).
 - **도메인**: 1년 단위로 하나 산다. HTTPS가 있어야 PWA 설치가 된다.
-- **백업**: DB가 서버 한 대에만 있으므로 백업 없이 열지 않는다. 매일 `mysqldump`를 서버 밖(예: 객체 저장소)에 보관하거나 서버 자동 스냅샷을 켠다. 복구를 한 번 해 본다.
+- **백업**: DB가 서버 한 대에만 있으므로 백업 없이 열지 않는다. 매일 `mysqldump`를 서버 밖(예: 객체 저장소)에 보관하거나 서버 자동 스냅샷을 켠다. 복구를 한 번 해 본다. **어느 쪽이든 7일이 지나면 지워지게 한다**(동의문 "백업과 인증 메일 발송 기록에서는 7일 안에 지워집니다", 2026-11-19 사용자 "7일").
 - Gmail SMTP는 587 포트를 쓴다. 클라우드가 바깥으로 나가는 메일 포트를 막는지는 업체별로 확인한다(확인 못 함).
 - 결정되면 `Dockerfile`·`compose.yaml`·`Caddyfile`은 작업 세션이 만들고 관제탑이 검수한다. 시크릿은 서버의 `.env`에만 둔다.
 
@@ -103,8 +103,10 @@
 2. `git clone` → `cd deploy && cp .env.example .env` → 값 채우기 → `chmod 600 .env`. `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`은 compose가 `DOMAIN`으로 만든다.
 3. `docker compose up -d --build`. `docker compose logs backend`에서 Flyway 적용과 `Started`를 본 뒤 아래 §6 순서로 확인한다.
 4. 업데이트: `git pull && docker compose up -d --build`. 2GB 서버에서 백엔드·프론트 빌드를 같이 돌리면 메모리가 빠듯할 수 있다. swap을 켜거나 이미지를 서버 밖에서 빌드한다(확인 못 함).
-5. 백업: crontab에 `0 4 * * * /경로/deploy/backup.sh`. 서버 밖 보관과 오래된 파일 정리는 아직 TODO다. **서버 밖 보관 전에는 서버가 사라지면 백업도 사라진다.**
-6. 복구: `gunzip -c <파일> | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot camgong'`
+5. 백업: crontab에 `0 4 * * * /경로/deploy/backup.sh`. 7일이 지난 덤프는 스크립트가 지운다(010 T017). 서버 밖 보관은 아직 TODO이고, 두게 되면 같은 7일 수명 규칙을 건다. **서버 밖 보관 전에는 서버가 사라지면 백업도 사라진다.** MySQL binlog는 compose에서 끈다(탈퇴 전 값이 30일 남기 때문, 010 plan 결정 5-1).
+6. 복구: `gunzip -c <파일> | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot camgong'`. **복구하면 백업 시점 뒤의 탈퇴가 되살아난다.** `docker compose logs backend`에서 백업 시점 뒤 탈퇴 성공 로그의 `memberId`를 찾아 같은 익명화를 다시 한다. 방법(앱 기능 없이 SQL로 할지)은 아직 정하지 않았다. 서버째 잃으면 로그도 없다(확인 못 함).
+6-1. Gmail 보낸편지함(서비스 계정): SMTP로 보낸 인증 메일이 자동 저장된다. 그 계정의 Apps Script에 하루 한 번 도는 트리거를 두고, `in:sent older_than:6d`로 찾은 메일을 Gmail 고급 서비스 `Gmail.Users.Messages.remove`로 영구 삭제한다. 휴지통으로 옮기면 30일 남으므로 그렇게 하지 않는다. 만들어 보지 않았다(확인 못 함).
+6-2. 개인정보 처리방침: 배포 전에 만들어 공개한다. 보호책임자 연락처는 서비스 Gmail로 한다(2026-11-19 사용자 선택 "동의문엔 빼고 처리방침엔 서비스 메일"). 비밀번호를 잊은 회원이 이 메일로 탈퇴를 요청하면 그 학교 메일 주소로 확인 메일을 보내고, 답장을 받은 뒤 처리한다. 처리 방법은 6번과 같이 아직 정하지 않았다.
 7. `docker compose down -v`는 쓰지 않는다. 볼륨(`mysql-data`, `caddy-data`)이 지워진다.
 8. `DB_USER`/`DB_PASSWORD`/`MYSQL_ROOT_PASSWORD`는 볼륨을 처음 만들 때만 쓰인다. 나중에 `.env`를 바꿔도 DB 계정은 바뀌지 않는다.
 

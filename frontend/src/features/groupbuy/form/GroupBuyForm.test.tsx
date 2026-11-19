@@ -23,6 +23,9 @@ async function fillForm(over: Record<string, string> = {}) {
   await userEvent.type(screen.getByLabelText('오픈채팅 링크'), v.openChatUrl)
 }
 
+const description = (el: HTMLElement) => (el.getAttribute('aria-describedby') ?? '').split(' ').map((id) => document.getElementById(id)?.textContent ?? '').join(' ')
+const HINT = '전화번호·계좌번호는 적지 마세요. 입금 안내는 오픈채팅에서 해요.'
+
 const asOrganizer = () => {
   mockState.sessionMemberId = 1
 }
@@ -34,6 +37,12 @@ describe('개설 폼 (US3)', () => {
     await screen.findByRole('heading', { name: '공구 열기' })
     screen.getByText('필수예요. https 주소만 쓸 수 있어요.')
     screen.getByText('필수예요. https 주소만 쓸 수 있어요. 모집이 끝나면 참여자에게만 보여요.')
+  })
+
+  test('T018: 설명 칸에 연락처·계좌를 적지 말라는 안내가 aria-describedby로 연결된다', async () => {
+    asOrganizer()
+    renderApp('/groupbuys/new')
+    expect(description(await screen.findByRole('textbox', { name: '설명' }))).toBe(HINT)
   })
 
   test('14. 내 부담 금액을 미리 보여준다(1,200 × 9 = 10,800원)', async () => {
@@ -154,6 +163,18 @@ describe('수정 폼', () => {
     expect((screen.getByLabelText('오픈채팅 링크') as HTMLInputElement).value).toBe('')
     screen.getByText(/마감은 늘리기만 할 수 있어요/)
     screen.getByText(/총 수량은 확보 수량\(9개\) 이상이어야 해요/)
+  })
+
+  test('T018: 수정 폼 설명 칸에도 같은 안내가 연결되고, 오류가 나면 오류와 안내가 함께 연결된다', async () => {
+    seedGroupBuy()
+    asOrganizer()
+    server.use(http.put('/api/groupbuys/:id', () => HttpResponse.json({ type: 'about:blank', title: 'Bad Request', status: 400, errors: [{ field: 'description', message: '설명이 너무 길어요' }] }, { status: 400 })))
+    renderApp('/groupbuys/1/edit')
+    await screen.findByRole('heading', { name: '공구 수정' })
+    const desc = await screen.findByRole('textbox', { name: '설명' })
+    expect(description(desc)).toBe(HINT)
+    await userEvent.click(screen.getByRole('button', { name: '수정 저장' }))
+    await waitFor(() => expect(description(desc)).toBe(`설명이 너무 길어요 ${HINT}`))
   })
 
   test('수정에 성공하면 상세로 돌아간다(총 수량 < 확보는 필드 오류)', async () => {

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import { chars, hasInvisible, strip } from '../text'
+import { chars, hasInvisible, reservedKey, strip } from '../text'
 import { NOT_UNIVERSITY, schoolOf } from '../school'
 import { currentMember, mockState } from '../state'
 import { shownStatus } from './groupbuys'
@@ -87,8 +87,8 @@ export const authHandlers = [
     const password = typeof b.password === 'string' ? b.password : ''
     const errors: { field: string; message: string }[] = []
     if (chars(name) < 2 || chars(name) > 20) errors.push({ field: 'displayName', message: '2~20자로 입력해 주세요' })
+    else if (reservedKey(name) === '탈퇴한회원') errors.push({ field: 'displayName', message: '쓸 수 없는 이름입니다.' }) // 010 예약어(서버처럼 보이지 않는 글자 검사보다 먼저)
     else if (hasInvisible(name)) errors.push({ field: 'displayName', message: '보이지 않는 글자는 쓸 수 없어요' })
-    else if (name.replace(/\p{White_Space}/gu, '') === '탈퇴한회원') errors.push({ field: 'displayName', message: '쓸 수 없는 이름입니다.' }) // 010 예약어
     if (password.length < 8) errors.push({ field: 'password', message: '8자 이상 입력해 주세요' })
     else if (!password.trim()) errors.push({ field: 'password', message: '공백만으로는 쓸 수 없어요' }) // 서버 isBlank
     else if (new TextEncoder().encode(password).length > 72) errors.push({ field: 'password', message: '72바이트 이하로 입력해 주세요' })
@@ -121,6 +121,7 @@ export const authHandlers = [
       .map((g) => ({ groupBuyId: g.id, title: g.title, role: g.organizerId === me.id ? 'ORGANIZER' : 'PARTICIPANT', status: shownStatus(g) }))
     if (blockers.length) return problem(409, 'ACTIVE_GROUPBUY', { detail: '진행 중인 공구가 있어 탈퇴할 수 없습니다.', blockers })
     mockState.notifications = mockState.notifications.filter((n) => n.memberId !== me.id)
+    for (const g of mockState.groupBuys) if (g.organizerId === me.id) g.description = null // 내가 연 공구의 설명(상태 무관, 010 plan 결정 5)
     mockState.pending = mockState.pending.filter((p) => p.email !== me.email)
     Object.assign(me, { withdrawn: true, displayName: WITHDRAWN_NAME, email: '', password: '' })
     mockState.loginFailures = 0 // 같은 이메일의 로그인 실패 기록도 지운다(plan 5)

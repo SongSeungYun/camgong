@@ -34,11 +34,14 @@ public class Member {
 
     private Instant createdAt;
 
+    /** 학교 키(009). 가입 확인 때 메일 도메인으로 정하고 바뀌지 않는다. */
+    private String school;
+
     protected Member() {
     }
 
     public Member(String displayName, String email, String passwordHash,
-            Instant consentAt, String consentVersion, Instant createdAt) {
+            Instant consentAt, String consentVersion, Instant createdAt, String school) {
         this.name = Keys.strip(displayName);
         this.displayNameKey = Keys.normalize(displayName);
         this.email = email.trim();
@@ -47,6 +50,7 @@ public class Member {
         this.consentAt = consentAt;
         this.consentVersion = consentVersion;
         this.createdAt = createdAt;
+        this.school = school;
     }
 
     public Long getId() {
@@ -63,5 +67,9 @@ public class Member {
 
     public String getPasswordHash() {
         return passwordHash;
+    }
+
+    public String getSchool() {
+        return school;
     }
 }

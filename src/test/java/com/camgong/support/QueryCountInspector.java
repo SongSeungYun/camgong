@@ -9,9 +9,16 @@ import org.hibernate.resource.jdbc.spi.StatementInspector;
 public class QueryCountInspector implements StatementInspector {
 
     private static final ThreadLocal<int[]> COUNT = ThreadLocal.withInitial(() -> new int[1]);
+    private static final ThreadLocal<java.util.List<String>> SQL = ThreadLocal.withInitial(java.util.ArrayList::new);
 
     public static void reset() {
         COUNT.get()[0] = 0;
+        SQL.get().clear();
+    }
+
+    /** reset 뒤에 이 스레드에서 실행된 Hibernate SQL(실행 계획이 바뀌는 쿼리 모양을 확인할 때 쓴다). */
+    public static java.util.List<String> statements() {
+        return java.util.List.copyOf(SQL.get());
     }
 
     public static int count() {
@@ -21,6 +28,7 @@ public class QueryCountInspector implements StatementInspector {
     @Override
     public String inspect(String sql) {
         COUNT.get()[0]++;
+        SQL.get().add(sql);
         return sql;
     }
 }

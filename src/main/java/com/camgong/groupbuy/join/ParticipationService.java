@@ -141,9 +141,12 @@ public class ParticipationService {
                 .orElseThrow(() -> new RetryableConflict("읽은 뒤 참여 행이 바뀌었다", null));
     }
 
-    /** 공구가 없거나 취소되면 404, 개설자면 403. 락 없는 사전 검사이며 최종 판정은 게이트가 한다. */
+    /**
+     * 공구가 없거나 취소됐거나 다른 학교 공구면 404(셋을 구분하지 않는다, 009), 개설자면 403. 락 없는 사전 검사이며 최종 판정은 게이트가 한다.
+     * 학교는 바뀌지 않으므로 게이트가 다시 볼 필요가 없다.
+     */
     private GroupBuyHead requireJoinable(Long groupBuyId, Long memberId) {
-        GroupBuyHead head = query.findHead(groupBuyId).filter(h -> h.status() != GroupBuyStatus.CANCELLED)
+        GroupBuyHead head = query.findHeadInSchoolOf(groupBuyId, memberId).filter(h -> h.status() != GroupBuyStatus.CANCELLED)
                 .orElseThrow(ParticipationService::groupBuyNotFound);
         if (head.organizerId().equals(memberId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "ORGANIZER_NOT_ALLOWED",
