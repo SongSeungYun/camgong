@@ -16,8 +16,8 @@ const err = async (p: Promise<unknown>): Promise<ApiError> => {
 test('목 인증이 계약 모양으로 응답한다', async () => {
   expect(await err(get('/api/auth/me'))).toMatchObject({ status: 401, code: 'UNAUTHENTICATED' })
   expect(await err(post('/api/auth/login', { email: 'organizer@school.ac.kr', password: 'x' }))).toMatchObject({ status: 401, code: 'INVALID_CREDENTIALS' })
-  expect(await post('/api/auth/login', { email: 'organizer@school.ac.kr', password: 'password1234' })).toEqual({ member: { id: 1, displayName: '개설자' } })
-  expect(await get('/api/auth/me')).toEqual({ member: { id: 1, displayName: '개설자' } })
+  expect(await post('/api/auth/login', { email: 'organizer@school.ac.kr', password: 'password1234' })).toEqual({ member: { id: 1, displayName: '개설자', school: 'school.ac.kr' } })
+  expect(await get('/api/auth/me')).toEqual({ member: { id: 1, displayName: '개설자', school: 'school.ac.kr' } })
   expect(await post('/api/auth/logout')).toBeUndefined()
   expect(await err(get('/api/auth/me'))).toMatchObject({ status: 401 })
 })
@@ -48,11 +48,11 @@ test('가입(이메일만) → 재발송 한도 → 인증 폼 검증(토큰 미
   expect(bad.fieldErrors.map((f) => f.field).sort()).toEqual(['consent', 'consentVersion', 'displayName', 'password'])
   expect(mockState.pending).toHaveLength(1)
   expect(await err(post('/api/auth/verify', { token, ...v, password: 'ㄱ'.repeat(25) }))).toMatchObject({ fieldErrors: [{ field: 'password' }] }) // 75바이트
-  expect(await post('/api/auth/verify', { token, ...v })).toEqual({ member: { id: 4, displayName: '새내기' } })
+  expect(await post('/api/auth/verify', { token, ...v })).toEqual({ member: { id: 6, displayName: '새내기', school: 'school.ac.kr' } })
   expect(mockState.pending).toHaveLength(0)
-  expect(await get('/api/auth/me')).toEqual({ member: { id: 4, displayName: '새내기' } })
+  expect(await get('/api/auth/me')).toEqual({ member: { id: 6, displayName: '새내기', school: 'school.ac.kr' } })
   expect(await post('/api/auth/logout')).toBeUndefined()
-  expect(await post('/api/auth/login', { email, password: v.password })).toEqual({ member: { id: 4, displayName: '새내기' } })
+  expect(await post('/api/auth/login', { email, password: v.password })).toEqual({ member: { id: 6, displayName: '새내기', school: 'school.ac.kr' } })
 })
 
 test('인증 시 이름 충돌이면 DISPLAY_NAME_TAKEN이고 토큰은 유효, 새 이름으로 재제출하면 성공', async () => {

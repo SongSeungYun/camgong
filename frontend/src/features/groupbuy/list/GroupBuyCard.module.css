@@ -8,3 +8,10 @@
 .chip[aria-pressed='true'], .chip[aria-selected='true'] { background: var(--color-primary); color: var(--color-primary-text); border-color: var(--color-primary); }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 .more { margin: var(--space-4) auto; display: block; }
+/* 009 학교 검색(콤보박스): 입력칸은 shared/ui의 .field와 같은 모양 */
+.school { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-3); position: relative; }
+.school label { font-size: var(--font-small); color: var(--color-muted); }
+.school input { min-height: var(--touch); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); font: inherit; width: 100%; }
+.options { list-style: none; margin: 0; padding: 0; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); }
+.option { min-height: var(--touch); display: flex; align-items: center; padding: 0 var(--space-3); cursor: pointer; overflow-wrap: anywhere; }
+.option[aria-selected='true'] { background: var(--color-primary); color: var(--color-primary-text); }

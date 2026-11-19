@@ -29,7 +29,7 @@ export const mockState = {
   recentCreates: [] as { key: string; at: number }[],
   sessionMemberId: null as number | null,
   loginFailures: 0,
-  nextMemberId: 4,
+  nextMemberId: 6,
   nextToken: 1,
   /** 시나리오: true면 다음 인증 요청부터 세션이 만료된 것처럼 401 */
   sessionExpired: false,
@@ -47,7 +47,7 @@ export const mockState = {
     this.recentCreates = []
     this.sessionMemberId = null
     this.loginFailures = 0
-    this.nextMemberId = 4
+    this.nextMemberId = 6
     this.nextToken = 1
     this.sessionExpired = false
     this.loginLocked = false

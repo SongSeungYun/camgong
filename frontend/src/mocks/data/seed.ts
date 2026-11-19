@@ -5,12 +5,16 @@ export interface SeedMember {
   displayName: string
   email: string
   password: string // 목 전용 가짜 값. 실제 계정이 아니다.
+  school: string
 }
 
 export const SEED_MEMBERS: SeedMember[] = [
-  { id: 1, displayName: '개설자', email: 'organizer@school.ac.kr', password: 'password1234' },
-  { id: 2, displayName: '참여자', email: 'participant@school.ac.kr', password: 'password1234' },
-  { id: 3, displayName: '구경꾼', email: 'outsider@school.ac.kr', password: 'password1234' },
+  { id: 1, displayName: '개설자', email: 'organizer@school.ac.kr', password: 'password1234', school: 'school.ac.kr' },
+  { id: 2, displayName: '참여자', email: 'participant@school.ac.kr', password: 'password1234', school: 'school.ac.kr' },
+  { id: 3, displayName: '구경꾼', email: 'outsider@school.ac.kr', password: 'password1234', school: 'school.ac.kr' },
+  // 009: 다른 학교 개설자(비로그인 전국 목록·학교 검색·학교 경계 시험용)
+  { id: 4, displayName: '서울대생', email: 'kim@snu.ac.kr', password: 'password1234', school: 'snu.ac.kr' },
+  { id: 5, displayName: '교대생', email: 'park@snue.ac.kr', password: 'password1234', school: 'snue.ac.kr' },
 ]
 
 export interface SeedGroupBuy {
@@ -27,6 +31,8 @@ export interface SeedGroupBuy {
   organizerId: number
   createdAt: string
   openChatUrl: string | null
+  /** 009: 개설자의 학교 */
+  school: string
   /** 개설자 본인 몫 포함 */
   participations: { memberId: number; quantity: number; paidConfirmedAt?: string | null; receivedConfirmedAt?: string | null }[]
 }
@@ -36,17 +42,21 @@ const STATUSES = ['OPEN', 'OPEN', 'OPEN', 'PENDING_CLOSE', 'COMPLETED', 'FAILED'
 const NAMES = ['햇반', '물티슈', '텀블러', '비타민', '노트', '라면', '세제', '프라이팬']
 const HOUR = 3_600_000
 
-/** 50개(모집 중 25개 이상): 상태 4종·카테고리 6종·마감 임박(24시간 이내) 포함. 기준 시각 now에서 상대적으로 만든다. */
+/**
+ * 50개(모집 중 25개 이상): 상태 4종·카테고리 6종·마감 임박(24시간 이내) 포함. 기준 시각 now에서 상대적으로 만든다.
+ * 47~50은 다른 학교(47·48 snu.ac.kr, 49·50 snue.ac.kr) 공구다.
+ */
 export function makeSeedGroupBuys(now: number): SeedGroupBuy[] {
   const iso = (ms: number) => new Date(Math.floor(ms / 60_000) * 60_000).toISOString() // 분 단위: 마감 입력(datetime-local)과 같은 정밀도
   return Array.from({ length: 50 }, (_, k) => {
     const id = k + 1
     const status = STATUSES[id % STATUSES.length]!
     const total = 10 + (id % 5) * 5
-    const organizerId = (id % 3) + 1
+    const other = id >= 47
+    const organizerId = other ? (id <= 48 ? 4 : 5) : (id % 3) + 1
     const organizerQty = 1 + (id % 3)
     const participations = [{ memberId: organizerId, quantity: organizerQty }]
-    if (status !== 'OPEN' || id % 2 === 0) {
+    if (!other && (status !== 'OPEN' || id % 2 === 0)) {
       const other = organizerId === 2 ? 3 : 2
       participations.push({ memberId: other, quantity: status === 'COMPLETED' ? total - organizerQty : 2 })
     }
@@ -67,6 +77,7 @@ export function makeSeedGroupBuys(now: number): SeedGroupBuy[] {
       organizerId,
       createdAt: iso(now - (51 - id) * HOUR),
       openChatUrl: 'https://open.kakao.com/o/mock' + id, // 노출 여부는 핸들러가 역할·상태로 정한다
+      school: other ? (id <= 48 ? 'snu.ac.kr' : 'snue.ac.kr') : 'school.ac.kr',
       participations,
     }
   })

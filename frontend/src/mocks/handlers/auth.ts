@@ -1,11 +1,12 @@
 import { http, HttpResponse } from 'msw'
 import { chars, hasInvisible, strip } from '../text'
+import { NOT_UNIVERSITY, schoolOf } from '../school'
 import { currentMember, mockState } from '../state'
 
 const problem = (status: number, title: string, extra: Record<string, unknown> = {}, headers?: HeadersInit) =>
   HttpResponse.json({ title, status, ...extra }, { status, headers })
 
-const toMember = (m: { id: number; displayName: string }) => ({ member: { id: m.id, displayName: m.displayName } })
+const toMember = (m: { id: number; displayName: string; school: string }) => ({ member: { id: m.id, displayName: m.displayName, school: m.school } })
 const RESEND_MS = 60_000
 const isoKst = (ms: number) => new Date(ms).toISOString()
 const tooMany = (retryAtMs: number) =>
@@ -44,7 +45,7 @@ export const authHandlers = [
   http.post('/api/auth/signup', async ({ request }) => {
     const b = (await request.json()) as Record<string, unknown>
     const email = String(b.email ?? '').trim().toLowerCase()
-    if (!/^[^@\s]+@school\.ac\.kr$/.test(email)) return problem(400, 'Bad Request', { errors: [{ field: 'email', message: '허용된 학교 이메일이 아니에요' }] })
+    if (!/^[^@\s]+@[^@\s]+$/.test(email) || !schoolOf(email)) return problem(400, 'Bad Request', { errors: [{ field: 'email', message: NOT_UNIVERSITY }] })
     if (mockState.members.some((m) => m.email === email)) return problem(409, 'ALREADY_REGISTERED')
 
     const prev = mockState.pending.find((p) => p.email === email)
@@ -76,6 +77,9 @@ export const authHandlers = [
     if (token === 'used-token') return problem(409, 'TOKEN_USED')
     const p = mockState.pending.find((x) => x.token === token)
     if (!p) return problem(400, 'INVALID_TOKEN')
+    // 009: 확인 시점에 다시 판정한다(그 사이 추가 목록에서 빠졌으면 token 필드 400). 서버처럼 토큰 검사 바로 다음, 본문 검증보다 먼저
+    const school = schoolOf(p.email)
+    if (!school) return problem(400, 'Bad Request', { errors: [{ field: 'token', message: '이 메일로는 더 이상 가입할 수 없습니다.' }] })
 
     const name = typeof b.displayName === 'string' ? strip(b.displayName) : ''
     const consent = b.consent === 'true' ? true : b.consent === 'false' ? false : b.consent // 서버는 문자열 "true"/"false"도 불리언으로 받는다
@@ -90,7 +94,7 @@ export const authHandlers = [
     if (errors.length) return problem(400, 'Bad Request', { errors })
 
     if (mockState.members.some((m) => m.displayName === name)) return problem(409, 'DISPLAY_NAME_TAKEN')
-    const member = { id: mockState.nextMemberId++, displayName: name, email: p.email, password }
+    const member = { id: mockState.nextMemberId++, displayName: name, email: p.email, password, school }
     mockState.members.push(member)
     mockState.pending = mockState.pending.filter((x) => x !== p)
     mockState.sessionMemberId = member.id

@@ -23,9 +23,10 @@ export const toCard = (g: SeedGroupBuy) => ({
   totalQuantity: g.totalQuantity,
   deadline: g.deadline,
   status: shownStatus(g),
+  school: g.school,
 })
 
-// 불투명 커서: 조건 서명 + 오프셋. 조건이 다르면 거부한다(003: sort·필터와 맞지 않으면 400).
+// 불투명 커서: 서명 + 오프셋. 목록은 sort만 서명에 넣는다(계약: sort가 다르거나 형식이 잘못된 커서만 400). 내 활동은 회원·역할을 넣는다.
 export const encodeCursor = (sig: string, offset: number) => btoa(JSON.stringify({ sig, offset }))
 export const decodeCursor = (c: string, sig: string): number | null => {
   try {
@@ -129,10 +130,15 @@ export const groupBuyHandlers = [
     if (sort !== 'latest' && sort !== 'deadline') return badRequest('sort', '지원하지 않는 정렬이에요')
     if (!Number.isInteger(size) || size < 1 || size > 50) return badRequest('size', '1~50 사이여야 해요')
     if (chars(q) > 50) return badRequest('q', '50자 이하여야 해요')
+    // 009: 로그인했으면 회원 학교로 거르고 school 파라미터는 무시한다. 비로그인은 school이 있으면 그 학교만
+    const schoolParam = strip(sp.get('school') ?? '').toLowerCase() || null // 서버처럼 trim·소문자, 빈 값은 필터 없음
+    if (schoolParam !== null && chars(schoolParam) > 253) return badRequest('school', '253자 이하여야 해요')
+    const school = currentMember()?.school ?? schoolParam
 
     const words = q.split(/\s+/).filter(Boolean).slice(0, 5).map((w) => w.toLowerCase())
     const rows = mockState.groupBuys
       .filter((g) => shownStatus(g) === status)
+      .filter((g) => !school || g.school === school)
       .filter((g) => !category || g.category === category)
       .filter((g) => words.every((w) => g.title.toLowerCase().includes(w) || g.itemName.toLowerCase().includes(w)))
       .sort((a, b) =>
@@ -141,7 +147,7 @@ export const groupBuyHandlers = [
           : Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id - a.id,
       )
 
-    const sig = [status, category, sort, words.join(' ')].join('|')
+    const sig = sort // 계약: 커서는 sort만 본다(상태·카테고리·검색어·학교와 묶지 않는다)
     const cursor = sp.get('cursor')
     const offset = cursor === null ? 0 : decodeCursor(cursor, sig)
     if (offset === null) return badRequest('cursor', '올바르지 않은 커서예요')
@@ -156,7 +162,7 @@ export const groupBuyHandlers = [
     const me = currentMember()
     if (!me) return problem(401, 'UNAUTHENTICATED')
     const g = mockState.groupBuys.find((x) => x.id === Number(params.id))
-    if (!g) return problem(404, 'Not Found')
+    if (!g || g.school !== me.school) return problem(404, 'Not Found') // 009: 다른 학교 공구는 없는 공구와 같다
     const mine = g.participations.find((p) => p.memberId === me.id)
     const isOrganizer = g.organizerId === me.id
     const total = secured(g)
@@ -187,6 +193,7 @@ export const groupBuyHandlers = [
         : null,
       // 공개 규칙(003 data-model): 개설자는 OPEN·PENDING_CLOSE·COMPLETED에서 항상, 참여자는 COMPLETED일 때만
       openChatUrl: (isOrganizer && ['OPEN', 'PENDING_CLOSE', 'COMPLETED'].includes(shownStatus(g))) || (mine && g.status === 'COMPLETED') ? g.openChatUrl : null,
+      school: g.school,
       participants: isOrganizer ? g.participations.map((p) => ({ memberId: p.memberId, name: nameOf(p.memberId), quantity: p.quantity })) : null,
       createdAt: g.createdAt,
     })
@@ -205,7 +212,7 @@ export const groupBuyHandlers = [
     mockState.recentCreates.push({ key, at: now })
     const g = {
       id: Math.max(0, ...mockState.groupBuys.map((x) => x.id)) + 1,
-      status: 'OPEN', organizerId: me.id, createdAt: new Date(now).toISOString(), participations: [],
+      status: 'OPEN', organizerId: me.id, school: me.school, createdAt: new Date(now).toISOString(), participations: [],
     } as unknown as SeedGroupBuy
     applyBody(g, b)
     mockState.groupBuys.unshift(g)
@@ -228,5 +235,13 @@ export const groupBuyHandlers = [
     if (!g) return res
     mockState.groupBuys = mockState.groupBuys.filter((x) => x !== g)
     return new HttpResponse(null, { status: 204 })
+  }),
+
+  // 009 학교 검색(비로그인 목록용): 공구가 있는 학교 키 중 q가 들어간 것, 사전순 최대 10개
+  http.get('/api/schools', ({ request }) => {
+    const q = strip(new URL(request.url).searchParams.get('q') ?? '').toLowerCase()
+    if (!q || chars(q) > 50) return badRequest('q', '1~50자로 입력해 주세요')
+    const items = [...new Set(mockState.groupBuys.map((g) => g.school))].filter((s) => s.includes(q)).sort().slice(0, 10)
+    return HttpResponse.json({ items })
   }),
 ]

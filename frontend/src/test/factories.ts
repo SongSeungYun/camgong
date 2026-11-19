@@ -17,6 +17,7 @@ export function makeGroupBuy(over: Partial<SeedGroupBuy> = {}): SeedGroupBuy {
     organizerId: 1,
     createdAt: new Date().toISOString(),
     openChatUrl: null,
+    school: 'school.ac.kr',
     participations: [
       { memberId: 1, quantity: 3 },
       { memberId: 2, quantity: 6 },

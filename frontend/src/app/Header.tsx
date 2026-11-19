@@ -17,7 +17,7 @@ function NotificationBell() {
 }
 
 export function Header() {
-  const { status, logout } = useSession()
+  const { status, logout, retry } = useSession()
   const navigate = useNavigate()
   const [logoutFailed, setLogoutFailed] = useState(false)
   const { pathname } = useLocation()
@@ -51,6 +51,9 @@ export function Header() {
           <Link to="/login">로그인</Link>
           <Link to="/signup">가입</Link>
         </>
+      ) : status === 'error' ? (
+        // 로그인 상태를 확인하지 못했다(5xx·네트워크). 새로고침 없이 다시 확인할 길을 준다
+        <Button variant="secondary" onClick={retry}>로그인 다시 확인</Button>
       ) : null}
     </header>
   )

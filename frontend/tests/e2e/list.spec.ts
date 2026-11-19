@@ -28,7 +28,7 @@ test('상세에 갔다 뒤로 오면 목록 위치와 불러온 페이지가 유
   await expect(page).toHaveURL(/\/$/)
 
   await page.getByRole('button', { name: '더 보기' }).click()
-  await expect(page.getByRole('listitem')).toHaveCount(26)
+  await expect(page.getByRole('listitem')).toHaveCount(23) // 로그인하면 우리 학교(school.ac.kr) 모집 중 공구만(009)
   await page.getByRole('listitem').nth(18).scrollIntoViewIfNeeded()
   const before = await page.evaluate(() => window.scrollY)
   expect(before).toBeGreaterThan(0)
@@ -36,7 +36,7 @@ test('상세에 갔다 뒤로 오면 목록 위치와 불러온 페이지가 유
   await page.getByRole('listitem').nth(18).getByRole('link').click()
   await expect(page).toHaveURL(/\/groupbuys\/\d+$/)
   await page.goBack()
-  await expect(page.getByRole('listitem')).toHaveCount(26) // 쿼리 캐시에서 복원
+  await expect(page.getByRole('listitem')).toHaveCount(23) // 쿼리 캐시에서 복원
   const after = await page.evaluate(() => window.scrollY)
   expect(Math.abs(after - before)).toBeLessThan(200)
 })

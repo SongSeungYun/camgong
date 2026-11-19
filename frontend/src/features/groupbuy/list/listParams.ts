@@ -7,9 +7,12 @@ export interface ListParams {
   category: string | null
   q: string
   sort: 'latest' | 'deadline'
+  /** 009: 비로그인일 때 고른 학교 키('' = 전국). 로그인하면 쓰지 않는다 */
+  school: string
 }
 
-const DEFAULTS: ListParams = { status: 'OPEN', category: null, q: '', sort: 'latest' }
+const DEFAULTS: ListParams = { status: 'OPEN', category: null, q: '', sort: 'latest', school: '' }
+const SCHOOL_MAX = 253
 const Q_MAX = 50
 const DEBOUNCE_MS = 300
 
@@ -21,11 +24,13 @@ export function parseListParams(sp: URLSearchParams): ListParams {
   const status = sp.get('status') ?? ''
   const category = sp.get('category') ?? ''
   const sort = sp.get('sort')
+  const school = (sp.get('school') ?? '').trim().toLowerCase() // 학교 키는 소문자
   return {
     status: isKnownStatus(status) ? status : DEFAULTS.status,
     category: isKnownCategory(category) ? category : null,
     q: normalizeQ(sp.get('q') ?? ''),
     sort: sort === 'deadline' ? 'deadline' : 'latest',
+    school: school.length <= SCHOOL_MAX ? school : DEFAULTS.school,
   }
 }
 
@@ -36,6 +41,7 @@ export function serializeListParams(p: ListParams): URLSearchParams {
   if (p.category) sp.set('category', p.category)
   if (p.q) sp.set('q', p.q)
   if (p.sort !== DEFAULTS.sort) sp.set('sort', p.sort)
+  if (p.school) sp.set('school', p.school)
   return sp
 }
 

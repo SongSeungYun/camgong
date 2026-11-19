@@ -29,6 +29,7 @@ export const meHandlers = [
 
     const items = rows.slice(offset, offset + size).map((g) => ({
       ...toCard(g),
+      school: undefined, // 내 활동 항목에는 school이 없다(계약 fc49fdd)
       ...(role === 'participant' ? { myQuantity: g.participations.find((p) => p.memberId === me.id)!.quantity } : {}),
     }))
     return HttpResponse.json({ items, nextCursor: offset + size < rows.length ? encodeCursor(sig, offset + size) : null })
