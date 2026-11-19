@@ -35,6 +35,12 @@ spring:
     problemdetails:
       enabled: true
 
+logging:
+  level:
+    # Hibernate 는 SQL 오류를 이 로거에 WARN 으로 찍는데, UNIQUE 위반 메시지('Duplicate entry <값>')에 이메일·표시 이름이 들어간다(010 T016).
+    # 가입 경합은 서비스가 409 로 바꾸므로 이 줄이 필요 없다. 처리하지 못한 오류는 예외로 올라가 따로 남는다.
+    org.hibernate.orm.jdbc.error: ERROR
+
 camgong:
   auth:
     # 가입은 ac.kr 메일이면 받는다(학교 키 <이름>.ac.kr). ac.kr 밖 대학이나 여러 도메인을 한 학교로 묶을 때만 여기에 쓴다.
