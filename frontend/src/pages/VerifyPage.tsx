@@ -41,7 +41,8 @@ export default function VerifyPage() {
     onSuccess: (r) => setMember(r.member),
     onError: (e) => {
       if (!(e instanceof ApiError)) return setTopErrors([errorMessage(new ApiError(0))])
-      if (e.code && TOKEN_CODES.includes(e.code)) return setTokenError(e)
+      // 토큰 코드, 또는 인증 때 학교 판정 실패(400 errors[token], 009): 다시 눌러도 같은 결과라 폼을 닫는다
+      if ((e.code && TOKEN_CODES.includes(e.code)) || e.fieldErrors.some((f) => f.field === 'token')) return setTokenError(e)
       setAlready(e.code === 'ALREADY_REGISTERED')
       if (e.code === 'DISPLAY_NAME_TAKEN') return setError('displayName', { type: 'server', message: errorMessage(e) })
       setTopErrors(applyServerErrors(e, setError, FIELDS))
@@ -66,7 +67,7 @@ export default function VerifyPage() {
     return (
       <Layout>
         <h1>이메일 인증</h1>
-        <p role="alert">{errorMessage(tokenError)}</p>
+        <p role="alert">{tokenError.fieldErrors.find((f) => f.field === 'token')?.message ?? errorMessage(tokenError)}</p>
         <p><Link to="/signup">가입 화면으로</Link></p>
         {tokenError.code === 'TOKEN_EXPIRED' && <ResendBox />}
       </Layout>

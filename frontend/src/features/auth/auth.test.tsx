@@ -256,6 +256,17 @@ describe('가입·인증 (변경 B2: 가입은 이메일만, 이름·비밀번�
     expect(!!screen.queryByRole('button', { name: '인증 메일 다시 받기' })).toBe(canResend)
   })
 
+  test('T031: 인증 때 학교 판정이 실패(400 errors[token])하면 폼을 닫고 그 문구와 가입 화면 링크를 보인다', async () => {
+    server.use(http.post('/api/auth/verify', () => HttpResponse.json({ type: 'about:blank', title: 'Bad Request', status: 400, errors: [{ field: 'token', message: '이 메일로는 더 이상 가입할 수 없습니다.' }] }, { status: 400 })))
+    renderApp(`/verify?token=${await newToken()}`)
+    await screen.findByLabelText('표시 이름')
+    await fillVerify()
+    expect((await screen.findByRole('alert')).textContent).toBe('이 메일로는 더 이상 가입할 수 없습니다.')
+    expect(screen.getByRole('link', { name: '가입 화면으로' }).getAttribute('href')).toBe('/signup')
+    expect(screen.queryByLabelText('표시 이름')).toBeNull() // 다시 눌러도 계속 실패할 폼을 남기지 않는다
+    expect(screen.queryByRole('button', { name: '인증 메일 다시 받기' })).toBeNull()
+  })
+
   test('9. token 쿼리가 없으면 올바르지 않은 링크와 같은 안내', async () => {
     renderApp('/verify')
     await screen.findByText('올바르지 않은 링크예요.')

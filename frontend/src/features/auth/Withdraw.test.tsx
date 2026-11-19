@@ -277,4 +277,15 @@ describe('탈퇴 (010)', () => {
     screen.getByText('햇반 210g')
     expect(document.querySelector('article [class*=desc]')).toBeNull() // 빈 설명 문단도 그리지 않는다
   })
+
+  test('T031: 목 탈퇴가 비밀번호는 맞고 409로 막혀도 로그인 실패 횟수를 지운다(백엔드와 같게)', async () => {
+    asOutsider([makeGroupBuy({ organizerId: 3, participations: [{ memberId: 3, quantity: 1 }] })])
+    mockState.loginFailures = 3
+    renderApp('/me')
+    await openDialog()
+    await userEvent.type(pw(), 'password1234')
+    await userEvent.keyboard('{Enter}')
+    await screen.findByRole('alert', { name: '진행 중인 공구가 있어 탈퇴할 수 없어요.' })
+    expect(mockState.loginFailures).toBe(0)
+  })
 })
