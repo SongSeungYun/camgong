@@ -232,4 +232,45 @@ describe('탈퇴 (010)', () => {
     await waitFor(() => expect(router.state.location.state).toBeNull())
     screen.getByText('탈퇴했어요.') // 화면에서는 남아 있다
   })
+
+  test('T018: 탈퇴 영역과 대화상자 안 모두 지우는 것·남는 것을 동의문과 같게 말하고, 대화상자 설명(aria-describedby)에도 들어간다', async () => {
+    asOutsider()
+    renderApp('/me')
+    const region = await screen.findByRole('region', { name: '탈퇴' })
+    const erased = '이메일·표시 이름·비밀번호, 내 알림, 내가 연 공구의 설명'
+    const kept = '함께한 공구의 수량과 입금·수령 기록, 내가 연 공구의 제목·상품명·상품 링크·오픈채팅 링크'
+    expect(region.textContent).toContain(erased)
+    expect(region.textContent).toContain(kept)
+    const dialog = await openDialog()
+    expect(dialog.textContent).toContain(erased)
+    expect(dialog.textContent).toContain(kept)
+    const desc = document.getElementById(dialog.getAttribute('aria-describedby') ?? '')!.textContent
+    expect(desc).toMatch(/되돌릴 수 없어요/)
+    expect(desc).toContain(erased)
+    expect(desc).toContain(kept)
+  })
+
+  test('T018: 목 탈퇴는 그 회원이 연 공구(상태 무관)의 설명만 비운다', async () => {
+    asOutsider([
+      makeGroupBuy({ id: 3, title: '완료된 내 공구', organizerId: 3, status: 'COMPLETED', description: '010-1234-5678로 입금', participations: [{ memberId: 3, quantity: 2 }, { memberId: 1, quantity: 2 }] }),
+      makeGroupBuy({ id: 5, title: '남의 공구', organizerId: 1, status: 'COMPLETED', description: '남의 설명', participations: [{ memberId: 1, quantity: 2 }, { memberId: 3, quantity: 2 }] }),
+    ])
+    renderApp('/me')
+    await openDialog()
+    await userEvent.type(pw(), 'password1234')
+    await userEvent.keyboard('{Enter}')
+    await screen.findByText('탈퇴했어요.')
+    expect(mockState.groupBuys.find((g) => g.id === 3)!.description).toBeNull()
+    expect(mockState.groupBuys.find((g) => g.id === 5)!.description).toBe('남의 설명')
+  })
+
+  test('T018: 탈퇴한 개설자의 완료 공구(설명 null)를 참여자가 열면 설명 없이 나머지가 그려진다', async () => {
+    mockState.sessionMemberId = 1
+    mockState.groupBuys = [makeGroupBuy({ id: 3, title: '완료된 공구', organizerId: 3, status: 'COMPLETED', description: null, participations: [{ memberId: 3, quantity: 2 }, { memberId: 1, quantity: 2 }] })]
+    mockState.members.find((m) => m.id === 3)!.withdrawn = true
+    renderApp('/groupbuys/3')
+    await screen.findByRole('heading', { name: '완료된 공구', level: 1 })
+    screen.getByText('햇반 210g')
+    expect(document.querySelector('article')!.textContent).not.toContain('null')
+  })
 })
