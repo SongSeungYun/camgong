@@ -31,6 +31,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   // 세대 번호: 로그인·로그아웃·언마운트 뒤에 도착한 옛 me 응답이 세션을 덮어쓰지 않게 한다
   const gen = useRef(0)
+  // 화면 세션에 마지막으로 들어온 회원. 개인 쿼리 키에 회원 id가 없어서, 다른 회원이 들어오면 이전 회원의 조회 캐시를 지운다(T028).
+  // 비로그인 401만으로는 지우지 않으니(공개 화면 캐시 유지) 다음 회원이 정해질 때 여기서 한 번에 판단한다.
+  // mutation 캐시는 남긴다(VerifyPage가 m.isSuccess로 화면을 정한다)
+  const owner = useRef<number | null>(null)
+  const adopt = useCallback(
+    (member: Member) => {
+      if (owner.current !== null && owner.current !== member.id) queryClient.removeQueries()
+      owner.current = member.id
+      setState({ status: 'authenticated', member, expired: false })
+    },
+    [queryClient],
+  )
 
   const clear = useCallback(
     (expired = false) => {
@@ -38,6 +50,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // 이미 비운 뒤 다른 요청의 401이 또 와도 처음 정한 만료 안내를 유지한다
       setState((prev) => ({ status: 'anonymous', member: null, expired: prev.status === 'authenticated' ? expired : prev.expired }))
       queryClient.clear()
+      owner.current = null
     },
     [queryClient],
   )
@@ -47,11 +60,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const ok = () => gen.current === mine
     setState({ status: 'checking', member: null, expired: false })
     get<{ member: Member }>('/api/auth/me', { expect401: true }).then(
-      (r) => ok() && setState({ status: 'authenticated', member: r.member, expired: false }),
+      (r) => ok() && adopt(r.member),
       // 비로그인 401은 정상 응답(공개 화면의 캐시를 비우지 않는다). 그 밖의 오류는 로그인 여부를 모르니 /login으로 보내지 않는다
       (e) => ok() && setState({ status: e instanceof ApiError && e.status === 401 ? 'anonymous' : 'error', member: null, expired: false }),
     )
-  }, [])
+  }, [adopt])
 
   useEffect(() => {
     setUnauthenticatedHandler(() => clear(true))
@@ -68,7 +81,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ackExpired: () => setState((prev) => (prev.expired ? { ...prev, expired: false } : prev)),
       setMember: (member) => {
         gen.current++
-        setState({ status: 'authenticated', member, expired: false })
+        adopt(member)
       },
       retry: checkMe,
       // 서버가 로그아웃을 확인한 뒤에만 화면을 비운다. 실패하면 던져서 호출한 쪽이 안내하고 로그인 상태를 유지한다
@@ -84,7 +97,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
       forget: () => clear(),
     }),
-    [state, clear, checkMe],
+    [state, clear, checkMe, adopt],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
