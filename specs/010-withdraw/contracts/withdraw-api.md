@@ -12,10 +12,10 @@
 
 | 상태 | title | 조건 |
 |------|-------|------|
-| 400 | `Bad Request` | `password` 누락·빈 값 (`errors`에 `password`) |
+| 400 | `Bad Request` | `password` 누락·빈 값·공백만 (`errors`에 `password`). 실패 횟수에 들어가지 않는다. 본문이 없거나 JSON이 아니면 같은 400이지만 `errors`는 빈 배열이다 |
 | 400 | `INVALID_PASSWORD` | 비밀번호가 틀림 (`errors: [{ "field": "password", "message": "비밀번호가 맞지 않습니다." }]`). 002 로그인 실패 횟수에 들어간다 |
 | 401 | `UNAUTHENTICATED` | 세션 없음·만료(이미 탈퇴한 경우 포함) |
-| 409 | `ACTIVE_GROUPBUY` | 모집 중(마감 확정 대기 포함) 공구에 개설자나 참여자로 있음. 아래 `blockers` 포함. 아무것도 바뀌지 않는다 |
+| 409 | `ACTIVE_GROUPBUY` | 모집 중(마감 확정 대기 포함) 공구에 개설자나 참여자로 있음. 아래 `blockers` 포함. 회원·공구 데이터는 바뀌지 않는다. 비밀번호는 맞았으므로 002 로그인 실패 횟수는 초기화된다 |
 | 429 | `LOGIN_LOCKED` | 002 잠금 상태. `Retry-After`, `retryAt` 포함 |
 
 409 본문(ProblemDetail 확장):
