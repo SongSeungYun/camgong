@@ -54,4 +54,21 @@ class WithdrawSessionCleanupFailureIT extends IntegrationTestBase {
         mockMvc.perform(get("/api/auth/me").cookie(new Cookie("camgong_session", "test-session-20")))
                 .andExpect(status().isUnauthorized());
     }
+
+    /** 010 T015: 설명 비우기·create_guard 삭제는 익명화와 한 트랜잭션이다. 실패하면 탈퇴 전체가 되돌아간다(커밋 뒤에 따로 하면 탈퇴만 남는다). */
+    @Test
+    void aFailureWhileClearingMyContentRollsBackTheWholeWithdrawal() throws Exception {
+        seedLoginMember(22, "c@school.ac.kr", "비우기", "password1");
+        doThrow(new IllegalStateException("DB 끊김")).when(withdrawService).clearOwnContent(anyLong());
+
+        try {
+            mockMvc.perform(post("/api/auth/withdraw").with(as(22)).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"password\":\"password1\"}")).andExpect(status().is5xxServerError());
+        } catch (jakarta.servlet.ServletException expected) {
+            // 처리하지 못한 오류가 MockMvc 까지 올라와도 실패 응답이다
+        }
+
+        assertThat(jdbc.queryForObject("SELECT withdrawn_at IS NULL FROM member WHERE id = 22", Boolean.class)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT email_key FROM member WHERE id = 22", String.class)).isEqualTo("c@school.ac.kr");
+    }
 }

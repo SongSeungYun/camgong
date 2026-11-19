@@ -16,7 +16,9 @@ docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -
 mv "$out.tmp" "$out"
 echo "$out"
 
-# 7일이 지난 덤프를 지운다(010 결정 5-1: 탈퇴 전 값이 백업에 남는 기간). 새 덤프가 성공한 뒤에만 지운다(set -e).
-find "$dir" -name 'camgong-*.sql.gz' -mtime +6 -delete
+# 6일(분 단위)이 지난 덤프를 지운다. 매일 돌면 어떤 덤프도 7일을 넘기지 않는다(010 결정 5-1: 동의문의 "7일 안에").
+# -mtime +6 은 7일이 꽉 찬 파일만 골라, 덤프 시간이 조금만 흔들려도 하루 더(8일) 남는다.
+# 새 덤프가 성공한 뒤에만 지운다(set -e): 덤프가 며칠 실패하면 남은 백업까지 지우지 않는다. 그동안은 7일을 넘길 수 있다.
+find "$dir" -name 'camgong-*.sql.gz' -mmin +$((6 * 24 * 60)) -delete
 
 # TODO: 서버 밖(객체 저장소 등)으로 보낸다. 서버가 사라지면 이 디렉터리도 같이 사라진다. 밖의 사본에도 같은 7일 규칙을 건다.

@@ -122,13 +122,21 @@ public class WithdrawService {
                 .param("now", LocalDateTime.ofInstant(now, ZoneOffset.UTC))
                 .param("id", memberId)
                 .update();
-        // 설명은 자유 텍스트라 연락처·계좌가 들어갈 수 있고, 끝난 공구는 본인도 고칠 수 없다(결정 5). 여기까지 왔으면 이 회원이 연 공구는
-        // 모두 종료 상태(COMPLETED·FAILED·CANCELLED)라 다른 경로가 바꾸지 않는다. 잠금 순서는 member → group_buy 그대로다.
-        jdbc.sql("UPDATE group_buy SET description = NULL WHERE organizer_id = :id").param("id", memberId).update();
-        jdbc.sql("DELETE FROM create_guard WHERE member_id = :id").param("id", memberId).update();
+        clearOwnContent(memberId);
         jdbc.sql("DELETE FROM notification WHERE recipient_id = :id").param("id", memberId).update();
         jdbc.sql("DELETE FROM pending_signup WHERE email_key = :key").param("key", emailKey).update();
         jdbc.sql("DELETE FROM login_attempt WHERE email_key = :key").param("key", emailKey).update();
+    }
+
+    /**
+     * 이 회원이 연 모든 공구의 설명과 create_guard 를 지운다(결정 5). 설명은 자유 텍스트라 연락처·계좌가 들어갈 수 있고, 끝난 공구는 본인도
+     * 고칠 수 없다. 익명화 트랜잭션 안에서 부른다(실패하면 탈퇴 전체가 되돌아가는지 테스트가 가로채는 지점이다).
+     * 여기까지 왔으면 이 회원이 연 공구는 모두 종료 상태라 바꾸는 경로가 없다. 수정·취소·참여·마감·체크가 그 행을 잠글 수는 있지만,
+     * 잠근 뒤 회원 행을 기다리지 않으므로 잠깐 기다릴 뿐 교착하지 않는다. 잠금 순서는 member → group_buy 다.
+     */
+    void clearOwnContent(long memberId) {
+        jdbc.sql("UPDATE group_buy SET description = NULL WHERE organizer_id = :id").param("id", memberId).update();
+        jdbc.sql("DELETE FROM create_guard WHERE member_id = :id").param("id", memberId).update();
     }
 
     /** 모집 중(마감 확정 대기 포함) 공구 가운데 이 회원이 열었거나 참여한 것, 공구 id 오름차순. */

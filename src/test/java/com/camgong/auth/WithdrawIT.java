@@ -341,6 +341,7 @@ class WithdrawIT extends IntegrationTestBase {
         }
         long others = groupBuy().status("COMPLETED").insert(jdbc);
         long othersOpen = groupBuy().insert(jdbc);
+        participate(others, ME, 1);                                 // 남의 공구에 참여만 했으면 그 설명은 그대로다
         jdbc.update("UPDATE group_buy SET description = '010-1234-5678 계좌 국민 123'");
         jdbc.update("INSERT INTO create_guard (member_id, fingerprint, created_at) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)",
                 ME, "a".repeat(64), utc(START), ME, "b".repeat(64), utc(START), ORGANIZER, "a".repeat(64), utc(START));

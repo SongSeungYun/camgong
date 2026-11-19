@@ -7,6 +7,7 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     # binlog 를 끈다(010 결정 5-1). 8.4 는 기본으로 켜져 탈퇴 UPDATE 전의 값을 30일 남긴다. 복제·시점 복구는 쓰지 않는다.
+    # 이미 binlog 를 켠 채 돌던 볼륨이면 남은 binlog.* 파일은 끈 뒤 자동으로 지워지지 않는다. 끄기 전에 한 번 RESET BINARY LOGS AND GTIDS 를 실행한다.
     command: ["--disable-log-bin"]
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
