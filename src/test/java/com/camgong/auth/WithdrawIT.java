@@ -205,6 +205,12 @@ class WithdrawIT extends IntegrationTestBase {
                 .andExpect(jsonPath("$.title").value("Bad Request"))
                 .andExpect(jsonPath("$.errors[0].field").value("password"));
         withdraw("").andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("password"));
+        for (String blank : List.of(" ", "   ", "\t \u3000")) {                     // 공백만(010 T021): 틀린 비밀번호가 아니라 빈 값
+            withdraw(blank).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.title").value("Bad Request"))
+                    .andExpect(jsonPath("$.errors[0].field").value("password"))
+                    .andExpect(jsonPath("$.errors[0].message").value("비밀번호를 입력해 주세요."));
+        }
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM login_attempt", Integer.class)).isZero();
 
         mockMvc.perform(post("/api/auth/withdraw").contentType(MediaType.APPLICATION_JSON).content(json(Map.of("password", PASSWORD))))

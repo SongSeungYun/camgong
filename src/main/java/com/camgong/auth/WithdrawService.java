@@ -54,7 +54,8 @@ public class WithdrawService {
     }
 
     public void withdraw(long memberId, String password) {
-        if (password == null || password.isEmpty()) {
+        // 공백만이면 빈 값이다(가입이 공백 비밀번호를 막아 맞을 수 없다). 실패 횟수에 넣지 않는다.
+        if (password == null || password.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.",
                     List.of(new ApiException.Field("password", "비밀번호를 입력해 주세요.")));
         }
