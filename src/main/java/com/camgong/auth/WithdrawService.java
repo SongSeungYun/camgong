@@ -81,6 +81,8 @@ public class WithdrawService {
         } catch (PessimisticLockingFailureException e) {     // 교착(1213)·잠금 대기 초과(1205) 둘 다
             tx.executeWithoutResult(s -> anonymise(memberId, emailKey, now));
         }
+        // 백업에서 복구하면 백업 뒤의 탈퇴가 되살아난다. 복구 절차가 이 줄로 다시 익명화한다(결정 5). 이메일·이름은 남기지 않는다.
+        log.info("withdrawn memberId={}", memberId);
         // 세션은 커밋 뒤에 지운다. 트랜잭션 안(회원 행 X 잠금을 쥔 채)에서 지우면 같은 회원의 세션 행을 넣는 문장과 교착할 수 있다:
         // INSERT … ON DUPLICATE KEY UPDATE(테스트 도우미 as())로는 재현됐고, 실제 로그인의 단순 INSERT 로는 900회 경쟁에서 재현되지 않았다.
         // 지우기 전에 남은 세션이나 그 사이 들어온 세션은 AuthFilter 가 탈퇴한 회원이라 받지 않고 지운다. 이 삭제가 실패해도 탈퇴는 이미 커밋됐으므로 204 로 끝내고 경고만 남긴다. 남은 행은 SessionCleanup 이 14일 TTL 로 지운다.
@@ -120,6 +122,10 @@ public class WithdrawService {
                 .param("now", LocalDateTime.ofInstant(now, ZoneOffset.UTC))
                 .param("id", memberId)
                 .update();
+        // 설명은 자유 텍스트라 연락처·계좌가 들어갈 수 있고, 끝난 공구는 본인도 고칠 수 없다(결정 5). 여기까지 왔으면 이 회원이 연 공구는
+        // 모두 종료 상태(COMPLETED·FAILED·CANCELLED)라 다른 경로가 바꾸지 않는다. 잠금 순서는 member → group_buy 그대로다.
+        jdbc.sql("UPDATE group_buy SET description = NULL WHERE organizer_id = :id").param("id", memberId).update();
+        jdbc.sql("DELETE FROM create_guard WHERE member_id = :id").param("id", memberId).update();
         jdbc.sql("DELETE FROM notification WHERE recipient_id = :id").param("id", memberId).update();
         jdbc.sql("DELETE FROM pending_signup WHERE email_key = :key").param("key", emailKey).update();
         jdbc.sql("DELETE FROM login_attempt WHERE email_key = :key").param("key", emailKey).update();

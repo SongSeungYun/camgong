@@ -23,6 +23,9 @@ import java.util.concurrent.Callable;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -325,5 +328,47 @@ class WithdrawIT extends IntegrationTestBase {
             participate(other, ME, 1);
         }
         withdraw(PASSWORD).andExpect(status().isNoContent());
+    }
+
+    // --- T015 (재검수: 공구 설명 비움, create_guard 삭제, INFO 로그) ---
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void myGroupBuyDescriptionsAndCreateGuardsAreClearedAndOnlyTheMemberIdIsLogged(CapturedOutput output) throws Exception {
+        List<Long> mine = new java.util.ArrayList<>();
+        for (String s : List.of("COMPLETED", "FAILED", "CANCELLED")) {
+            mine.add(groupBuy().organizer(ME).status(s).insert(jdbc));
+        }
+        long others = groupBuy().status("COMPLETED").insert(jdbc);
+        long othersOpen = groupBuy().insert(jdbc);
+        jdbc.update("UPDATE group_buy SET description = '010-1234-5678 계좌 국민 123'");
+        jdbc.update("INSERT INTO create_guard (member_id, fingerprint, created_at) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)",
+                ME, "a".repeat(64), utc(START), ME, "b".repeat(64), utc(START), ORGANIZER, "a".repeat(64), utc(START));
+
+        withdraw(PASSWORD).andExpect(status().isNoContent());
+
+        for (long id : mine) {
+            assertThat(jdbc.queryForObject("SELECT description FROM group_buy WHERE id = ?", String.class, id)).as("공구 " + id).isNull();
+        }
+        assertThat(jdbc.queryForList("SELECT description FROM group_buy WHERE id IN (?, ?)", String.class, others, othersOpen))
+                .containsOnly("010-1234-5678 계좌 국민 123");
+        assertThat(jdbc.queryForList("SELECT member_id FROM create_guard", Long.class)).containsExactly(ORGANIZER);
+
+        String withdrawLog = output.getAll().lines().filter(l -> l.contains("withdrawn")).findFirst().orElse("");
+        assertThat(withdrawLog).contains("INFO").contains("memberId=" + ME);
+        assertThat(output.getAll()).doesNotContain(EMAIL).doesNotContain("탈퇴자");
+    }
+
+    @Test
+    void aBlockedWithdrawalClearsNothing() throws Exception {
+        long done = groupBuy().organizer(ME).status("COMPLETED").insert(jdbc);
+        groupBuy().organizer(ME).insert(jdbc);                       // 모집 중이라 막힌다
+        jdbc.update("UPDATE group_buy SET description = '설명'");
+        jdbc.update("INSERT INTO create_guard (member_id, fingerprint, created_at) VALUES (?, ?, ?)", ME, "a".repeat(64), utc(START));
+
+        withdraw(PASSWORD).andExpect(status().isConflict());
+
+        assertThat(jdbc.queryForObject("SELECT description FROM group_buy WHERE id = ?", String.class, done)).isEqualTo("설명");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM create_guard", Integer.class)).isEqualTo(1);
     }
 }
