@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -40,13 +41,24 @@ public class NotificationCleanup {
         int total = 0;
         int deleted;
         do {
-            deleted = jdbc.sql("DELETE FROM notification WHERE created_at < :cutoff LIMIT " + BATCH).param("cutoff", cutoff).update();
+            try {
+                deleted = deleteBatch(cutoff);
+            } catch (PessimisticLockingFailureException e) {
+                // 정리 두 개가 동시에 돌면 DELETE … LIMIT 끼리 드물게 교착한다(1213, 동시 실행 테스트에서 60회 중 1회 재현, 교착 그래프는 못 잡았다).
+                // 한 문장이 곧 한 트랜잭션이라 진 쪽은 아무것도 지우지 않았다. 같은 묶음을 한 번만 다시 지운다.
+                deleted = deleteBatch(cutoff);
+            }
             total += deleted;
         } while (deleted > 0);
         if (total > 0) {
             log.info("notification-cleanup deleted={}", total);
         }
         return total;
+    }
+
+    /** 한 묶음 지우기. 교착 재시도를 테스트가 가로채는 지점이다. */
+    int deleteBatch(LocalDateTime cutoff) {
+        return jdbc.sql("DELETE FROM notification WHERE created_at < :cutoff LIMIT " + BATCH).param("cutoff", cutoff).update();
     }
 
     @Configuration
