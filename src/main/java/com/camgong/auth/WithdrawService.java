@@ -31,6 +31,13 @@ public class WithdrawService {
     private static final int BCRYPT_MAX_BYTES = 72;
     /** 어떤 비밀번호와도 맞지 않는 값(BCrypt 형식이 아니다). */
     private static final String NO_PASSWORD = "withdrawn";
+    /**
+     * 이 회원이 연 공구의 설명 비우기(결정 5). 인덱스를 고정한다: 작은 테이블에서 한 회원이 대부분을 열었으면 옵티마이저가 PRIMARY 전체 훑기를
+     * 고르고, REPEATABLE READ 에서 모든 공구 행에 X 잠금이 걸린다(006 체크와 교착할 수 있다). 고정하면 이 회원의 행과 그 뒤 간격만 잠근다(결정 3).
+     * 테스트가 실행 계획(EXPLAIN)을 확인한다.
+     */
+    static final String CLEAR_DESCRIPTIONS =
+            "UPDATE group_buy FORCE INDEX (idx_group_buy_organizer_id) SET description = NULL WHERE organizer_id = :id";
 
     /** 409 ACTIVE_GROUPBUY 의 blockers 한 줄. status 는 003 표시 상태(OPEN | PENDING_CLOSE). */
     public record Blocker(long groupBuyId, String title, String role, String status) {
@@ -136,7 +143,7 @@ public class WithdrawService {
      * 잠근 뒤 회원 행을 기다리지 않으므로 잠깐 기다릴 뿐 교착하지 않는다. 잠금 순서는 member → group_buy 다.
      */
     void clearOwnContent(long memberId) {
-        jdbc.sql("UPDATE group_buy SET description = NULL WHERE organizer_id = :id").param("id", memberId).update();
+        jdbc.sql(CLEAR_DESCRIPTIONS).param("id", memberId).update();
         jdbc.sql("DELETE FROM create_guard WHERE member_id = :id").param("id", memberId).update();
     }
 

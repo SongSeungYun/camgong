@@ -387,4 +387,22 @@ class WithdrawIT extends IntegrationTestBase {
         assertThat(jdbc.queryForObject("SELECT description FROM group_buy WHERE id = ?", String.class, done)).isEqualTo("설명");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM create_guard", Integer.class)).isEqualTo(1);
     }
+
+    /**
+     * 010 T025: 설명 비우기는 organizer 인덱스로 이 회원의 공구 행만 잠근다(plan 결정 3). 작은 테이블에서 한 회원이 대부분을 열었으면
+     * 옵티마이저가 PRIMARY 전체 훑기를 고르고, REPEATABLE READ 에서 모든 행에 X 잠금이 걸려 006 체크(공구 S → 참여 X → 회원 S)와 교착할 수 있다.
+     */
+    @Test
+    void clearingDescriptionsUsesTheOrganizerIndexEvenWhenTheMemberOrganisedMostRows() {
+        for (int i = 0; i < 9; i++) {
+            groupBuy().organizer(ME).status("COMPLETED").insert(jdbc);
+        }
+        groupBuy().status("COMPLETED").insert(jdbc);
+        jdbc.execute("ANALYZE TABLE group_buy");
+
+        Map<String, Object> plan = jdbc.queryForMap("EXPLAIN " + WithdrawService.CLEAR_DESCRIPTIONS.replace(":id", String.valueOf(ME)));
+
+        assertThat(plan.get("key")).as(plan.toString()).isEqualTo("idx_group_buy_organizer_id");
+        assertThat(plan.get("type")).isEqualTo("range");
+    }
 }
