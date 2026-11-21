@@ -37,6 +37,19 @@ services:
       VERIFY_LINK_BASE_URL: https://${DOMAIN:?}/verify?token=
       # env_file 로 같이 들어오는 DB root 비밀번호는 앱에 주지 않는다.
       MYSQL_ROOT_PASSWORD: ""
+      # 탈퇴 장부(010 결정 5-2). 컨테이너 안 경로는 고정이고, 호스트 디렉터리(WITHDRAW_LEDGER_DIR)를 바인드 마운트한다.
+      # 컨테이너를 다시 만들어도(up -d --build) 남아야 복구 때 되살아난 탈퇴를 다시 익명화할 수 있다.
+      WITHDRAW_LEDGER: /var/lib/camgong/ledger/withdraw-ledger.tsv
+    volumes:
+      # 앱은 uid 10001 로 돈다(backend.Dockerfile). 디렉터리를 먼저 만들고 넘겨준다: mkdir -p <디렉터리> && sudo chown 10001 <디렉터리>
+      # 못 쓰면 백엔드가 뜨지 않는다(조용히 장부 없이 돌지 않게).
+      - ${WITHDRAW_LEDGER_DIR:?}:/var/lib/camgong/ledger
+    # 로그는 복구 근거가 아니다(장부가 맡는다). 가린 수신 주소 같은 줄이 기한 없이 쌓이지 않게 돌린다: 최대 10MB × 3개.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       mysql:
         condition: service_healthy
