@@ -81,3 +81,50 @@ test('401이 연달아 와도(예: 화면 이동 시 상세와 읽지 않은 수
   await Promise.all([get('/api/auth/me').catch(() => {}), get('/api/notifications/unread-count').catch(() => {})])
   await screen.findByText('로그인이 필요해요. 입력하던 내용은 저장되지 않아요.')
 })
+
+// T028: 화면 세션의 회원이 바뀌면 이전 회원의 조회 캐시를 지운다(개인 쿼리 키에 회원 id가 없다)
+test('T028 경로 1: A 세션이 다른 탭에서 끝나 anonymous가 된 뒤 같은 탭에서 B가 로그인하면 A의 조회 캐시가 없다', async () => {
+  mockState.sessionMemberId = 1
+  const { client, router } = renderApp('/')
+  await screen.findByText('우리 학교 · school.ac.kr')
+  client.setQueryData(['myGroupbuys', 'A'], 'A의 내 활동')
+  server.use(http.get('/api/notifications/unread-count', () => HttpResponse.json({ unreadCount: 0 }))) // 다른 개인 요청이 401을 먼저 받지 않은 경우(목록 응답이 먼저)
+  mockState.sessionMemberId = null // 다른 탭에서 로그아웃
+  await userEvent.click(screen.getByRole('button', { name: '주방' })) // 전국 목록이 와 범위가 어긋남 → me 재확인 401
+  await screen.findByRole('link', { name: '로그인' })
+  expect(client.getQueryData(['myGroupbuys', 'A'])).toBe('A의 내 활동') // 비로그인 401만으로는 비우지 않는다
+  await router.navigate('/login')
+  await userEvent.type(await screen.findByLabelText('이메일'), 'participant@school.ac.kr')
+  await userEvent.type(screen.getByLabelText('비밀번호'), 'password1234')
+  await userEvent.click(screen.getByRole('button', { name: '로그인' }))
+  await screen.findByRole('button', { name: '로그아웃' })
+  expect(client.getQueryData(['myGroupbuys', 'A'])).toBeUndefined()
+})
+
+test('T028 경로 2: 다른 탭에서 A 로그아웃·B 로그인 뒤 me 재확인이 B면 A의 조회 캐시가 없다', async () => {
+  mockState.sessionMemberId = 1
+  const { client } = renderApp('/')
+  await screen.findByText('우리 학교 · school.ac.kr')
+  client.setQueryData(['myGroupbuys', 'A'], 'A의 내 활동')
+  mockState.sessionMemberId = 4 // 다른 탭에서 snu.ac.kr 회원으로
+  await userEvent.click(screen.getByRole('button', { name: '생활용품' }))
+  await screen.findByText('우리 학교 · snu.ac.kr')
+  expect(client.getQueryData(['myGroupbuys', 'A'])).toBeUndefined()
+})
+
+test('T028: 같은 회원이 다시 로그인하면 캐시를 지우지 않는다', async () => {
+  mockState.sessionMemberId = 1
+  const { client, router } = renderApp('/')
+  await screen.findByText('우리 학교 · school.ac.kr')
+  client.setQueryData(['myGroupbuys', 'A'], 'A의 내 활동')
+  server.use(http.get('/api/notifications/unread-count', () => HttpResponse.json({ unreadCount: 0 })))
+  mockState.sessionMemberId = null
+  await userEvent.click(screen.getByRole('button', { name: '주방' }))
+  await screen.findByRole('link', { name: '로그인' })
+  await router.navigate('/login')
+  await userEvent.type(await screen.findByLabelText('이메일'), 'organizer@school.ac.kr')
+  await userEvent.type(screen.getByLabelText('비밀번호'), 'password1234')
+  await userEvent.click(screen.getByRole('button', { name: '로그인' }))
+  await screen.findByRole('button', { name: '로그아웃' })
+  expect(client.getQueryData(['myGroupbuys', 'A'])).toBe('A의 내 활동')
+})

@@ -119,12 +119,12 @@ export const authHandlers = [
       .filter((g) => ['OPEN', 'PENDING_CLOSE'].includes(shownStatus(g)) && (g.organizerId === me.id || g.participations.some((p) => p.memberId === me.id)))
       .sort((a, b) => a.id - b.id)
       .map((g) => ({ groupBuyId: g.id, title: g.title, role: g.organizerId === me.id ? 'ORGANIZER' : 'PARTICIPANT', status: shownStatus(g) }))
+    mockState.loginFailures = 0 // 비밀번호가 맞으면 409 전에 실패 기록을 지운다(백엔드와 같다)
     if (blockers.length) return problem(409, 'ACTIVE_GROUPBUY', { detail: '진행 중인 공구가 있어 탈퇴할 수 없습니다.', blockers })
     mockState.notifications = mockState.notifications.filter((n) => n.memberId !== me.id)
     for (const g of mockState.groupBuys) if (g.organizerId === me.id) g.description = null // 내가 연 공구의 설명(상태 무관, 010 plan 결정 5)
     mockState.pending = mockState.pending.filter((p) => p.email !== me.email)
     Object.assign(me, { withdrawn: true, displayName: WITHDRAWN_NAME, email: '', password: '' })
-    mockState.loginFailures = 0 // 같은 이메일의 로그인 실패 기록도 지운다(plan 5)
     mockState.sessionMemberId = null
     return new HttpResponse(null, { status: 204 })
   }),

@@ -33,12 +33,13 @@ async function open(api: APIRequestContext, title: string, total = 10, mine = 3,
   expect(r.status()).toBe(201)
   return ((await r.json()) as { id: number }).id
 }
-async function withdrawUi(page: Page, password: string) {
+async function withdrawUi(page: Page, password: string, beforeSubmit?: () => void) {
   await page.goto('/me')
   await page.getByRole('region', { name: '탈퇴' }).getByRole('button', { name: '탈퇴' }).click()
   const dialog = page.getByRole('dialog', { name: '탈퇴할까요?' })
   await expect(dialog.getByLabel('비밀번호')).toBeFocused()
   await dialog.getByLabel('비밀번호').fill(password)
+  beforeSubmit?.()
   await page.keyboard.press('Enter')
   return dialog
 }
@@ -50,9 +51,8 @@ test('실서버 010: 진행 중 공구가 있으면 막히고 공구별 안내(�
   const openId = await open(o.api, `열린공구${tag}${v}`)
   const closedId = await open(o.api, `마감공구${tag}${v}`)
   expect((await p.api.post(`/api/groupbuys/${openId}/participations`, { data: { quantity: 1, expectedUnitPrice: 1200 } })).status()).toBe(201)
-  sql(`UPDATE group_buy SET deadline = UTC_TIMESTAMP(6) - INTERVAL 1 MINUTE WHERE id=${closedId}`) // 마감 지남(확정 대기)
-
-  const dialog = await withdrawUi(o.page, 'password1234')
+  // 마감 지남(확정 대기). 로컬 마감 스케줄러(30초)가 먼저 돌면 FAILED가 되므로 제출 바로 앞에서 바꾼다(T029)
+  const dialog = await withdrawUi(o.page, 'password1234', () => sql(`UPDATE group_buy SET deadline = UTC_TIMESTAMP(6) - INTERVAL 1 MINUTE WHERE id=${closedId}`))
   const alert = o.page.getByRole('alert', { name: '진행 중인 공구가 있어 탈퇴할 수 없어요.' })
   await expect(alert).toBeVisible()
   await expect(dialog).toHaveCount(0)
