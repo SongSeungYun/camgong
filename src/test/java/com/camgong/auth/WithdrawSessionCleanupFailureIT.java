@@ -70,5 +70,6 @@ class WithdrawSessionCleanupFailureIT extends IntegrationTestBase {
 
         assertThat(jdbc.queryForObject("SELECT withdrawn_at IS NULL FROM member WHERE id = 22", Boolean.class)).isTrue();
         assertThat(jdbc.queryForObject("SELECT email_key FROM member WHERE id = 22", String.class)).isEqualTo("c@school.ac.kr");
+        assertThat(java.nio.file.Files.readString(LEDGER)).as("롤백된 탈퇴는 장부에 남지 않는다(010 T032)").isEmpty();
     }
 }

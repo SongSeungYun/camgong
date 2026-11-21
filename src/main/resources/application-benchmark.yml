@@ -10,5 +10,7 @@ logging:
     com.camgong: WARN
 
 camgong:
+  withdraw:
+    ledger: ${WITHDRAW_LEDGER:build/withdraw-ledger.tsv}
   mail:
     sender: logging       # 측정에는 메일이 필요 없다(기본 smtp 는 SMTP 설정 없이 기동하지 못한다)

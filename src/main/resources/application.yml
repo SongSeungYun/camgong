@@ -65,6 +65,10 @@ camgong:
   mail:
     # smtp(기본) | logging(local/test/benchmark 프로파일에서만). SMTP 접속 정보는 SPRING_MAIL_* 환경변수로만 받는다.
     sender: ${MAIL_SENDER:smtp}
+  withdraw:
+    # 탈퇴 장부 파일(010 결정 5-2). 복구 뒤 되살아난 탈퇴를 기동 때 다시 익명화한다. 비어 있으면 기동이 실패한다(운영에서 빠뜨리지 않게).
+    # 운영 compose 는 호스트 디렉터리를 바인드 마운트한 경로를 준다. 로컬·측정 프로파일은 build/ 아래를 쓴다.
+    ledger: ${WITHDRAW_LEDGER:}
   notification:
     async:
       enabled: true         # false 면 알림을 요청 스레드에서 바로 만든다(테스트용). 운영은 true

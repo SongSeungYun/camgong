@@ -59,6 +59,27 @@ public abstract class IntegrationTestBase {
         registry.add("camgong.auth.bcrypt-cost", () -> 4); // 테스트 속도
         registry.add("camgong.mail.sender", () -> "logging"); // 실제 메일 대신 기록
         registry.add("camgong.auth.cleanup.enabled", () -> false); // 정리는 SessionCleanupIT 가 직접 호출
+        registry.add("camgong.withdraw.ledger", LEDGER::toString);  // 010 탈퇴 장부. 테스트마다 비운다
+    }
+
+    /** JVM 하나에 장부 파일 하나. 모든 컨텍스트가 같이 쓰므로 테스트 앞뒤로 비운다(새 컨텍스트가 뜰 때 앞 테스트의 줄을 다시 적용하지 않게). */
+    protected static final java.nio.file.Path LEDGER = createLedgerPath();
+
+    private static java.nio.file.Path createLedgerPath() {
+        try {
+            return java.nio.file.Files.createTempDirectory("camgong-ledger").resolve("withdraw-ledger.tsv");
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearLedgerAfter() throws java.io.IOException {
+        clearLedger();
+    }
+
+    protected static void clearLedger() throws java.io.IOException {
+        java.nio.file.Files.writeString(LEDGER, "");
     }
 
     @Autowired
@@ -80,7 +101,8 @@ public abstract class IntegrationTestBase {
     protected org.springframework.security.crypto.password.PasswordEncoder encoder;
 
     @BeforeEach
-    void resetState() {
+    void resetState() throws java.io.IOException {
+        clearLedger();
         currentJdbc = jdbc;
         currentClock = clock;
         clock.set(START);
