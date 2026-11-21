@@ -90,6 +90,11 @@ class WithdrawIT extends IntegrationTestBase {
                 + "window_started_at, sent_count, created_at) VALUES (?, ?, REPEAT('a', 64), ?, ?, ?, 1, ?)",
                 EMAIL, EMAIL, utc(START.plusSeconds(3600)), utc(START), utc(START), utc(START));
         jdbc.update("INSERT INTO login_attempt (email_key, failed_count, updated_at) VALUES (?, 1, ?)", EMAIL, utc(START));
+        String other = "other@school.ac.kr";                                  // 다른 이메일의 행은 남는다
+        jdbc.update("INSERT INTO pending_signup (email_key, email, token_hash, token_expires_at, last_sent_at, "
+                + "window_started_at, sent_count, created_at) VALUES (?, ?, REPEAT('b', 64), ?, ?, ?, 1, ?)",
+                other, other, utc(START.plusSeconds(3600)), utc(START), utc(START), utc(START));
+        jdbc.update("INSERT INTO login_attempt (email_key, failed_count, updated_at) VALUES (?, 1, ?)", other, utc(START));
         jdbc.update("INSERT INTO login_session (token_hash, member_id, created_at, last_used_at) "
                 + "VALUES (SHA2('other-device', 256), ?, ?, ?)", ME, utc(START), utc(START));
         List<Map<String, Object>> before = records();
@@ -107,8 +112,8 @@ class WithdrawIT extends IntegrationTestBase {
         assertThat(m.get("withdrawn_at")).isEqualTo(utc(START));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM login_session WHERE member_id = ?", Integer.class, ME)).isZero();
         assertThat(jdbc.queryForList("SELECT recipient_id FROM notification", Long.class)).containsExactly(PARTICIPANT);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pending_signup", Integer.class)).isZero();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM login_attempt", Integer.class)).isZero();
+        assertThat(jdbc.queryForList("SELECT email_key FROM pending_signup", String.class)).containsExactly(other);
+        assertThat(jdbc.queryForList("SELECT email_key FROM login_attempt", String.class)).containsExactly(other);
         assertThat(records()).isEqualTo(before);
 
         mockMvc.perform(get("/api/auth/me").cookie(new Cookie("camgong_session", "other-device")))
@@ -225,7 +230,11 @@ class WithdrawIT extends IntegrationTestBase {
 
     @Test
     void twoWithdrawalsAtOnceOnlyOneSucceedsAndNoneIs500() throws Exception {
-        Callable<Integer> call = () -> withdraw(PASSWORD).andReturn().getResponse().getStatus();
+        // 세션은 미리 넣는다: as() 는 요청마다 세션 행을 INSERT … ON DUPLICATE KEY UPDATE 로 넣어, 먼저 끝난 탈퇴의 커밋 뒤 세션 삭제와 교착할 수 있다.
+        jdbc.update("INSERT INTO login_session (token_hash, member_id, created_at, last_used_at) VALUES (SHA2('twice', 256), ?, ?, ?)",
+                ME, utc(START), utc(START));
+        Callable<Integer> call = () -> mockMvc.perform(post("/api/auth/withdraw").cookie(new Cookie("camgong_session", "twice"))
+                .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("password", PASSWORD)))).andReturn().getResponse().getStatus();
         List<Integer> statuses = Concurrent.all(List.of(call, call));
         assertThat(statuses).containsExactlyInAnyOrder(204, 401);
     }
@@ -289,14 +298,15 @@ class WithdrawIT extends IntegrationTestBase {
 
     @Test
     void activeGroupBuysBlockWithdrawalAndAreListedInIdOrder() throws Exception {
-        long openOwn = groupBuy().organizer(ME).title("내가 연 공구").insert(jdbc);
-        participate(openOwn, ME, 9);
+        // 참여한 공구를 먼저 만든다: 쿼리의 UNION 순서(연 공구 → 참여한 공구)와 id 순서가 달라야 정렬을 확인할 수 있다.
         long openJoined = groupBuy().title("참여한 공구").insert(jdbc);
         participate(openJoined, ORGANIZER, 9);
         participate(openJoined, ME, 1);
         long pending = groupBuy().title("확정 대기").deadline(START.minusSeconds(60)).insert(jdbc);
         participate(pending, ORGANIZER, 9);
         participate(pending, ME, 1);
+        long openOwn = groupBuy().organizer(ME).title("내가 연 공구").insert(jdbc);
+        participate(openOwn, ME, 9);
         long done = groupBuy().status("COMPLETED").insert(jdbc);
         participate(done, ME, 1);
         long otherOpen = groupBuy().title("남의 공구").insert(jdbc);   // 참여하지 않은 모집 중 공구는 막지 않는다
@@ -308,16 +318,16 @@ class WithdrawIT extends IntegrationTestBase {
                 .andExpect(jsonPath("$.title").value("ACTIVE_GROUPBUY"))
                 .andExpect(jsonPath("$.detail").value("진행 중인 공구가 있어 탈퇴할 수 없습니다."))
                 .andExpect(jsonPath("$.blockers.length()").value(3))
-                .andExpect(jsonPath("$.blockers[0].groupBuyId").value(openOwn))
-                .andExpect(jsonPath("$.blockers[0].title").value("내가 연 공구"))
-                .andExpect(jsonPath("$.blockers[0].role").value("ORGANIZER"))
+                .andExpect(jsonPath("$.blockers[0].groupBuyId").value(openJoined))
+                .andExpect(jsonPath("$.blockers[0].role").value("PARTICIPANT"))
                 .andExpect(jsonPath("$.blockers[0].status").value("OPEN"))
-                .andExpect(jsonPath("$.blockers[1].groupBuyId").value(openJoined))
+                .andExpect(jsonPath("$.blockers[1].groupBuyId").value(pending))
                 .andExpect(jsonPath("$.blockers[1].role").value("PARTICIPANT"))
-                .andExpect(jsonPath("$.blockers[1].status").value("OPEN"))
-                .andExpect(jsonPath("$.blockers[2].groupBuyId").value(pending))
-                .andExpect(jsonPath("$.blockers[2].role").value("PARTICIPANT"))
-                .andExpect(jsonPath("$.blockers[2].status").value("PENDING_CLOSE"));
+                .andExpect(jsonPath("$.blockers[1].status").value("PENDING_CLOSE"))
+                .andExpect(jsonPath("$.blockers[2].groupBuyId").value(openOwn))
+                .andExpect(jsonPath("$.blockers[2].title").value("내가 연 공구"))
+                .andExpect(jsonPath("$.blockers[2].role").value("ORGANIZER"))
+                .andExpect(jsonPath("$.blockers[2].status").value("OPEN"));
 
         assertThat(records()).isEqualTo(before);
         assertThat(jdbc.queryForObject("SELECT withdrawn_at IS NULL FROM member WHERE id = ?", Boolean.class, ME)).isTrue();
