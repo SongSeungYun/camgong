@@ -13,6 +13,8 @@ export const options = {
   duration: '20s',
   summaryTrendStats: ['avg', 'med', 'p(95)', 'max'],
   thresholds: {
+    // 응답 검사가 하나라도 실패하면 측정 실패다: 세션이 만료돼 로그인 목록이 전국 목록으로 와도 member_* 시간이 통과하는 구멍을 막는다.
+    checks: ['rate==1'],
     'http_req_duration{name:list}': ['p(95)<50'],
     'http_req_duration{name:search_common}': ['p(95)<50'],
     'http_req_duration{name:search_rare}': ['p(95)<50'],

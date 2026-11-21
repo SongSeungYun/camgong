@@ -12,7 +12,7 @@ export const options = {
   vus: 5,
   duration: __ENV.DURATION || '60s',
   summaryTrendStats: ['avg', 'med', 'p(95)', 'p(99)', 'max'],
-  thresholds: { 'http_req_duration{name:list}': ['p(95)<1000'], 'http_req_duration{name:detail}': ['p(95)<1000'] },
+  thresholds: { checks: ['rate==1'], 'http_req_duration{name:list}': ['p(95)<1000'], 'http_req_duration{name:detail}': ['p(95)<1000'] },
 };
 
 export default function () {
