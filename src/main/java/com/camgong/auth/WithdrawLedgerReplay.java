@@ -15,8 +15,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * 기동 때 탈퇴 장부를 다시 적용한다(010 결정 5-2). 복구 절차는 백엔드 중지 → 덤프 넣기 → 백엔드 시작 → 로그의 reanonymized=N 확인이다.
- * 웹 서버가 요청을 받기 전(모든 싱글턴을 만든 직후)에 돈다: 되살아난 회원이 그 사이 로그인하지 못하게. 실패하면 기동도 실패한다(복구가 덜 된 채로 뜨지 않게).
- * 8일 지난 줄은 적용 전에, 그리고 하루 한 번 지운다(T034).
+ * 웹 서버가 요청을 받기 전(모든 싱글턴을 만든 직후)에 돈다: 되살아난 회원이 그 사이 로그인하지 못하게. 적용이 실패하면 기동도 실패한다(복구가 덜 된 채로 뜨지 않게).
+ * 8일 지난 줄은 적용한 **뒤에**, 그리고 하루 한 번 지운다(T034). 8일은 복구하는 날부터 세므로, 백업이 며칠 실패했거나 오래된 사본을 복구하면 덤프가 그보다
+ * 오래됐을 수 있다. 먼저 지우면 그 사이 탈퇴가 되살아난다. 오래된 줄을 적용해도 번호·가입 시각이 맞아야만 지우므로 안전하다. 정리 실패는 경고만 한다.
  */
 @Component
 public class WithdrawLedgerReplay implements SmartInitializingSingleton {
@@ -40,7 +41,6 @@ public class WithdrawLedgerReplay implements SmartInitializingSingleton {
 
     /** @return 다시 익명화한 회원 수 */
     public int replay() {
-        ledger.prune(Instant.now(clock));
         int count = 0;
         for (WithdrawLedger.Entry entry : ledger.entries()) {
             Optional<List<Long>> open = withdrawals.reanonymise(entry);
@@ -54,7 +54,16 @@ public class WithdrawLedgerReplay implements SmartInitializingSingleton {
             }
         }
         log.info("reanonymized={}", count);
+        prune(ledger, clock);
         return count;
+    }
+
+    private static void prune(WithdrawLedger ledger, Clock clock) {
+        try {
+            ledger.prune(Instant.now(clock));
+        } catch (RuntimeException e) {
+            log.warn("withdraw-ledger-prune-failed reason={}", e.getClass().getSimpleName());
+        }
     }
 
     @Configuration
@@ -71,11 +80,7 @@ public class WithdrawLedgerReplay implements SmartInitializingSingleton {
 
         @Scheduled(fixedDelayString = "P1D", initialDelayString = "P1D")
         void prune() {
-            try {
-                ledger.prune(Instant.now(clock));
-            } catch (RuntimeException e) {
-                log.warn("withdraw-ledger-prune-failed reason={}", e.getClass().getSimpleName());
-            }
+            WithdrawLedgerReplay.prune(ledger, clock);
         }
     }
 }

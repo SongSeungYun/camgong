@@ -70,7 +70,8 @@ public class WithdrawLedger {
             if (Files.notExists(this.path)) {
                 Files.createFile(this.path);
             }
-            if (!Files.isWritable(this.path)) {
+            // 정리는 같은 디렉터리에 임시 파일을 만들어 바꿔 넣으므로 디렉터리도 쓸 수 있어야 한다. 파일만 넘겨주면 며칠 뒤 정리에서야 터진다.
+            if (!Files.isWritable(this.path) || !Files.isWritable(parent)) {
                 throw new IOException("쓸 수 없다");
             }
         } catch (IOException e) {
@@ -81,7 +82,9 @@ public class WithdrawLedger {
     /** 한 줄 붙이기. 실패는 호출한 쪽이 처리한다(탈퇴는 이미 커밋됐다). */
     synchronized void append(Entry entry) {
         try {
-            Files.writeString(path, entry.line(), StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+            // 줄바꿈을 앞에도 붙인다: 앞선 쓰기가 줄 중간에서 잘렸어도(디스크 가득) 이 줄이 그 조각에 붙어 못 읽게 되지 않는다(빈 줄은 읽을 때 건너뛴다).
+            // DSYNC: 탈퇴는 드물고, 커밋된 탈퇴의 줄이 서버가 꺼지며 사라지면 복구 때 되살아난다.
+            Files.writeString(path, "\n" + entry.line(), StandardCharsets.UTF_8, StandardOpenOption.APPEND, StandardOpenOption.DSYNC);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

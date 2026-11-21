@@ -88,4 +88,28 @@ class WithdrawLedgerTest {
         ledger.prune(NOW);
         assertThat(Files.readString(path)).startsWith("garbage\n");
     }
+
+    @Test
+    void anUnwritableDirectoryFailsAtStartupBecausePruningReplacesTheFileThere() throws Exception {
+        Path sub = Files.createDirectory(dir.resolve("ro"));
+        Path path = Files.createFile(sub.resolve("l.tsv"));
+        sub.toFile().setWritable(false);
+        try {
+            assertThatThrownBy(() -> new WithdrawLedger(path.toString())).isInstanceOf(IllegalStateException.class);
+        } finally {
+            sub.toFile().setWritable(true);
+        }
+    }
+
+    @Test
+    void aLineCutShortByAFailedWriteDoesNotSwallowTheNextOne() throws Exception {
+        Path path = dir.resolve("l.tsv");
+        WithdrawLedger ledger = new WithdrawLedger(path.toString());
+        Files.writeString(path, "7\t2026-10-27T00:00:00\t2026-11-2");         // 디스크가 차서 줄 끝이 잘렸다
+        Entry next = new Entry(8, utc(NOW), utc(NOW));
+
+        ledger.append(next);
+
+        assertThat(ledger.entries()).containsExactly(next);
+    }
 }

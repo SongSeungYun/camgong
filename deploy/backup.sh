@@ -12,7 +12,8 @@ out="$dir/camgong-$(date +%Y%m%d-%H%M%S).sql.gz"
 # (cron 이 안 돎, 서버가 죽음) healthchecks.io 가 메일을 보낸다. 주소는 .env 의 HC_PING_URL 에만 둔다. .env 를 source 하지 않고 그 줄만 읽는다.
 hc="${HC_PING_URL:-}"
 if [ -z "$hc" ] && [ -f .env ]; then
-	hc="$(sed -n 's/^HC_PING_URL=//p' .env | tail -n 1)"
+	# compose 의 env_file 이 받는 따옴표("…", '…')와 윈도 줄 끝(CR)을 걷어 낸다.
+	hc="$(sed -n 's/^HC_PING_URL=//p' .env | tail -n 1 | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/")"
 fi
 if [ -z "$hc" ]; then
 	echo "warning: HC_PING_URL 이 비어 있어 백업 결과를 알리지 않는다" >&2

@@ -156,7 +156,12 @@ public class WithdrawService {
             return Optional.of(open);
         });
         if (done.isPresent()) {
-            deleteSessions(id);                                 // 탈퇴와 같이 커밋 뒤에 지운다
+            try {
+                deleteSessions(id);                             // 탈퇴와 같이 커밋 뒤에 지운다
+            } catch (RuntimeException e) {
+                // 익명화는 커밋됐다. 남은 세션은 AuthFilter 가 탈퇴한 회원이라 받지 않고, SessionCleanup 이 TTL 로 지운다. 기동은 계속한다.
+                log.warn("reanonymize-session-cleanup-failed memberId={} reason={}", id, e.getClass().getSimpleName());
+            }
         }
         return done;
     }

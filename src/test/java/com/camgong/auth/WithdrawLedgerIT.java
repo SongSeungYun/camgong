@@ -156,16 +156,31 @@ class WithdrawLedgerIT extends IntegrationTestBase {
 
     // --- T034 ---
 
+    /**
+     * 기동 때는 먼저 적용하고 그다음에 정리한다: 8일은 복구하는 날부터 센다. 백업이 며칠 실패했거나 오래된 사본을 복구하면 덤프가 8일보다 오래됐을 수
+     * 있고, 정리를 먼저 하면 그 사이 탈퇴가 되살아난다. 오래된 줄을 적용해도 번호·가입 시각이 맞아야만 지우므로 안전하다.
+     */
     @Test
-    void replayPrunesLinesOlderThanEightDaysFirst() {
+    void startupReplaysEveryLineBeforePruningOldOnes() {
         clock.set(START.plus(Duration.ofDays(30)));
-        ledger.append(new Entry(ME, JOINED, utc(START.plus(Duration.ofDays(21)))));   // 9일 전: 지운다
-        ledger.append(new Entry(2, JOINED, utc(START.plus(Duration.ofDays(29)))));
+        ledger.append(new Entry(ME, JOINED, utc(START.plus(Duration.ofDays(21)))));   // 9일 전 탈퇴: 그래도 적용한다
+        ledger.append(new Entry(2, JOINED.plusSeconds(1), utc(START.plus(Duration.ofDays(29)))));
 
-        replay.replay();
+        assertThat(replay.replay()).isEqualTo(1);
 
-        assertThat(ledger.entries()).containsExactly(new Entry(2, JOINED, utc(START.plus(Duration.ofDays(29)))));
-        assertThat(jdbc.queryForObject("SELECT withdrawn_at IS NULL FROM member WHERE id = ?", Boolean.class, ME))
-                .as("지워진 줄은 적용하지 않는다").isTrue();
+        assertThat(jdbc.queryForObject("SELECT withdrawn_at FROM member WHERE id = ?", LocalDateTime.class, ME))
+                .isEqualTo(utc(START.plus(Duration.ofDays(21))));
+        assertThat(ledger.entries()).containsExactly(new Entry(2, JOINED.plusSeconds(1), utc(START.plus(Duration.ofDays(29)))));
+    }
+
+    @Test
+    void replayRunsAtStartupBeforeTheWebServerAcceptsRequests() {
+        // 웹 서버는 컨텍스트 새로 고침이 끝날 때 연결을 연다. 싱글턴을 다 만든 직후(그보다 앞)에 돈다.
+        assertThat(replay).isInstanceOf(org.springframework.beans.factory.SmartInitializingSingleton.class);
+        ledger.append(new Entry(ME, JOINED, utc(START)));
+
+        replay.afterSingletonsInstantiated();
+
+        assertThat(jdbc.queryForObject("SELECT withdrawn_at IS NOT NULL FROM member WHERE id = ?", Boolean.class, ME)).isTrue();
     }
 }
