@@ -206,7 +206,8 @@ public class SignupService {
         java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFC).codePoints()
                 .filter(c -> !Keys.isSpace(c) && !Keys.isInvisible(c) && Character.getType(c) != Character.NON_SPACING_MARK)
                 .forEach(out::appendCodePoint);
-        return out.toString();
+        // 걸러낸 뒤 한 번 더 합친다: 풀어 쓴 자모 사이에 결합 표시(U+034F 등)를 끼우면 앞의 NFC 가 음절을 못 합친 채 표시만 지워진다.
+        return java.text.Normalizer.normalize(out, java.text.Normalizer.Form.NFC);
     }
 
     /** 인증 메일 재발송. 표시 이름·비밀번호는 그대로 두고 새 토큰만 건다. */
