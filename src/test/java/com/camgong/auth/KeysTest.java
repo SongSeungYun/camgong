@@ -46,8 +46,9 @@ class KeysTest {
             assertThat(Character.getType(cp)).as(Integer.toHexString(cp)).isEqualTo(Character.UNASSIGNED);
             assertThat(Keys.hasInvisible("홍길동" + Character.toString(cp))).as(Integer.toHexString(cp)).isTrue();
         }
-        // 다른 미할당 칸(JDK 보다 새 이모지 자리 등)은 상자나 글자로 보이므로 막지 않는다.
-        assertThat(Character.getType(0x1FAE9)).isEqualTo(Character.UNASSIGNED);
-        assertThat(Keys.hasInvisible("홍길동" + Character.toString(0x1FAE9))).isFalse();
+        // 다른 미할당 칸은 상자로 보이므로 막지 않는다(JDK 보다 새 이모지도 이쪽이다). U+0378 은 그리스 문자 블록의 빈칸이다.
+        assertThat(Character.getType(0x0378)).isEqualTo(Character.UNASSIGNED);
+        assertThat(Keys.hasInvisible("홍길동" + Character.toString(0x0378))).isFalse();
+        assertThat(Keys.hasInvisible("홍길동" + Character.toString(0x1FAE9))).isFalse();      // Unicode 16 이모지(JDK 21 에선 미할당)
     }
 }

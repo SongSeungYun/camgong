@@ -46,6 +46,7 @@ public class NotificationCleanup {
             } catch (PessimisticLockingFailureException e) {
                 // 정리 두 개가 동시에 돌면 DELETE … LIMIT 끼리 드물게 교착한다(1213, 동시 실행 테스트에서 60회 중 1회 재현, 교착 그래프는 못 잡았다).
                 // 한 문장이 곧 한 트랜잭션이라 진 쪽은 아무것도 지우지 않았다. 같은 묶음을 한 번만 다시 지운다.
+                log.info("notification-cleanup-retry reason={}", e.getClass().getSimpleName());
                 deleted = deleteBatch(cutoff);
             }
             total += deleted;

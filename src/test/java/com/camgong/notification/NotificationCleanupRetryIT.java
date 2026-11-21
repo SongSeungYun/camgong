@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.time.Duration;
 
@@ -52,5 +54,6 @@ class NotificationCleanupRetryIT extends NotificationTestBase {
         doThrow(new CannotAcquireLockException("Deadlock found when trying to get lock")).when(cleanup).deleteBatch(any());
 
         assertThatThrownBy(cleanup::run).isInstanceOf(CannotAcquireLockException.class);
+        verify(cleanup, times(2)).deleteBatch(any());                       // 한 번만 다시 한다
     }
 }
