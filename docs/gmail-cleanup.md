@@ -16,7 +16,7 @@
 4. `Code.gs`를 아래 코드로 바꾼다.
 5. 함수 `purge`를 한 번 직접 실행해 권한을 허용한다. 본인만 쓰는 스크립트라도 "확인되지 않은 앱" 경고가 나올 수 있다(확인 못 함). 그때는 "고급 → 이동"을 누른다.
 6. 함수 `install`을 한 번 실행한다. 매일 04시대(시각은 1시간 안에서 무작위)에 `purge`가 돈다.
-7. 실행 기록에서 `purge deleted=N`이 남는지 본다. 트리거가 실패하면 Google이 계정 주소로 "Summary of failures for Apps Script" 메일을 보낸다.
+7. 실행 기록에서 `purge days=6 deleted=N`, `purge days=30 deleted=N`이 남는지 본다. 트리거가 실패하면 Google이 계정 주소로 "Summary of failures for Apps Script" 메일을 보낸다.
 
 ### appsscript.json
 
@@ -37,23 +37,27 @@
 ### Code.gs
 
 ```js
-// 6일(초 단위)이 지난 보낸 메일과 반송 메일을 휴지통을 거치지 않고 지운다. 하루 한 번 돌면 어떤 메일도 7일을 넘기지 않는다.
-// 남겨 둘 메일은 'keep' 라벨을 붙이면 지우지 않는다(라벨은 Gmail에서 미리 만든다).
-const DAYS = 6;
-const QUERY = '{in:sent from:mailer-daemon} -label:keep';
+// 보낸 메일·반송 메일은 6일, 그 밖의 메일(문의 등)은 30일이 지나면 휴지통을 거치지 않고 지운다. 하루 한 번 돌면 7일·31일을 넘기지 않는다.
+// 남겨 둘 메일은 'keep' 라벨을 붙이면 지우지 않는다(라벨은 Gmail에서 미리 만든다). 스팸·휴지통은 Gmail이 30일 뒤 스스로 지운다.
+const RULES = [
+  { days: 6, query: '{in:sent from:mailer-daemon} -label:keep' },
+  { days: 30, query: '-in:sent -from:mailer-daemon -label:keep' },
+];
 
 function purge() {
-  const cutoff = Math.floor(Date.now() / 1000) - DAYS * 86400; // older_than:은 일 단위라 경계가 흐려서 초 단위 before:를 쓴다
-  const q = `${QUERY} before:${cutoff}`;
-  let deleted = 0;
-  // 지우는 동안 페이지 토큰을 따라가면 건너뛸 수 있어 매번 처음부터 다시 찾는다. 지워지지 않는데 계속 찾는 일을 막으려고 횟수를 묶는다.
-  for (let round = 0; round < 50; round++) {
-    const ids = (Gmail.Users.Messages.list('me', { q, maxResults: 500 }).messages || []).map((m) => m.id);
-    if (ids.length === 0) break;
-    Gmail.Users.Messages.batchDelete({ ids }, 'me');
-    deleted += ids.length;
+  for (const { days, query } of RULES) {
+    const cutoff = Math.floor(Date.now() / 1000) - days * 86400; // older_than:은 일 단위라 경계가 흐려서 초 단위 before:를 쓴다
+    const q = `${query} before:${cutoff}`;
+    let deleted = 0;
+    // 지우는 동안 페이지 토큰을 따라가면 건너뛸 수 있어 매번 처음부터 다시 찾는다. 지워지지 않는데 계속 찾는 일을 막으려고 횟수를 묶는다.
+    for (let round = 0; round < 50; round++) {
+      const ids = (Gmail.Users.Messages.list('me', { q, maxResults: 500 }).messages || []).map((m) => m.id);
+      if (ids.length === 0) break;
+      Gmail.Users.Messages.batchDelete({ ids }, 'me');
+      deleted += ids.length;
+    }
+    console.log(`purge days=${days} deleted=${deleted}`);
   }
-  console.log(`purge deleted=${deleted}`);
 }
 
 function install() {
@@ -62,13 +66,13 @@ function install() {
 }
 ```
 
-- 한 번에 500개씩, 최대 50번(25,000통) 지운다. 그보다 많이 쌓이면 다음 날 이어서 지운다.
-- 쿼터: list 5단위, batchDelete 50단위, 사용자당 분당 6,000단위([쿼터](https://developers.google.com/workspace/gmail/api/reference/quota)). 위 반복은 최대 2,750단위다. 개인 계정 Apps Script는 실행당 6분, 트리거 실행 합계는 하루 90분이다([한도](https://developers.google.com/apps-script/guides/services/quotas)).
+- 규칙마다 한 번에 500개씩, 최대 50번(25,000통) 지운다. 그보다 많이 쌓이면 다음 날 이어서 지운다.
+- 쿼터: list 5단위, batchDelete 50단위, 사용자당 분당 6,000단위([쿼터](https://developers.google.com/workspace/gmail/api/reference/quota)). 규칙 하나가 최대 2,750단위라, 두 규칙을 다 채우면 분당 한도에 가깝다(그럴 만큼 쌓일 일은 드물다). 개인 계정 Apps Script는 실행당 6분, 트리거 실행 합계는 하루 90분이다([한도](https://developers.google.com/apps-script/guides/services/quotas)).
 - `batchDelete`의 한 번당 개수 상한은 문서에 없다. 비슷한 `batchModify`가 1,000개라 500개로 나눴다.
 
 ## 받은편지함의 문의 메일
 
-처리방침의 보호책임자 연락처로 온 문의(열람·정정·삭제 요청 등)는 받은편지함에 남는다. 위 스크립트는 받은편지함의 일반 메일을 지우지 않는다. 처리가 끝난 문의를 언제 지울지는 개인정보 처리방침에 적는다(`docs/privacy-policy-v1.md`).
+처리방침의 보호책임자 연락처로 온 문의(열람·정정·삭제 요청 등)도 30일이 지나면 위 두 번째 규칙이 지운다(처리방침 4절 "문의 메일은 30일 안에"). 처리하는 데 더 오래 걸리는 문의는 `keep` 라벨을 붙이고, 끝나면 라벨을 떼서 정리에 맡긴다. healthchecks.io 알림, Apps Script 실패 알림 같은 운영 메일도 같은 규칙으로 30일 뒤 지워진다.
 
 ## 확인 못 한 것
 
