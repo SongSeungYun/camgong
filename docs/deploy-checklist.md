@@ -9,7 +9,7 @@
 | 대학 이메일 도메인 | `EXTRA_SCHOOL_DOMAINS`(009) | **결정(2026-11-19): 전국 대학.** `ac.kr` 메일은 설정 없이 모두 가입된다. `ac.kr`이 아닌 국내 대학(예: `skku.edu`)만 `키=도메인,도메인;…` 형식으로 넣는다. 키는 한 번 쓰면 바꾸지 않는다. **회원이 생긴 뒤 묶음을 바꾸면(예: 이미 가입자가 있는 `sg.ac.kr`을 `sogang.ac.kr` 묶음에 넣음) 기존 회원과 새 회원이 다른 학교가 된다.** 학교는 가입 확인 때 한 번만 정하기 때문이다. 바꿀 때는 그 도메인 회원의 `member.school`과 그 회원들이 연 `group_buy.school`을 같이 고친다(절차는 확인 못 함). `co.kr`처럼 누구나 받는 메일 도메인은 넣지 않는다(설정 검사는 `ac.kr`만 막는다). 스펙 `specs/009-school-scope` |
 | SMTP 계정(호스트·포트·계정·비밀번호) | `SPRING_MAIL_*` | **Gmail로 결정**(2026-11-18, 아래 2.1). 계정·앱 비밀번호는 사용자가 서버 환경변수로만 넣는다 |
 | 개인정보 동의 안내문과 버전 | 프론트 `frontend/src/pages/VerifyPage.tsx`의 `CONSENT_VERSION`(지금 `'v1'`), 안내문 본문 | 초안 `docs/consent-v1.md`(사용자 확인 대기). 버전은 서버에서 20자 이하 |
-| 배포 대상과 도메인 | `ALLOWED_ORIGINS`, `VERIFY_LINK_BASE_URL`, 쿠키 Secure | 관제탑 추천은 아래 7(사용자 확인 대기) |
+| 배포 대상과 도메인 | `DOMAIN`(compose가 `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`을 만든다), 쿠키 Secure | 도메인은 `camgong.app`(2026-11-23 가비아 구매). 서버는 아래 7(사용자 확인 대기) |
 | README 수요 확인 문구 | README(관제탑이 못 고침) | 초안은 아래 8. 수요 확인 인원·응답은 사용자가 채운다 |
 
 ### 1.1 이메일 도메인 조사 (2026-11-18)
@@ -92,7 +92,7 @@
 
 - **서버 한 대 + Docker Compose**: MySQL 8.4, 백엔드 jar, Caddy 세 개를 한 서버에 둔다. Caddy가 HTTPS 인증서를 자동으로 받고, 프론트 정적 파일을 서빙하며 `/api`를 백엔드로 넘긴다. 같은 출처라 쿠키·Origin 문제가 없다. SPA 폴백도 Caddy `try_files` 한 줄이다.
 - **서버**: AWS Lightsail 서울 리전, 메모리 2GB 플랜. Spring Boot와 MySQL을 한 대에 올리면 1GB는 빠듯하다. 0원을 원하면 Oracle Cloud 무료 VM도 후보지만 가입·유휴 회수 문제가 있다는 얘기가 있어 1순위로 두지 않았다. 가격은 가입 때 확인한다(확인 못 함).
-- **도메인**: 1년 단위로 하나 산다. HTTPS가 있어야 PWA 설치가 된다. 2026-11-22 조회: `camgong.com`·`camgong.co.kr`은 이미 남이 등록했고, `camgong.kr`·`camgong.app`은 비어 있다. 관제탑 추천은 Cloudflare에서 `camgong.app`(첫해 약 $8.20, 갱신 약 $14.20, 가격은 비공식 집계 기준이라 결제 화면에서 확인). Cloudflare Registrar는 Cloudflare DNS를 써야 한다. Caddy가 인증서를 받게 레코드는 프록시 끔(DNS only)으로 둔다. `.kr`은 카페24·가비아에서 첫해 약 1.5만원·갱신 약 2.2~2.4만원이고, 국내 주소가 필요하며 whois에 이름·주소가 공개된다(비공개 서비스 필요). 사용자 결정 대기.
+- **도메인**: 1년 단위로 하나 산다. HTTPS가 있어야 PWA 설치가 된다. 2026-11-22 조회: `camgong.com`·`camgong.co.kr`은 이미 남이 등록했고, `camgong.kr`·`camgong.app`은 비어 있다. 관제탑 추천은 Cloudflare에서 `camgong.app`(첫해 약 $8.20, 갱신 약 $14.20, 가격은 비공식 집계 기준이라 결제 화면에서 확인). Cloudflare Registrar는 Cloudflare DNS를 써야 한다. Caddy가 인증서를 받게 레코드는 프록시 끔(DNS only)으로 둔다. `.kr`은 카페24·가비아에서 첫해 약 1.5만원·갱신 약 2.2~2.4만원이고, 국내 주소가 필요하며 whois에 이름·주소가 공개된다(비공개 서비스 필요). **결정(2026-11-23): 가비아에서 `camgong.app` 구매.** `.env`의 `DOMAIN=camgong.app`. 유료 SSL 인증서는 사지 않는다(Caddy가 Let's Encrypt로 받는다). 서버 IP가 나오면 가비아 DNS에 `camgong.app` A 레코드를 그 IP로 넣고 80·443을 연다. 자동 갱신과 whois 정보 비공개는 사용자가 가비아에서 확인한다(확인 못 함).
 - **백업**: DB가 서버 한 대에만 있으므로 백업 없이 열지 않는다. 매일 `mysqldump`를 서버 밖(예: 객체 저장소)에 보관하거나 서버 자동 스냅샷을 켠다. 복구를 한 번 해 본다. **어느 쪽이든 7일이 지나면 지워지게 한다**(동의문 "백업과 인증 메일 발송 기록에서는 7일 안에 지워집니다", 2026-11-19 사용자 "7일"). 서버 스냅샷과 서버 디스크 덤프(7.1-5)를 같이 쓰면 스냅샷 안에 최대 7일 된 덤프가 들어가 약 13일 남는다. 스냅샷을 켜면 덤프 디렉터리를 빼거나 둘 중 하나만 쓴다.
 - Gmail SMTP는 587 포트를 쓴다. 클라우드가 바깥으로 나가는 메일 포트를 막는지는 업체별로 확인한다(확인 못 함).
 - 결정되면 `Dockerfile`·`compose.yaml`·`Caddyfile`은 작업 세션이 만들고 관제탑이 검수한다. 시크릿은 서버의 `.env`에만 둔다.
