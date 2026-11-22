@@ -10,6 +10,18 @@ const problem = (status: number, title: string, extra: Record<string, unknown> =
 const toMember = (m: { id: number; displayName: string; school: string }) => ({ member: { id: m.id, displayName: m.displayName, school: m.school } })
 const RESEND_MS = 60_000
 export const WITHDRAWN_NAME = '탈퇴한 회원'
+const DAY_MS = 86_400_000
+const RESET_TTL_MS = 3_600_000
+
+/** 002 가입 비밀번호 규칙(인증·재설정 공통) */
+const passwordErrors = (password: string) =>
+  password.length < 8
+    ? [{ field: 'password', message: '8자 이상 입력해 주세요' }]
+    : !password.trim()
+      ? [{ field: 'password', message: '공백만으로는 쓸 수 없어요' }] // 서버 isBlank
+      : new TextEncoder().encode(password).length > 72
+        ? [{ field: 'password', message: '72바이트 이하로 입력해 주세요' }]
+        : []
 const locked = () => mockState.loginLocked || mockState.loginFailures >= 5
 const lockedRes = () => problem(429, 'LOGIN_LOCKED', { retryAt: isoKst(Date.now() + 15 * 60_000) }, { 'Retry-After': '900' })
 const isoKst = (ms: number) => new Date(ms).toISOString()
@@ -89,9 +101,7 @@ export const authHandlers = [
     if (chars(name) < 2 || chars(name) > 20) errors.push({ field: 'displayName', message: '2~20자로 입력해 주세요' })
     else if (reservedKey(name) === '탈퇴한회원') errors.push({ field: 'displayName', message: '쓸 수 없는 이름입니다.' }) // 010 예약어(서버처럼 보이지 않는 글자 검사보다 먼저)
     else if (hasInvisible(name)) errors.push({ field: 'displayName', message: '보이지 않는 글자는 쓸 수 없어요' })
-    if (password.length < 8) errors.push({ field: 'password', message: '8자 이상 입력해 주세요' })
-    else if (!password.trim()) errors.push({ field: 'password', message: '공백만으로는 쓸 수 없어요' }) // 서버 isBlank
-    else if (new TextEncoder().encode(password).length > 72) errors.push({ field: 'password', message: '72바이트 이하로 입력해 주세요' })
+    errors.push(...passwordErrors(password))
     if (consent !== true) errors.push({ field: 'consent', message: '동의가 필요해요' })
     if (typeof b.consentVersion !== 'string' || !b.consentVersion) errors.push({ field: 'consentVersion', message: '동의 안내문 버전이 필요해요' })
     if (errors.length) return problem(400, 'Bad Request', { errors })
@@ -122,10 +132,49 @@ export const authHandlers = [
     mockState.loginFailures = 0 // 비밀번호가 맞으면 409 전에 실패 기록을 지운다(백엔드와 같다)
     if (blockers.length) return problem(409, 'ACTIVE_GROUPBUY', { detail: '진행 중인 공구가 있어 탈퇴할 수 없습니다.', blockers })
     mockState.notifications = mockState.notifications.filter((n) => n.memberId !== me.id)
+    mockState.passwordResets = mockState.passwordResets.filter((r) => r.email !== me.email) // 011: 탈퇴하면 재설정 요청 기록도
     for (const g of mockState.groupBuys) if (g.organizerId === me.id) g.description = null // 내가 연 공구의 설명(상태 무관, 010 plan 결정 5)
     mockState.pending = mockState.pending.filter((p) => p.email !== me.email)
     Object.assign(me, { withdrawn: true, displayName: WITHDRAWN_NAME, email: '', password: '' })
     mockState.sessionMemberId = null
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  // 011 재설정 요청: 가입 여부와 무관하게 같은 202, 같은 한도(1분, 24시간 5회). 메일(토큰)은 가입을 마친 회원에게만
+  http.post('/api/auth/password-reset', async ({ request }) => {
+    const b = (await request.json().catch(() => ({}))) as { email?: unknown }
+    const email = String(b.email ?? '').trim().toLowerCase()
+    if (email.length > 254 || !/^[^@\s]+@[^@\s]+$/.test(email) || !schoolOf(email)) return problem(400, 'Bad Request', { errors: [{ field: 'email', message: NOT_UNIVERSITY }] })
+    const now = Date.now()
+    let r = mockState.passwordResets.find((x) => x.email === email)
+    if (r && now - r.lastSentAt < RESEND_MS) return tooMany(r.lastSentAt + RESEND_MS)
+    if (r && now - r.windowStartedAt < DAY_MS && r.sentCount >= 5) return tooMany(r.windowStartedAt + DAY_MS)
+    if (!r) {
+      r = { email, token: null, memberId: null, expiresAt: 0, usedAt: null, lastSentAt: 0, windowStartedAt: now, sentCount: 0 }
+      mockState.passwordResets.push(r)
+    }
+    if (now - r.windowStartedAt >= DAY_MS) Object.assign(r, { windowStartedAt: now, sentCount: 0 })
+    const m = mockState.members.find((x) => !x.withdrawn && x.email === email)
+    Object.assign(r, { lastSentAt: now, sentCount: r.sentCount + 1, memberId: m?.id ?? null, token: m ? `reset-${mockState.nextToken++}` : null, expiresAt: now + RESET_TTL_MS, usedAt: null })
+    return HttpResponse.json({ retryAt: isoKst(now + RESEND_MS) }, { status: 202 })
+  }),
+
+  // 011 확인: 토큰(400/409/410) → 비밀번호 규칙(400, 토큰 그대로) → 탈퇴했으면 400 INVALID_TOKEN → 204(세션 끝, 실패 기록 지움, 자동 로그인 없음)
+  http.post('/api/auth/password-reset/confirm', async ({ request }) => {
+    const b = (await request.json().catch(() => ({}))) as { token?: unknown; password?: unknown }
+    const r = typeof b.token === 'string' && b.token ? mockState.passwordResets.find((x) => x.token === b.token) : undefined
+    if (!r) return problem(400, 'INVALID_TOKEN')
+    if (r.usedAt) return problem(409, 'TOKEN_USED')
+    if (Date.now() > r.expiresAt) return problem(410, 'TOKEN_EXPIRED')
+    const errors = passwordErrors(typeof b.password === 'string' ? b.password : '')
+    if (errors.length) return problem(400, 'Bad Request', { errors })
+    const m = mockState.members.find((x) => x.id === r.memberId)
+    if (!m || m.withdrawn) return problem(400, 'INVALID_TOKEN')
+    m.password = b.password as string
+    r.usedAt = Date.now()
+    mockState.loginFailures = 0
+    mockState.loginLocked = false
+    if (mockState.sessionMemberId === m.id) mockState.sessionMemberId = null // 그 회원의 모든 세션이 끝난다
     return new HttpResponse(null, { status: 204 })
   }),
 ]

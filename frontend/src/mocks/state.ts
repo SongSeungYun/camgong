@@ -19,11 +19,24 @@ interface Pending {
   lastSentAt: number
 }
 
+/** 011 재설정 요청 기록: 주소당 한 줄, 가입 여부와 무관하게 만든다(한도를 같게 세려고). 회원이 아니면 token이 null */
+interface PasswordReset {
+  email: string
+  token: string | null
+  memberId: number | null
+  expiresAt: number
+  usedAt: number | null
+  lastSentAt: number
+  windowStartedAt: number
+  sentCount: number
+}
+
 /** 목 서버의 메모리 상태. 테스트는 reset()으로 초기화하고, 시나리오 스위치로 오류를 만든다. */
 export const mockState = {
   members: [] as SeedMember[],
   groupBuys: [] as SeedGroupBuy[],
   pending: [] as Pending[],
+  passwordResets: [] as PasswordReset[],
   notifications: [] as MockNotification[],
   /** 개설 중복 감지(10초) */
   recentCreates: [] as { key: string; at: number }[],
@@ -43,6 +56,7 @@ export const mockState = {
     this.members = SEED_MEMBERS.map((m) => ({ ...m }))
     this.groupBuys = makeSeedGroupBuys(Date.now())
     this.pending = []
+    this.passwordResets = []
     this.notifications = makeSeedNotifications(Date.now())
     this.recentCreates = []
     this.sessionMemberId = null
