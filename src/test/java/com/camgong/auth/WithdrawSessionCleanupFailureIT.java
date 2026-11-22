@@ -70,5 +70,28 @@ class WithdrawSessionCleanupFailureIT extends IntegrationTestBase {
 
         assertThat(jdbc.queryForObject("SELECT withdrawn_at IS NULL FROM member WHERE id = 22", Boolean.class)).isTrue();
         assertThat(jdbc.queryForObject("SELECT email_key FROM member WHERE id = 22", String.class)).isEqualTo("c@school.ac.kr");
+        assertThat(java.nio.file.Files.readString(LEDGER)).as("롤백된 탈퇴는 장부에 남지 않는다(010 T032)").isEmpty();
     }
+
+    /** 010 T033: 다시 적용할 때 커밋 뒤 세션 삭제가 실패해도 기동을 멈추지 않는다(익명화는 이미 커밋됐다). 경고만 남기고 다음 줄로 간다. */
+    @Test
+    void aFailedSessionDeleteDuringReplayOnlyWarns(CapturedOutput output) throws Exception {
+        seedLoginMember(23, "r@school.ac.kr", "복구", "password1");
+        seedLoginMember(24, "s@school.ac.kr", "복구둘", "password1");
+        doThrow(new IllegalStateException("DB 끊김")).doCallRealMethod().when(withdrawService).deleteSessions(anyLong());
+        java.time.LocalDateTime joined = java.time.LocalDateTime.ofInstant(START, java.time.ZoneOffset.UTC);
+        ledger.append(new WithdrawLedger.Entry(23, joined, joined));
+        ledger.append(new WithdrawLedger.Entry(24, joined, joined));
+
+        assertThat(replay.replay()).isEqualTo(2);
+
+        assertThat(output).contains("reanonymize-session-cleanup-failed memberId=23 reason=IllegalStateException");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM member WHERE id IN (23, 24) AND withdrawn_at IS NOT NULL", Integer.class)).isEqualTo(2);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    WithdrawLedger ledger;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    WithdrawLedgerReplay replay;
 }

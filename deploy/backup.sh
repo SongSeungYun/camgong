@@ -6,9 +6,34 @@ umask 077   # 덤프에 이메일·비밀번호 해시가 들어 있다. 서버�
 cd "$(dirname "$0")"
 
 dir="${BACKUP_DIR:-$HOME/camgong-backups}"
-mkdir -p "$dir"
 out="$dir/camgong-$(date +%Y%m%d-%H%M%S).sql.gz"
-trap 'rm -f "$out.tmp"' EXIT
+
+# 결과 알림(010 결정 5-3): 끝까지 성공하면 healthchecks.io 확인 주소, 어디서든 실패하면 /fail 을 부른다. 하루 동안 아무 호출이 없어도
+# (cron 이 안 돎, 서버가 죽음) healthchecks.io 가 메일을 보낸다. 주소는 .env 의 HC_PING_URL 에만 둔다. .env 를 source 하지 않고 그 줄만 읽는다.
+hc="${HC_PING_URL:-}"
+if [ -z "$hc" ] && [ -f .env ]; then
+	# compose 의 env_file 이 받는 따옴표("…", '…')와 윈도 줄 끝(CR)을 걷어 낸다.
+	hc="$(sed -n 's/^HC_PING_URL=//p' .env | tail -n 1 | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/")"
+fi
+if [ -z "$hc" ]; then
+	echo "warning: HC_PING_URL 이 비어 있어 백업 결과를 알리지 않는다" >&2
+fi
+
+# 알림이 실패해도 백업 결과(종료 코드)는 바뀌지 않는다.
+hc_ping() {
+	[ -n "$hc" ] || return 0
+	curl -fsS -m 10 --retry 3 -o /dev/null "$hc$1" || echo "warning: 백업 결과 알림 실패${1:+ ($1)}" >&2   # 주소는 비밀이라 찍지 않는다
+}
+
+finish() {
+	status=$?
+	rm -f "$out.tmp"
+	if [ "$status" -eq 0 ]; then hc_ping ""; else hc_ping "/fail"; fi
+	exit "$status"
+}
+trap finish EXIT
+
+mkdir -p "$dir"
 
 # 비밀번호는 컨테이너 안의 환경변수로 넘긴다(호스트 프로세스 목록에 남지 않게). 끝까지 성공한 덤프만 남긴다.
 docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -uroot --single-transaction --routines --triggers camgong' \

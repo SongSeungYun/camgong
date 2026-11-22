@@ -1,5 +1,7 @@
 # 로컬 개발용: ./gradlew bootRun --args='--spring.profiles.active=local'
 camgong:
+  withdraw:
+    ledger: ${WITHDRAW_LEDGER:build/withdraw-ledger.tsv}
   auth:
     cookie-secure: false
   mail:

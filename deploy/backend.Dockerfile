@@ -9,7 +9,8 @@ COPY src src
 RUN ./gradlew --no-daemon bootJar && cp build/libs/*.jar app.jar
 
 FROM eclipse-temurin:21-jre
-RUN useradd --system app
+# uid 를 고정한다: 탈퇴 장부 바인드 마운트(compose.yaml)의 호스트 디렉터리 소유자를 이 번호로 맞춘다.
+RUN useradd --system --uid 10001 app
 USER app
 COPY --from=build /src/app.jar /app/app.jar
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

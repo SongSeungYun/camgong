@@ -79,6 +79,10 @@ public class Member {
         return school;
     }
 
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
     public String getEmailKey() {
         return emailKey;
     }

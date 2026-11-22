@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -49,9 +50,11 @@ public class WithdrawService {
     private final JdbcClient jdbc;
     private final Clock clock;
     private final TransactionTemplate tx;
+    private final WithdrawLedger ledger;
 
     public WithdrawService(MemberRepository members, PasswordEncoder encoder, LoginService login, JdbcClient jdbc,
-            Clock clock, PlatformTransactionManager transactionManager) {
+            Clock clock, PlatformTransactionManager transactionManager, WithdrawLedger ledger) {
+        this.ledger = ledger;
         this.members = members;
         this.encoder = encoder;
         this.login = login;
@@ -84,13 +87,22 @@ public class WithdrawService {
 
         // 탈퇴의 notification 삭제(recipient 인덱스 → PK)와 NotificationCleanup(created_at 인덱스 → PK)은 잠금 순서가 반대라 드물게
         // 교착한다. 한 번만 다시 한다(새 트랜잭션이라 잠금도 처음부터 다시 잡는다).
+        Instant at = now.truncatedTo(ChronoUnit.MICROS);    // DB(DATETIME(6))와 장부가 같은 탈퇴 시각을 갖게
         try {
-            tx.executeWithoutResult(s -> anonymise(memberId, emailKey, now));
+            tx.executeWithoutResult(s -> anonymise(memberId, emailKey, at));
         } catch (PessimisticLockingFailureException e) {     // 교착(1213)·잠금 대기 초과(1205) 둘 다
-            tx.executeWithoutResult(s -> anonymise(memberId, emailKey, now));
+            tx.executeWithoutResult(s -> anonymise(memberId, emailKey, at));
         }
-        // 백업에서 복구하면 백업 뒤의 탈퇴가 되살아난다. 복구 절차가 이 줄로 다시 익명화한다(결정 5). 이메일·이름은 남기지 않는다.
+        // 백업에서 복구하면 백업 뒤의 탈퇴가 되살아난다. 커밋된 뒤에만 장부에 남긴다(결정 5-2): 커밋 전에 쓰면 롤백된 탈퇴가 남아 복구 때
+        // 탈퇴하지 않은 사람을 지운다. 이메일·이름은 남기지 않는다.
         log.info("withdrawn memberId={}", memberId);
+        try {
+            ledger.append(new WithdrawLedger.Entry(memberId, LocalDateTime.ofInstant(member.getCreatedAt(), ZoneOffset.UTC),
+                    LocalDateTime.ofInstant(at, ZoneOffset.UTC)));
+        } catch (RuntimeException e) {
+            // 탈퇴는 이미 끝났다. 이 줄이 없으면 복구 때 다시 익명화되지 않으므로 운영자가 보게 ERROR 로 남긴다(위 INFO 로그로 되살릴 수 있다).
+            log.error("withdraw-ledger-write-failed memberId={} reason={}", memberId, e.getClass().getSimpleName());
+        }
         // 세션은 커밋 뒤에 지운다. 트랜잭션 안(회원 행 X 잠금을 쥔 채)에서 지우면 같은 회원의 세션 행을 넣는 문장과 교착할 수 있다:
         // INSERT … ON DUPLICATE KEY UPDATE(테스트 도우미 as())로는 재현됐고, 실제 로그인의 단순 INSERT 로는 900회 경쟁에서 재현되지 않았다.
         // 지우기 전에 남은 세션이나 그 사이 들어온 세션은 AuthFilter 가 탈퇴한 회원이라 받지 않고 지운다. 이 삭제가 실패해도 탈퇴는 이미 커밋됐으므로 204 로 끝내고 경고만 남긴다. 남은 행은 SessionCleanup 이 14일 TTL 로 지운다.
@@ -121,6 +133,41 @@ public class WithdrawService {
             throw new ApiException(HttpStatus.CONFLICT, "ACTIVE_GROUPBUY", "진행 중인 공구가 있어 탈퇴할 수 없습니다.")
                     .property("blockers", blockers);
         }
+        erase(memberId, emailKey, now);
+    }
+
+    /**
+     * 복구 뒤 장부 한 줄 다시 적용(결정 5-2). 번호와 가입 시각이 같고 아직 탈퇴 전인 회원만 익명화한다: 복구하면 AUTO_INCREMENT 도 되돌아가
+     * 복구 뒤 새로 가입한 사람이 같은 번호를 받을 수 있다. 본인은 이미 탈퇴했으므로 비밀번호·막는 조건은 보지 않고, 탈퇴 시각은 장부 값을 쓴다.
+     *
+     * @return 적용했으면 그 회원이 걸린 모집 중 공구 id(운영자 경고용), 대상이 아니면 empty
+     */
+    Optional<List<Long>> reanonymise(WithdrawLedger.Entry entry) {
+        long id = entry.memberId();
+        Optional<List<Long>> done = tx.execute(s -> {
+            Optional<String> emailKey = jdbc.sql("""
+                    SELECT email_key FROM member WHERE id = :id AND created_at = :joined AND withdrawn_at IS NULL FOR UPDATE""")
+                    .param("id", id).param("joined", entry.createdAt()).query(String.class).optional();
+            if (emailKey.isEmpty()) {
+                return Optional.<List<Long>>empty();
+            }
+            List<Long> open = blockers(id, Instant.now(clock)).stream().map(Blocker::groupBuyId).toList();
+            erase(id, emailKey.get(), entry.withdrawnAt().toInstant(ZoneOffset.UTC));
+            return Optional.of(open);
+        });
+        if (done.isPresent()) {
+            try {
+                deleteSessions(id);                             // 탈퇴와 같이 커밋 뒤에 지운다
+            } catch (RuntimeException e) {
+                // 익명화는 커밋됐다. 남은 세션은 AuthFilter 가 탈퇴한 회원이라 받지 않고, SessionCleanup 이 TTL 로 지운다. 기동은 계속한다.
+                log.warn("reanonymize-session-cleanup-failed memberId={} reason={}", id, e.getClass().getSimpleName());
+            }
+        }
+        return done;
+    }
+
+    /** 결정 5의 익명화와 삭제 전부(세션 제외: 커밋 뒤에 따로 지운다). 회원 행을 FOR UPDATE 로 잡은 트랜잭션 안에서 부른다. */
+    private void erase(long memberId, String emailKey, Instant now) {
         jdbc.sql("""
                 UPDATE member SET name = :name, display_name_key = NULL, email = NULL, email_key = NULL,
                     password_hash = :noPassword, withdrawn_at = :now
