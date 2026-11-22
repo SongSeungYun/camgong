@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, onTestFinished, test } from 'vitest'
 import { server } from '../mocks/server'
 import { mockState } from '../mocks/state'
 import { renderApp } from '../test/utils'
@@ -85,12 +85,12 @@ describe('새 비밀번호 정하기 (011)', () => {
     const token = await resetToken()
     let calls = 0
     server.events.on('request:start', ({ request }) => void (request.url.endsWith('/confirm') && calls++))
+    onTestFinished(() => server.events.removeAllListeners()) // 실패해도 다음 테스트에 남지 않게
     renderApp(`/password-reset/confirm?token=${token}`)
     await fill('new-password-1', 'new-password-2')
     const again = screen.getByLabelText('새 비밀번호 확인')
     await waitFor(() => expect(described(again)).toContain('두 비밀번호가 달라요.'))
     expect(calls).toBe(0)
-    server.events.removeAllListeners()
   })
 
   test('비밀번호 규칙 400은 새 비밀번호 칸 옆, 링크는 그대로라 고쳐서 다시 낼 수 있다', async () => {

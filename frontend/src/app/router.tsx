@@ -31,9 +31,12 @@ function Footer() {
 function RootError() {
   console.error(useRouteError())
   return (
-    <Layout>
-      <StateView state="error" onRetry={() => location.reload()} />
-    </Layout>
+    <>
+      <Layout>
+        <StateView state="error" onRetry={() => location.reload()} />
+      </Layout>
+      <Footer />
+    </>
   )
 }
 

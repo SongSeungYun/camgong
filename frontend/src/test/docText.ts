@@ -13,3 +13,24 @@ export const plain = (s: string) =>
     .map((l) => l.replace(/^- /, '').replace(/\*\*|`|\|/g, ''))
     .join('')
     .replace(/\s+/g, '')
+
+/** 문서의 표들: 표마다 행(칸 글자 배열). 표 구분 줄과 빈 머리 줄(| | |)은 뺀다 */
+export function docTables(body: string) {
+  const tables: string[][][] = []
+  let cur: string[][] | null = null
+  for (const l of body.split('\n')) {
+    if (!l.startsWith('|')) {
+      cur = null
+      continue
+    }
+    if (!cur) tables.push((cur = []))
+    if (/^\|[-\s|]+\|$/.test(l)) continue
+    const cells = l.slice(1, -1).split('|').map((c) => c.replace(/\*\*|`/g, '').trim())
+    if (cells.some(Boolean)) cur.push(cells)
+  }
+  return tables
+}
+
+/** 화면 표의 행(칸 글자 배열) */
+export const domTable = (table: HTMLTableElement) =>
+  [...table.rows].map((r) => [...r.cells].map((c) => (c.textContent ?? '').trim()))

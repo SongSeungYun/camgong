@@ -18,9 +18,11 @@ test('동의문 본문을 체크박스 위 <details>("자세히 보기")에 그�
   expect(screen.queryByText('안내문 보기')).toBeNull() // 예전 요약 안내는 없앤다
 })
 
-test('동의문의 "개인정보 처리방침"은 처리방침 화면 링크다', async () => {
+test('동의문의 "개인정보 처리방침"은 처리방침 화면을 새 창으로 여는 링크다', async () => {
   renderApp('/verify?token=abc')
   const summary = await screen.findByText('자세히 보기')
   const details = summary.closest('details')!
-  expect(within(details).getByRole('link', { name: '개인정보 처리방침' }).getAttribute('href')).toBe('/privacy')
+  // 인증 폼 안이라 같은 탭으로 가면 입력한 이름·비밀번호가 사라진다 → 새 창으로, 이름에 알린다
+  const link = within(details).getByRole('link', { name: '개인정보 처리방침 (새 창)' })
+  expect([link.getAttribute('href'), link.getAttribute('target'), link.getAttribute('rel')]).toEqual(['/privacy', '_blank', 'noopener'])
 })

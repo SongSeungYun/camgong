@@ -1,8 +1,8 @@
 import { screen, within } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, onTestFinished, test } from 'vitest'
 import { mockState } from '../mocks/state'
 import { findPlaceholders } from '../../scripts/check-placeholders'
-import { docBody, plain } from '../test/docText'
+import { docBody, docTables, domTable, plain } from '../test/docText'
 import { renderApp } from '../test/utils'
 
 // 개인정보 처리방침(docs/privacy-policy-v1.md 두 구분선 사이)을 /privacy에 그대로 보여준다
@@ -12,7 +12,8 @@ describe('개인정보 처리방침', () => {
     const h1 = await screen.findByRole('heading', { name: '캠공 개인정보 처리방침', level: 1 })
     const article = h1.closest('article')!
     expect(article.textContent!.replace(/\s+/g, '')).toBe(plain(docBody('privacy-policy-v1.md')))
-    expect(within(article).getAllByRole('table').length).toBe(5)
+    // 표는 행·칸 단위로도 문서와 같아야 한다(칸이 다른 열로 옮겨 가도 글자 비교만으로는 못 잡는다)
+    expect((within(article).getAllByRole('table') as HTMLTableElement[]).map(domTable)).toEqual(docTables(docBody('privacy-policy-v1.md')))
     within(article).getByRole('heading', { name: '6. 국외 이전', level: 2 })
   })
 
@@ -20,6 +21,15 @@ describe('개인정보 처리방침', () => {
     renderApp(path)
     const footer = await screen.findByRole('contentinfo')
     expect(within(footer).getByRole('link', { name: '개인정보 처리방침' }).getAttribute('href')).toBe('/privacy')
+  })
+
+  test('오류 화면(최상위 오류 경계)에도 있다', async () => {
+    const { routes } = await import('../app/router')
+    routes[0]!.children!.push({ path: '/boom', loader: () => { throw new Error('boom') } })
+    onTestFinished(() => void routes[0]!.children!.pop())
+    renderApp('/boom')
+    await screen.findByText('잠시 문제가 생겼어요. 다시 시도해 주세요.')
+    expect(within(screen.getByRole('contentinfo')).getByRole('link', { name: '개인정보 처리방침' }).getAttribute('href')).toBe('/privacy')
   })
 
   test('로그인한 화면 아래에도 있다', async () => {
