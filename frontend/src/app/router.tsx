@@ -47,6 +47,7 @@ export const routes: RouteObject[] = [
       { path: '/signup', lazy: page(() => import('../pages/SignupPage')) },
       { path: '/login', lazy: page(() => import('../pages/LoginPage')) },
       { path: '/verify', lazy: page(() => import('../pages/VerifyPage')) },
+      { path: '/password-reset', lazy: page(() => import('../pages/PasswordResetPage')) },
       { path: '/privacy', lazy: page(() => import('../pages/PrivacyPage')) },
       {
         element: <RequireAuth />,

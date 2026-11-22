@@ -35,6 +35,9 @@ export default function LoginPage() {
         <Button type="submit" pending={m.isPending}>로그인</Button>
       </form>
       <p>
+        <Link to="/password-reset">비밀번호를 잊었어요</Link>
+      </p>
+      <p>
         <Link to="/signup">가입하기</Link>
       </p>
       <section aria-label="인증 메일">
