@@ -70,7 +70,7 @@ export function PrivacyText() {
         </thead>
         <tbody>
           <tr><th scope="row">Google LLC</th><td>인증·재설정 메일 발송과 발송 기록 보관(Gmail)</td></tr>
-          <tr><th scope="row">[배포 대상 확정 뒤: Amazon Web Services Korea LLC]</th><td>[서버, 데이터베이스, 백업 보관(서울 리전)]</td></tr>
+          <tr><th scope="row">[계약 회사명 확인 뒤: Microsoft Corporation]</th><td>서버, 데이터베이스, 백업 보관(Microsoft Azure 한국 중부 리전, 서울)</td></tr>
         </tbody>
       </table>
       <h2>6. 국외 이전</h2>
