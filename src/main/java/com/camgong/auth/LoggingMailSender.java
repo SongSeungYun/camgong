@@ -34,7 +34,11 @@ public class LoggingMailSender implements MailSender {
     public void sendVerification(String toEmail, String verifyLink) {
         log.info("verification mail to={}", VerificationMailListener.mask(toEmail));
         log.debug("verification link={}", verifyLink);
-        sent.add(new Sent(toEmail, verifyLink));
+        keep(new Sent(toEmail, verifyLink));
+    }
+
+    private void keep(Sent mail) {
+        sent.add(mail);
         while (sent.size() > KEEP) {                 // 테스트가 읽는 용도라 최근 몇 건만 둔다(링크 토큰이 쌓이지 않게)
             sent.remove(0);
         }
@@ -46,5 +50,12 @@ public class LoggingMailSender implements MailSender {
 
     public void clear() {
         sent.clear();
+    }
+
+    @Override
+    public void sendPasswordReset(String toEmail, String resetLink) {
+        log.info("password reset mail to={}", VerificationMailListener.mask(toEmail));
+        log.debug("password reset link={}", resetLink);
+        keep(new Sent(toEmail, resetLink));
     }
 }

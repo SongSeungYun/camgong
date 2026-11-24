@@ -21,9 +21,11 @@ class AuthController {
     private final LoginService loginService;
     private final SessionService sessions;
     private final WithdrawService withdrawService;
+    private final PasswordResetService resets;
 
     AuthController(SignupService signupService, LoginService loginService, SessionService sessions,
-            WithdrawService withdrawService) {
+            WithdrawService withdrawService, PasswordResetService resets) {
+        this.resets = resets;
         this.withdrawService = withdrawService;
         this.signupService = signupService;
         this.loginService = loginService;
@@ -72,6 +74,20 @@ class AuthController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, sessions.clearCookie().toString())
                 .build();
+    }
+
+    /** 재설정 요청(011). 가입 여부와 상관없이 같은 202. */
+    @PostMapping("/password-reset")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    PasswordResetResponse requestReset(@Valid @RequestBody PasswordResetRequest request) {
+        return resets.request(request);
+    }
+
+    /** 새 비밀번호 정하기(011). 쿠키는 건드리지 않는다(자동 로그인 없음). */
+    @PostMapping("/password-reset/confirm")
+    ResponseEntity<Void> confirmReset(@RequestBody PasswordResetConfirmRequest request) {
+        resets.confirm(request);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/me")

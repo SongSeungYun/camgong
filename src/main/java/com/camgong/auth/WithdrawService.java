@@ -180,6 +180,7 @@ public class WithdrawService {
         clearOwnContent(memberId);
         jdbc.sql("DELETE FROM notification WHERE recipient_id = :id").param("id", memberId).update();
         jdbc.sql("DELETE FROM pending_signup WHERE email_key = :key").param("key", emailKey).update();
+        jdbc.sql("DELETE FROM password_reset WHERE email_key = :key").param("key", emailKey).update();   // 011 결정 4
         jdbc.sql("DELETE FROM login_attempt WHERE email_key = :key").param("key", emailKey).update();
     }
 

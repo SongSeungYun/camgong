@@ -45,6 +45,28 @@ public class SessionService {
         return raw;
     }
 
+    /**
+     * 로그인용(011 결정 3): 검증한 비밀번호 해시가 아직 그대로일 때만 세션을 넣는다. 이 SELECT 는 회원 행을 공유 잠금으로 읽어(REPEATABLE READ 의
+     * INSERT … SELECT) 진행 중인 재설정·탈퇴의 커밋을 기다리고, 그 뒤 해시가 바뀌었으면 아무것도 넣지 않는다. 옛 비밀번호로 로그인하던 요청이
+     * 재설정 커밋 직후 세션을 넣는 경쟁을 막는다(세션 생성 시각이 변경 시각보다 늦어 password_changed_at 비교로는 못 막는다).
+     *
+     * @return 넣었으면 원문 토큰, 해시가 바뀌었으면 empty
+     */
+    public Optional<String> issueIfPassword(long memberId, String verifiedHash) {
+        String raw = Tokens.newToken();
+        LocalDateTime now = utc(Instant.now(clock));
+        int inserted = jdbc.sql("""
+                INSERT INTO login_session (token_hash, member_id, created_at, last_used_at)
+                SELECT :hash, id, :now, :now FROM member WHERE id = :member AND password_hash = :verified
+                """)
+                .param("hash", Tokens.sha256Hex(raw))
+                .param("member", memberId)
+                .param("verified", verifiedHash)
+                .param("now", now)
+                .update();
+        return inserted == 0 ? Optional.empty() : Optional.of(raw);
+    }
+
     /** 확인된 세션: 회원 id 와, 이번 요청이 last_used_at 을 실제로 갱신했는지(쿠키도 다시 내려줘야 하는지). */
     public record Resolved(long memberId, boolean refreshed) {}
 
@@ -58,15 +80,27 @@ public class SessionService {
             return Optional.empty();
         }
         Instant now = Instant.now(clock);
-        Optional<Row> found = jdbc.sql("SELECT id, member_id, last_used_at FROM login_session WHERE token_hash = :hash")
+        // 비밀번호를 바꾸기(011) 전에 만든 세션은 없는 세션이다: 재설정 커밋 뒤 세션 삭제가 실패하거나 놓쳐도 옛 세션을 쓸 수 없다.
+        Optional<Row> found = jdbc.sql("""
+                SELECT s.id, s.member_id, s.last_used_at, s.created_at < m.password_changed_at AS stale
+                FROM login_session s JOIN member m ON m.id = s.member_id WHERE s.token_hash = :hash""")
                 .param("hash", Tokens.sha256Hex(rawToken))
                 .query((rs, i) -> new Row(rs.getLong("id"), rs.getLong("member_id"),
-                        rs.getObject("last_used_at", LocalDateTime.class).toInstant(ZoneOffset.UTC)))
+                        rs.getObject("last_used_at", LocalDateTime.class).toInstant(ZoneOffset.UTC), rs.getBoolean("stale")))
                 .optional();
         if (found.isEmpty()) {
             return Optional.empty();
         }
         Row row = found.get();
+        if (row.stale()) {
+            // 지우기는 최선 노력이다: 재설정의 member_id 기준 삭제와 겹치면 교착에 질 수 있다. 져도 이 요청은 비로그인이다.
+            try {
+                jdbc.sql("DELETE FROM login_session WHERE id = :id").param("id", row.id()).update();
+            } catch (org.springframework.dao.DataAccessException e) {
+                // 남은 행은 다음 요청이나 SessionCleanup(TTL)이 지운다
+            }
+            return Optional.empty();
+        }
         if (!row.lastUsedAt().plus(props.sessionTtl()).isAfter(now)) {
             // last_used_at 까지 맞춰야 읽은 뒤 다른 요청이 갱신한 행을 지우지 않는다.
             jdbc.sql("DELETE FROM login_session WHERE id = :id AND last_used_at = :seen")
@@ -114,5 +148,5 @@ public class SessionService {
         return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
-    private record Row(long id, long memberId, Instant lastUsedAt) {}
+    private record Row(long id, long memberId, Instant lastUsedAt, boolean stale) {}
 }

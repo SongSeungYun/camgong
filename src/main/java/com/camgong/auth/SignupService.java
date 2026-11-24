@@ -57,11 +57,7 @@ public class SignupService {
      */
     @Transactional
     public SignupResponse signup(SignupRequest r) {
-        String emailKey = Keys.normalize(r.email());
-        if (emailKey.length() > MAX_EMAIL_KEY || !asciiOnly(r.email()) || schools.schoolOf(emailKey).isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.",
-                    List.of(new ApiException.Field("email", "대학 메일로만 가입할 수 있습니다.")));
-        }
+        String emailKey = universityKey(r.email());
         if (members.existsByEmailKey(emailKey)) {
             throw new ApiException(HttpStatus.CONFLICT, "ALREADY_REGISTERED", "이미 가입된 이메일입니다.");
         }
@@ -157,6 +153,31 @@ public class SignupService {
         return new Authenticated(new AuthResponse(MemberView.of(member)), sessionToken);
     }
 
+    /** 가입할 수 있는 주소의 이메일 키. 아니면 400 errors[email]. 재설정 요청(011)도 같은 규칙이다. */
+    String universityKey(String email) {
+        String emailKey = Keys.normalize(email);
+        if (emailKey.length() > MAX_EMAIL_KEY || !asciiOnly(email) || schools.schoolOf(emailKey).isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Bad Request", "입력값이 올바르지 않습니다.",
+                    List.of(new ApiException.Field("email", "대학 메일로만 가입할 수 있습니다.")));
+        }
+        return emailKey;
+    }
+
+    /** 비밀번호 규칙(002)에 어긋나면 그 메시지. 재설정(011)도 같은 규칙이다. */
+    static Optional<String> passwordProblem(String password) {
+        if (password == null || password.isBlank()) {
+            return Optional.of("비밀번호를 입력해 주세요.");
+        }
+        if (password.length() < 8) {
+            return Optional.of("비밀번호는 8자 이상이어야 합니다.");
+        }
+        if (password.getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_BYTES) {
+            // BCrypt 는 72바이트 뒤를 잘라 버리므로 글자 수가 아니라 바이트로 막는다.
+            return Optional.of("비밀번호는 72바이트(영문 72자, 한글 24자) 이하여야 합니다.");
+        }
+        return Optional.empty();
+    }
+
     /** 본문 검증 오류를 모아 400 으로 돌려준다. 토큰은 아직 소진되지 않았다. */
     private static void validateSignupInput(VerifyRequest r, String displayName) {
         List<ApiException.Field> errors = new ArrayList<>();
@@ -172,15 +193,7 @@ public class SignupService {
             // 소문자 변환이 길이를 늘리는 글자(예: 'İ')는 이름 키 컬럼(20자)을 넘어 저장 오류가 되므로 미리 막는다.
             errors.add(new ApiException.Field("displayName", "사용할 수 없는 글자가 포함된 이름입니다."));
         }
-        String password = r.password();
-        if (password == null || password.isBlank()) {
-            errors.add(new ApiException.Field("password", "비밀번호를 입력해 주세요."));
-        } else if (password.length() < 8) {
-            errors.add(new ApiException.Field("password", "비밀번호는 8자 이상이어야 합니다."));
-        } else if (password.getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_BYTES) {
-            // BCrypt 는 72바이트 뒤를 잘라 버리므로 글자 수가 아니라 바이트로 막는다.
-            errors.add(new ApiException.Field("password", "비밀번호는 72바이트(영문 72자, 한글 24자) 이하여야 합니다."));
-        }
+        passwordProblem(r.password()).ifPresent(message -> errors.add(new ApiException.Field("password", message)));
         if (!Boolean.TRUE.equals(r.consent())) {
             errors.add(new ApiException.Field("consent", "개인정보 수집·이용에 동의해야 합니다."));
         }
