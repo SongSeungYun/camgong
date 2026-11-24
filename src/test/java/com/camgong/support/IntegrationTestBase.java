@@ -141,6 +141,12 @@ public abstract class IntegrationTestBase {
         awaitLockWaits(1, timeoutMillis);
     }
 
+    /** InnoDB 가 지금까지 찾은 교착 수(lock_deadlocks, 기본으로 켜진 지표). 앞뒤로 비교해 교착이 없었는지 본다. */
+    protected long deadlocks() {
+        return rootJdbc().queryForObject("SELECT `COUNT` FROM information_schema.INNODB_METRICS WHERE NAME = 'lock_deadlocks'",
+                Long.class);
+    }
+
     /** 대기 중인 잠금 요청이 n 개 이상 보일 때까지 기다린다(두 요청이 모두 막혔는지 볼 때). */
     protected void awaitLockWaits(int n, long timeoutMillis) throws InterruptedException {
         var root = rootJdbc();
