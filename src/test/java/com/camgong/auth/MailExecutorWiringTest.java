@@ -44,6 +44,10 @@ class MailExecutorWiringTest extends IntegrationTestBase {
                     Thread.currentThread().interrupt();
                 }
             }
+
+            @Override
+            public void sendPasswordReset(String to, String link) {
+            }
         };
         var props = org.mockito.Mockito.mock(AuthProperties.class);
         org.mockito.Mockito.when(props.verifyLinkBaseUrl()).thenReturn("http://x/verify?token=");

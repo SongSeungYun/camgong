@@ -16,7 +16,8 @@ public record AuthProperties(
         boolean cookieSecure,
         int bcryptCost,
         String verifyLinkBaseUrl,
-        List<String> allowedOrigins) {
+        List<String> allowedOrigins,
+        String resetLinkBaseUrl) {
 
     public record Mail(Duration resendInterval, int dailyLimit) {}
 

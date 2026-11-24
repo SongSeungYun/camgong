@@ -62,6 +62,8 @@ camgong:
     # 프록시 뒤에서 호스트가 달라지면 여기에 프론트 출처를 쉼표로 적는다(Origin 검사 허용 목록).
     allowed-origins: ${ALLOWED_ORIGINS:}
     verify-link-base-url: ${VERIFY_LINK_BASE_URL:http://localhost:5173/verify?token=}
+    # 011 비밀번호 재설정 링크. 운영 compose 는 DOMAIN 으로 만든다.
+    reset-link-base-url: ${RESET_LINK_BASE_URL:http://localhost:5173/password-reset/confirm?token=}
   mail:
     # smtp(기본) | logging(local/test/benchmark 프로파일에서만). SMTP 접속 정보는 SPRING_MAIL_* 환경변수로만 받는다.
     sender: ${MAIL_SENDER:smtp}

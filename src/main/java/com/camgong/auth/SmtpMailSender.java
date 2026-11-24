@@ -30,4 +30,18 @@ public class SmtpMailSender implements MailSender {
         message.setText("아래 링크에서 가입을 마무리해 주세요. 링크는 24시간 안에 확인해야 합니다.\n\n" + verifyLink);
         mailSender.send(message);
     }
+
+    /** 011 결정 6. 표시 이름은 넣지 않는다. */
+    @Override
+    public void sendPasswordReset(String toEmail, String resetLink) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        if (!from.isBlank()) {
+            message.setFrom(from);
+        }
+        message.setTo(toEmail);
+        message.setSubject("[캠공] 비밀번호 재설정");
+        message.setText("아래 링크에서 새 비밀번호를 정해 주세요. 1시간 동안 한 번만 쓸 수 있어요.\n\n" + resetLink
+                + "\n\n요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 바뀌지 않아요.");
+        mailSender.send(message);
+    }
 }

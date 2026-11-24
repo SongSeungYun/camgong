@@ -67,10 +67,12 @@ public class LoginService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS",
                     "이메일 또는 비밀번호가 올바르지 않습니다.");
         }
-        completeSuccess(emailKey);
         Member member = found.get();
-        return new Authenticated(new AuthResponse(MemberView.of(member)),
-                sessions.issue(member.getId()));
+        // 비교한 해시가 그 사이 바뀌었으면(재설정·탈퇴가 커밋됨) 세션을 넣지 않고 실패로 답한다(011 결정 3).
+        String session = sessions.issueIfPassword(member.getId(), hash).orElseThrow(() -> new ApiException(
+                HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다."));
+        completeSuccess(emailKey);
+        return new Authenticated(new AuthResponse(MemberView.of(member)), session);
     }
 
     /**

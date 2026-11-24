@@ -38,6 +38,24 @@ class VerificationMailListener {
         }
     }
 
+    /** 재설정 메일(011)도 같은 실행기로 요청 스레드 밖에서 보낸다: 회원 주소만 SMTP 시간만큼 늦으면 응답 시간으로 가입이 드러난다. */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    void on(PasswordResetMailRequested event) {
+        try {
+            executor.execute(() -> sendReset(event));
+        } catch (RuntimeException e) {
+            log.warn("password reset mail dropped to={} cause={}", mask(event.email()), e.getClass().getSimpleName());
+        }
+    }
+
+    private void sendReset(PasswordResetMailRequested event) {
+        try {
+            mailSender.sendPasswordReset(event.email(), props.resetLinkBaseUrl() + event.token());
+        } catch (RuntimeException e) {
+            log.warn("password reset mail failed to={} cause={}", mask(event.email()), e.getClass().getSimpleName());
+        }
+    }
+
     private void send(VerificationMailRequested event) {
         try {
             mailSender.sendVerification(event.email(), props.verifyLinkBaseUrl() + event.token());

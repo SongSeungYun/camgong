@@ -15,7 +15,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** 만료된 세션·풀린 잠금 기록·쓸모없어진 가입 신청을 지운다. */
+/** 만료된 세션·풀린 잠금 기록·쓸모없어진 가입 신청·재설정 요청 기록을 지운다. */
 // ponytail: 단일 인스턴스 전제, 다중 인스턴스면 락 필요
 @Component
 class SessionCleanup {
@@ -64,7 +64,11 @@ class SessionCleanup {
                 + "OR used_at < :usedCut")
                 .param("expiredCut", at(now.minus(Duration.ofDays(7)))).param("usedCut", at(now.minus(Duration.ofDays(1))))
                 .update();
-        log.info("cleanup: sessions={} attempts={} pending={}", sessions, attempts, pending);
+        // 011 결정 7: 24시간 창이 지났고 쓸 수 있는 토큰이 없는 재설정 요청 기록. 한도 판정은 창이 지나면 어차피 새로 시작한다.
+        int resets = jdbc.sql("DELETE FROM password_reset WHERE window_started_at < :cut "
+                + "AND (token_hash IS NULL OR used_at IS NOT NULL OR token_expires_at <= :now)")
+                .param("cut", at(now.minus(Duration.ofDays(1)))).param("now", at(now)).update();
+        log.info("cleanup: sessions={} attempts={} pending={} resets={}", sessions, attempts, pending, resets);
     }
 
     private static LocalDateTime at(Instant t) {
