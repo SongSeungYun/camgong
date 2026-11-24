@@ -9,7 +9,7 @@
 | 대학 이메일 도메인 | `EXTRA_SCHOOL_DOMAINS`(009) | **결정(2026-11-19): 전국 대학.** `ac.kr` 메일은 설정 없이 모두 가입된다. `ac.kr`이 아닌 국내 대학(예: `skku.edu`)만 `키=도메인,도메인;…` 형식으로 넣는다. 키는 한 번 쓰면 바꾸지 않는다. **회원이 생긴 뒤 묶음을 바꾸면(예: 이미 가입자가 있는 `sg.ac.kr`을 `sogang.ac.kr` 묶음에 넣음) 기존 회원과 새 회원이 다른 학교가 된다.** 학교는 가입 확인 때 한 번만 정하기 때문이다. 바꿀 때는 그 도메인 회원의 `member.school`과 그 회원들이 연 `group_buy.school`을 같이 고친다(절차는 확인 못 함). `co.kr`처럼 누구나 받는 메일 도메인은 넣지 않는다(설정 검사는 `ac.kr`만 막는다). 스펙 `specs/009-school-scope` |
 | SMTP 계정(호스트·포트·계정·비밀번호) | `SPRING_MAIL_*` | **Gmail로 결정**(2026-11-18, 아래 2.1). 계정·앱 비밀번호는 사용자가 서버 환경변수로만 넣는다 |
 | 개인정보 동의 안내문과 버전 | 프론트 `frontend/src/pages/VerifyPage.tsx`의 `CONSENT_VERSION`(지금 `'v1'`), 안내문 본문 | 초안 `docs/consent-v1.md`(사용자 확인 대기). 버전은 서버에서 20자 이하 |
-| 배포 대상과 도메인 | `DOMAIN`(compose가 `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`을 만든다), 쿠키 Secure | 도메인은 `camgong.app`(2026-11-23 가비아 구매). 서버는 Vultr 서울 1GB(아래 7) |
+| 배포 대상과 도메인 | `DOMAIN`(compose가 `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`·`RESET_LINK_BASE_URL`을 만든다), 쿠키 Secure | 도메인은 `camgong.app`(2026-11-23 가비아 구매). 서버는 Vultr 서울 1GB(아래 7) |
 | README 수요 확인 문구 | README(관제탑이 못 고침) | 초안은 아래 8. 수요 확인 인원·응답은 사용자가 채운다 |
 
 ### 1.1 이메일 도메인 조사 (2026-11-18)
@@ -42,6 +42,7 @@
 | `MAIL_SENDER` | `smtp` | 기본값 유지 | `logging`은 local/test/benchmark용. 운영에서 쓰면 메일이 안 나간다 |
 | `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` / `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | 없음 | **반드시 설정** | 보내는 주소는 `spring.mail.username`이다. 465(SMTPS)면 `SPRING_MAIL_PROTOCOL=smtps`. 587이면 STARTTLS 설정(`SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true` 등)이 메일 업체에 따라 필요하다(확인 못 함) |
 | `VERIFY_LINK_BASE_URL` | `http://localhost:5173/verify?token=` | **반드시 설정** | 빠뜨리면 인증 메일 링크가 localhost를 가리킨다. 예: `https://<도메인>/verify?token=` |
+| `RESET_LINK_BASE_URL` | `http://localhost:5173/password-reset/confirm?token=` | **반드시 설정** | 011. 빠뜨리면 재설정 메일 링크가 localhost를 가리킨다. 예: `https://<도메인>/password-reset/confirm?token=` |
 | `COOKIE_SECURE` | `true` | 기본값 유지 | HTTPS 배포 전제. local 프로필만 false |
 | `ALLOWED_ORIGINS` | 빈 값 | 배포 형태에 따라 (아래 3) | 쉼표로 여러 개 |
 
@@ -91,10 +92,10 @@
 ## 7. 배포 대상 (서버·도메인 결정됨)
 
 - **서버 한 대 + Docker Compose**: MySQL 8.4, 백엔드 jar, Caddy 세 개를 한 서버에 둔다. Caddy가 HTTPS 인증서를 자동으로 받고, 프론트 정적 파일을 서빙하며 `/api`를 백엔드로 넘긴다. 같은 출처라 쿠키·Origin 문제가 없다. SPA 폴백도 Caddy `try_files` 한 줄이다.
-- **서버**: **결정(2026-11-24): Vultr 서울, Cloud Compute(Regular Performance) 1 vCPU·1GB·25GB SSD 월 $5, Ubuntu 24.04 LTS.** 메모리가 모자라면 같은 서버를 2GB(월 $10)로 올린다(Vultr는 올리기만 되고 내리기는 안 된다). Vultr 자동 백업은 쓰지 않는다(보관 위치·기간 확인 못 함, 백업은 아래 덤프로). 버린 후보: Azure for Students(2026-11-23 골랐으나 학교 메일 인증 뒤 "무료 계정 자격 없음"으로 거절, 새 Microsoft 계정도 같음, 원인 확인 못 함), AWS Lightsail 2GB 월 $12(기존 계정이라 새 계정 크레딧 대상 아님), Oracle 무료(2026년 춘천 A1 비활성·유휴 회수), 네이버 Micro(디스크 10GB, 공인 IP 별도).
+- **서버**: **결정(2026-11-24): Vultr 서울, Cloud Compute(Regular Performance) 1 vCPU·1GB·25GB SSD 월 $5, Ubuntu 26.04 LTS(2026-11-25 생성, 지원 2031-04까지).** 확인함: 위치 Seoul, `Ubuntu 26.04.1 LTS`, 루트 디스크 23G(6.1G 사용), 공인 IPv4가 `enp1s0`에 바로 붙음, Auto Backups Not Enabled, SSH 키 접속(방화벽 그룹 `camgong`). 처음 실수로 만든 Atlanta·26.10 서버는 지웠고, 월 청구 $5를 확인했다(2026-11-25 사용자). 메모리가 모자라면 같은 서버를 2GB(월 $10)로 올린다(Vultr는 올리기만 되고 내리기는 안 된다). Vultr 자동 백업은 쓰지 않는다(보관 위치·기간 확인 못 함, 백업은 아래 덤프로). 버린 후보: Azure for Students(2026-11-23 골랐으나 학교 메일 인증 뒤 "무료 계정 자격 없음"으로 거절, 새 Microsoft 계정도 같음, 원인 확인 못 함), AWS Lightsail 2GB 월 $12(기존 계정이라 새 계정 크레딧 대상 아님), Oracle 무료(2026년 춘천 A1 비활성·유휴 회수), 네이버 Micro(디스크 10GB, 공인 IP 별도).
   - **1GB 메모리**: 로컬 MySQL 컨테이너가 기본 설정으로 531MB를 쓴다(2026-11-23). 1GB에 올리려면 JVM 힙 한도, MySQL `performance_schema` 끄기·버퍼 풀 축소, 스왑 2GB가 필요하다. 여는 조건: 컨테이너 메모리 한도 합 1GB에서 k6 부하를 버티는 측정(`docs/benchmarks/`). 백엔드 세션 작업, 011·012 다음.
   - **포트**: Vultr 방화벽 그룹으로 연다. 인바운드는 80·443(TCP)·443(UDP)과 SSH 22(내 IP만). 서버 안의 ufw는 Docker가 연 포트를 막지 못하므로(Docker가 iptables 규칙을 직접 넣는다) 방화벽 그룹이 기준이다. Vultr는 바깥으로 나가는 25만 막고 587(Gmail SMTP)은 막지 않는다.
-- **도메인**: 1년 단위로 하나 산다. HTTPS가 있어야 PWA 설치가 된다. 2026-11-22 조회: `camgong.com`·`camgong.co.kr`은 이미 남이 등록했고, `camgong.kr`·`camgong.app`은 비어 있다. 관제탑 추천은 Cloudflare에서 `camgong.app`(첫해 약 $8.20, 갱신 약 $14.20, 가격은 비공식 집계 기준이라 결제 화면에서 확인). Cloudflare Registrar는 Cloudflare DNS를 써야 한다. Caddy가 인증서를 받게 레코드는 프록시 끔(DNS only)으로 둔다. `.kr`은 카페24·가비아에서 첫해 약 1.5만원·갱신 약 2.2~2.4만원이고, 국내 주소가 필요하며 whois에 이름·주소가 공개된다(비공개 서비스 필요). **결정(2026-11-23): 가비아에서 `camgong.app` 구매.** `.env`의 `DOMAIN=camgong.app`. 유료 SSL 인증서는 사지 않는다(Caddy가 Let's Encrypt로 받는다). 서버 IP가 나오면 가비아 DNS에 `camgong.app` A 레코드를 그 IP로 넣고 80·443을 연다. 자동 갱신과 whois 정보 비공개는 사용자가 가비아에서 확인한다(확인 못 함).
+- **도메인**: 1년 단위로 하나 산다. HTTPS가 있어야 PWA 설치가 된다. 2026-11-22 조회: `camgong.com`·`camgong.co.kr`은 이미 남이 등록했고, `camgong.kr`·`camgong.app`은 비어 있다. 관제탑 추천은 Cloudflare에서 `camgong.app`(첫해 약 $8.20, 갱신 약 $14.20, 가격은 비공식 집계 기준이라 결제 화면에서 확인). Cloudflare Registrar는 Cloudflare DNS를 써야 한다. Caddy가 인증서를 받게 레코드는 프록시 끔(DNS only)으로 둔다. `.kr`은 카페24·가비아에서 첫해 약 1.5만원·갱신 약 2.2~2.4만원이고, 국내 주소가 필요하며 whois에 이름·주소가 공개된다(비공개 서비스 필요). **결정(2026-11-23): 가비아에서 `camgong.app` 구매.** `.env`의 `DOMAIN=camgong.app`. 유료 SSL 인증서는 사지 않는다(Caddy가 Let's Encrypt로 받는다). 가비아 DNS 관리툴에 `camgong.app` A 레코드(호스트 `@`, TTL 600)를 Vultr 서버 IP로 넣었다(2026-11-25, 가비아 네임서버 3개와 1.1.1.1·8.8.8.8에서 조회 확인). AAAA·`www`는 없다. 가비아 부가서비스(포워딩·파킹·도메인 연결)는 .app이라 쓸 수 없고 쓰지 않는다. 자동 갱신과 whois 정보 비공개는 사용자가 가비아에서 확인한다(확인 못 함).
 - **백업**: DB가 서버 한 대에만 있으므로 백업 없이 열지 않는다. 매일 `mysqldump`를 서버 밖(예: 객체 저장소)에 보관하거나 서버 자동 스냅샷을 켠다. 복구를 한 번 해 본다. **어느 쪽이든 7일이 지나면 지워지게 한다**(동의문 "백업과 인증 메일 발송 기록에서는 7일 안에 지워집니다", 2026-11-19 사용자 "7일"). 서버 스냅샷과 서버 디스크 덤프(7.1-5)를 같이 쓰면 스냅샷 안에 최대 7일 된 덤프가 들어가 약 13일 남는다. 스냅샷을 켜면 덤프 디렉터리를 빼거나 둘 중 하나만 쓴다.
 - Gmail SMTP는 587 포트를 쓴다. Vultr는 587을 막지 않는다(위 서버 항목).
 - 결정되면 `Dockerfile`·`compose.yaml`·`Caddyfile`은 작업 세션이 만들고 관제탑이 검수한다. 시크릿은 서버의 `.env`에만 둔다.
@@ -102,7 +103,7 @@
 ### 7.1 운영 절차 (`deploy/`, 2026-11-19 백엔드 세션 초안 반영)
 
 1. 서버: Docker 설치, 방화벽은 22·80·443만 연다. DNS A 레코드를 서버 IP로 먼저 잡는다(Caddy 인증서 발급 전에).
-2. `git clone` → `cd deploy && cp .env.example .env` → 값 채우기 → `chmod 600 .env`. `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`은 compose가 `DOMAIN`으로 만든다.
+2. `git clone` → `cd deploy && cp .env.example .env` → 값 채우기 → `chmod 600 .env`. `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`·`RESET_LINK_BASE_URL`은 compose가 `DOMAIN`으로 만든다.
 3. `docker compose up -d --build`. `docker compose logs backend`에서 Flyway 적용과 `Started`를 본 뒤 아래 §6 순서로 확인한다.
 4. 업데이트: `git pull && docker compose up -d --build`. 2GB 서버에서 백엔드·프론트 빌드를 같이 돌리면 메모리가 빠듯할 수 있다. swap을 켜거나 이미지를 서버 밖에서 빌드한다(확인 못 함).
 5. 백업: crontab에 `0 4 * * * /경로/deploy/backup.sh`. 7일이 지난 덤프는 스크립트가 지운다(010 T017). **덤프가 실패한 날은 지우지 않는다**(남은 백업을 지키려고). 실패가 이어지면 7일을 넘겨 남는다. 그래서 healthchecks.io(무료)로 알아챈다(2026-11-22 사용자 선택, 010 plan 결정 5-3): 서비스 Gmail로 가입 → 주기 1일·유예 1시간 확인을 하나 만든다 → 그 주소를 `.env`의 `HC_PING_URL`에 넣는다. 스크립트가 성공하면 호출하고 실패하면 `/fail`을 호출한다. 호출이 끊기면(cron이 안 돎, 서버가 죽음) 메일이 온다(010 T036). 서버 밖 보관은 아직 TODO이고, 두게 되면 같은 7일 수명 규칙을 건다. **서버 밖 보관 전에는 서버가 사라지면 백업도 사라진다.** MySQL binlog는 compose에서 끈다(탈퇴 전 값이 30일 남기 때문, 010 plan 결정 5-1). binlog를 켠 채 돌던 볼륨이면 이미 남은 `binlog.*`는 끈 뒤에도 지워지지 않는다. 끄기 전에 `RESET BINARY LOGS AND GTIDS`를 한 번 실행한다. 새 볼륨으로 시작하면 필요 없다.
