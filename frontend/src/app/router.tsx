@@ -1,8 +1,9 @@
 import type { ComponentType } from 'react'
-import { Outlet, ScrollRestoration, useRouteError, type RouteObject } from 'react-router'
+import { Link, Outlet, ScrollRestoration, useRouteError, type RouteObject } from 'react-router'
 import { Layout, StateView } from '../shared/ui'
 import { Header } from './Header'
 import { RequireAuth } from './RequireAuth'
+import s from './Footer.module.css'
 
 const page = (load: () => Promise<{ default: ComponentType }>): RouteObject['lazy'] => async () => ({ Component: (await load()).default })
 
@@ -11,8 +12,18 @@ function Root() {
     <>
       <Header />
       <Outlet />
+      <Footer />
       <ScrollRestoration />
     </>
+  )
+}
+
+/** 모든 화면 아래. 처리방침 링크는 다른 고지와 구분되게 굵게 둔다(시행령 제31조 제2항, 작성지침) */
+function Footer() {
+  return (
+    <footer className={s.footer}>
+      <Link to="/privacy" className={s.privacy}>개인정보 처리방침</Link>
+    </footer>
   )
 }
 
@@ -20,9 +31,12 @@ function Root() {
 function RootError() {
   console.error(useRouteError())
   return (
-    <Layout>
-      <StateView state="error" onRetry={() => location.reload()} />
-    </Layout>
+    <>
+      <Layout>
+        <StateView state="error" onRetry={() => location.reload()} />
+      </Layout>
+      <Footer />
+    </>
   )
 }
 
@@ -36,6 +50,9 @@ export const routes: RouteObject[] = [
       { path: '/signup', lazy: page(() => import('../pages/SignupPage')) },
       { path: '/login', lazy: page(() => import('../pages/LoginPage')) },
       { path: '/verify', lazy: page(() => import('../pages/VerifyPage')) },
+      { path: '/password-reset', lazy: page(() => import('../pages/PasswordResetPage')) },
+      { path: '/password-reset/confirm', lazy: page(() => import('../pages/PasswordResetConfirmPage')) },
+      { path: '/privacy', lazy: page(() => import('../pages/PrivacyPage')) },
       {
         element: <RequireAuth />,
         children: [

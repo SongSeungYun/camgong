@@ -1,0 +1,3 @@
+.footer { max-width: var(--read-width); margin: var(--space-4) auto 0; padding: var(--space-4); border-top: 1px solid var(--color-border); }
+/* 처리방침 링크는 다른 링크와 구분되게 굵고 크게(작성지침: 글자 크기·굵기로 구분). 눌러지는 높이도 확보 */
+.privacy { display: inline-flex; align-items: center; min-height: var(--touch); font-weight: 700; font-size: 1.0625rem; }

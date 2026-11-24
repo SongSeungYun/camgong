@@ -241,11 +241,14 @@ describe('탈퇴 (010)', () => {
     const kept = '함께한 공구의 수량과 입금·수령 기록, 내가 연 공구의 제목·상품명·상품 링크·오픈채팅 링크, 소속 학교, 가입·탈퇴 시각, 동의 시각·버전'
     const how = '모집 중인 공구는 참여를 취소하거나 내가 연 공구를 취소하면 되고, 마감 확정을 기다리는 공구는 확정된 뒤에 할 수 있어요'
     expect(region.textContent).toContain(how) // T030
+    const retention = '그 공구가 끝난 날부터 1년이 지나면 공구와 함께 지워요'
+    expect(region.textContent).toContain(retention) // 2026-11-22 보존 기간
     expect(region.textContent).toContain(erased)
     expect(region.textContent).toContain(kept)
     const dialog = await openDialog()
     expect(dialog.textContent).toContain(erased)
     expect(dialog.textContent).toContain(kept)
+    expect(dialog.textContent).toContain(retention)
     const desc = document.getElementById(dialog.getAttribute('aria-describedby') ?? '')!.textContent
     expect(desc).toMatch(/되돌릴 수 없어요/)
     expect(desc).toContain(erased)

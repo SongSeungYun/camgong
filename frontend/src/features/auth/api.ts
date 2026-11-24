@@ -27,3 +27,7 @@ export interface WithdrawBlocker {
   status: 'OPEN' | 'PENDING_CLOSE' | string
 }
 export const withdraw = (password: string) => post('/api/auth/withdraw', { password })
+
+/** 011 비밀번호 재설정. 가입 여부와 무관하게 같은 202(retryAt: 다시 요청할 수 있는 가장 이른 시각) */
+export const requestPasswordReset = (email: string) => post<{ retryAt: string }>('/api/auth/password-reset', { email })
+export const confirmPasswordReset = (token: string, password: string) => post('/api/auth/password-reset/confirm', { token, password })
