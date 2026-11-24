@@ -114,9 +114,14 @@ class RetentionCleanupIT extends IntegrationTestBase {
         String mine = mockMvc.perform(get("/api/me/groupbuys?role=participant").with(as(PARTICIPANT)))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         assertThat(mine).contains("\"id\":" + young).doesNotContain("\"id\":" + completed + ",");
-        String list = mockMvc.perform(get("/api/groupbuys?status=all").with(as(PARTICIPANT)))
-                .andReturn().getResponse().getContentAsString();
-        assertThat(list).doesNotContain("\"id\":" + completed + ",").doesNotContain("\"id\":" + failed + ",");
+        // 관제탑 검수 T007: 상태별 목록이 실제로 응답하고(200), 남은 공구는 보이고 지운 공구는 안 보인다
+        String done = mockMvc.perform(get("/api/groupbuys?status=COMPLETED").with(as(PARTICIPANT)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(done).contains("\"id\":" + young + ",").doesNotContain("\"id\":" + completed + ",");
+        long youngFailed = groupBuyEnded("FAILED", Duration.ofDays(3));
+        String lost = mockMvc.perform(get("/api/groupbuys?status=FAILED").with(as(PARTICIPANT)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(lost).contains("\"id\":" + youngFailed + ",").doesNotContain("\"id\":" + failed + ",");
     }
 
     private List<Map<String, Object>> snapshotOf(long... ids) {
@@ -131,6 +136,7 @@ class RetentionCleanupIT extends IntegrationTestBase {
 
     @Test
     void nothingYoungerThanAYearOrUnfinishedIsTouched() {
+        groupBuyEnded("COMPLETED", YEAR);                  // 정확히 365일: 남는다(ended_at < 기준)
         groupBuyEnded("COMPLETED", YEAR.minusMinutes(1));
         groupBuyEnded("CANCELLED", Duration.ofDays(1));
         groupBuyEnded("OPEN", null);
@@ -172,7 +178,9 @@ class RetentionCleanupIT extends IntegrationTestBase {
                 + "window_started_at, sent_count, created_at) VALUES ('d@school.ac.kr', 13, NULL, NULL, ?, ?, 1, ?)",
                 ago(Duration.ofHours(1)), ago(Duration.ofHours(1)), ago(Duration.ofHours(1)));
         jdbc.update("INSERT INTO create_guard (member_id, fingerprint, created_at) VALUES (13, ?, ?)", "f".repeat(64),
-                ago(Duration.ofDays(400)));
+                ago(Duration.ofHours(1)));                 // 1일 안 된 것도 회원과 함께 지운다
+        long recent = groupBuyEnded("COMPLETED", Duration.ofDays(5));
+        notify(recent, 13);                                // 탈퇴 뒤에 남은 받은 알림
 
         RetentionCleanup.Result result = cleanup.run();
 
@@ -183,6 +191,10 @@ class RetentionCleanupIT extends IntegrationTestBase {
         assertThat(jdbc.queryForList("SELECT id FROM member WHERE id < 10 ORDER BY id", Long.class))
                 .as("탈퇴 안 한 회원은 그대로").containsExactly(1L, 2L, 3L);
         assertThat(count("SELECT COUNT(*) FROM login_session WHERE member_id IN (10, 13)")).isZero();
+        assertThat(count("SELECT COUNT(*) FROM password_reset WHERE member_id = 13")).isZero();
+        assertThat(count("SELECT COUNT(*) FROM create_guard WHERE member_id = 13")).isZero();
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE recipient_id IN (10, 13)")).isZero();
+        assertThat(count("SELECT COUNT(*) FROM notification WHERE group_buy_id = ?", recent)).as("다른 회원의 알림은 그대로").isEqualTo(2);
         assertThat(output).contains("retention-cleanup groupBuys=1 members=2");
     }
 
@@ -194,6 +206,96 @@ class RetentionCleanupIT extends IntegrationTestBase {
         assertThat(cleanup.run().members()).isOne();
         assertThat(count("SELECT COUNT(*) FROM member WHERE id = 20")).isZero();
         assertThat(count("SELECT COUNT(*) FROM member WHERE id = 21")).isOne();
+    }
+
+    /** 관제탑 검수 T012: 최근 공구를 열었고 오래된 공구에 참여한 탈퇴 회원은 남고, 오래된 공구·그 참여만 사라진다. */
+    @Test
+    void aWithdrawnMemberWhoStillOrganizesARecentGroupBuyStays() {
+        seedMembers(40, 41);
+        withdraw(40);
+        long recent = groupBuyEnded("COMPLETED", Duration.ofDays(20), 40, 41);
+        long old = groupBuyEnded("COMPLETED", YEAR.plusDays(2), ORGANIZER, 40);
+
+        RetentionCleanup.Result result = cleanup.run();
+
+        assertThat(result.groupBuys()).isOne();
+        assertThat(result.members()).isZero();
+        assertThat(count("SELECT COUNT(*) FROM member WHERE id = 40")).isOne();
+        assertThat(count("SELECT COUNT(*) FROM group_buy WHERE id = ?", recent)).isOne();
+        assertThat(count("SELECT COUNT(*) FROM participation WHERE group_buy_id = ?", recent)).isEqualTo(2);
+        assertThat(count("SELECT COUNT(*) FROM group_buy WHERE id = ?", old)).isZero();
+        assertThat(count("SELECT COUNT(*) FROM participation WHERE member_id = 40 AND group_buy_id = ?", old)).isZero();
+    }
+
+    // ---- T010 ----
+
+    /** create_guard(공구 글의 해시)는 활동 회원 것도 1일 지나면 지운다. */
+    @Test
+    void createGuardsOlderThanADayAreDeleted() {
+        jdbc.update("INSERT INTO create_guard (member_id, fingerprint, created_at) VALUES (?, ?, ?), (?, ?, ?)",
+                ORGANIZER, "a".repeat(64), ago(Duration.ofDays(1).plusSeconds(1)),
+                ORGANIZER, "b".repeat(64), ago(Duration.ofHours(23)));
+        cleanup.run();
+        assertThat(jdbc.queryForList("SELECT fingerprint FROM create_guard", String.class)).containsExactly("b".repeat(64));
+    }
+
+    // ---- T009 ----
+
+    /**
+     * 개설자 탈퇴가 회원 행을 잡은 사이 정리가 돌면 정리는 그 회원 행에서 기다려야 한다(회원 → 공구, 다른 경로와 같은 순서). 공구 행부터 잡으면
+     * 탈퇴의 설명 지우기(개설자 인덱스 → 공구 PK)와 정리의 공구 삭제(공구 PK → 개설자 인덱스)가 반대로 잡아 교착한다.
+     */
+    @Test
+    void theCleanupWaitsOnTheOrganizerBeforeLockingTheGroupBuy() throws Exception {
+        seedMembers(50, 51);
+        long old = groupBuyEnded("COMPLETED", YEAR.plusDays(1), 50, 51);
+        long recent = groupBuyEnded("COMPLETED", Duration.ofDays(1), 50, 51);
+        jdbc.update("UPDATE group_buy SET description = '연락처' WHERE organizer_id = 50");
+        long before = deadlocks();
+        var tx = new org.springframework.transaction.support.TransactionTemplate(txManager);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> withdrawal = pool.submit(() -> tx.execute(s -> {
+                jdbc.queryForObject("SELECT id FROM member WHERE id = 50 FOR UPDATE", Long.class);
+                locked.countDown();
+                try {
+                    go.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return jdbc.update("UPDATE group_buy FORCE INDEX (idx_group_buy_organizer_id) SET description = NULL "
+                        + "WHERE organizer_id = 50");
+            }));
+            locked.await();
+            Future<RetentionCleanup.Result> run = pool.submit(() -> cleanup.run());
+            awaitLockWait(5000);
+            go.countDown();
+            assertThat(withdrawal.get()).isEqualTo(2);
+            assertThat(run.get().groupBuys()).isOne();
+        } finally {
+            go.countDown();
+            pool.shutdownNow();
+        }
+        assertThat(deadlocks()).as("교착 없음").isEqualTo(before);
+        assertThat(count("SELECT COUNT(*) FROM group_buy WHERE id = ?", old)).isZero();
+        assertThat(count("SELECT COUNT(*) FROM group_buy WHERE id = ?", recent)).isOne();
+    }
+
+    /** 참여·알림 DELETE 는 group_buy_id 인덱스 범위로만 잠근다(작은 표에서 전체 훑기를 고르면 모든 행이 잠긴다). */
+    @Test
+    void deletingParticipationsAndNotificationsUsesTheGroupBuyIndex() {
+        List<Long> all = new ArrayList<>();
+        for (int i = 0; i < 40; i++) {                     // 묶음이 표 전체: 옵티마이저가 전체 훑기를 고르기 쉬운 모양
+            all.add(groupBuyEnded("COMPLETED", YEAR.plusDays(1 + i)));
+        }
+        jdbc.execute("ANALYZE TABLE participation, notification");
+        String ids = all.toString().replaceAll("[\\[\\]]", "");
+        assertThat(jdbc.queryForMap("EXPLAIN " + RetentionCleanup.DELETE_PARTICIPATIONS.replace(":ids", ids)))
+                .containsEntry("key", "uq_participation_group_member").containsEntry("type", "range");
+        assertThat(jdbc.queryForMap("EXPLAIN " + RetentionCleanup.DELETE_NOTIFICATIONS.replace(":ids", ids)))
+                .containsEntry("key", "idx_notification_group_buy").containsEntry("type", "range");
     }
 
     // ---- T005 ----
