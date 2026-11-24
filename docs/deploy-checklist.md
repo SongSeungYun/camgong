@@ -9,7 +9,7 @@
 | 대학 이메일 도메인 | `EXTRA_SCHOOL_DOMAINS`(009) | **결정(2026-11-19): 전국 대학.** `ac.kr` 메일은 설정 없이 모두 가입된다. `ac.kr`이 아닌 국내 대학(예: `skku.edu`)만 `키=도메인,도메인;…` 형식으로 넣는다. 키는 한 번 쓰면 바꾸지 않는다. **회원이 생긴 뒤 묶음을 바꾸면(예: 이미 가입자가 있는 `sg.ac.kr`을 `sogang.ac.kr` 묶음에 넣음) 기존 회원과 새 회원이 다른 학교가 된다.** 학교는 가입 확인 때 한 번만 정하기 때문이다. 바꿀 때는 그 도메인 회원의 `member.school`과 그 회원들이 연 `group_buy.school`을 같이 고친다(절차는 확인 못 함). `co.kr`처럼 누구나 받는 메일 도메인은 넣지 않는다(설정 검사는 `ac.kr`만 막는다). 스펙 `specs/009-school-scope` |
 | SMTP 계정(호스트·포트·계정·비밀번호) | `SPRING_MAIL_*` | **Gmail로 결정**(2026-11-18, 아래 2.1). 계정·앱 비밀번호는 사용자가 서버 환경변수로만 넣는다 |
 | 개인정보 동의 안내문과 버전 | 프론트 `frontend/src/pages/VerifyPage.tsx`의 `CONSENT_VERSION`(지금 `'v1'`), 안내문 본문 | 초안 `docs/consent-v1.md`(사용자 확인 대기). 버전은 서버에서 20자 이하 |
-| 배포 대상과 도메인 | `DOMAIN`(compose가 `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`을 만든다), 쿠키 Secure | 도메인은 `camgong.app`(2026-11-23 가비아 구매). 서버는 Azure for Students(아래 7) |
+| 배포 대상과 도메인 | `DOMAIN`(compose가 `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`을 만든다), 쿠키 Secure | 도메인은 `camgong.app`(2026-11-23 가비아 구매). 서버는 Vultr 서울 1GB(아래 7) |
 | README 수요 확인 문구 | README(관제탑이 못 고침) | 초안은 아래 8. 수요 확인 인원·응답은 사용자가 채운다 |
 
 ### 1.1 이메일 도메인 조사 (2026-11-18)
@@ -91,12 +91,12 @@
 ## 7. 배포 대상 (서버·도메인 결정됨)
 
 - **서버 한 대 + Docker Compose**: MySQL 8.4, 백엔드 jar, Caddy 세 개를 한 서버에 둔다. Caddy가 HTTPS 인증서를 자동으로 받고, 프론트 정적 파일을 서빙하며 `/api`를 백엔드로 넘긴다. 같은 출처라 쿠키·Origin 문제가 없다. SPA 폴백도 Caddy `try_files` 한 줄이다.
-- **서버**: **결정(2026-11-23): Azure for Students, 한국 중부(Korea Central, 서울) 리전, `B2ats v2`(2 vCPU, 1GB) Ubuntu 24.04 LTS.** 학생 인증으로 카드 없이 매년 $100 크레딧, 12개월 동안 B1s·B2pts v2·B2ats v2 각 750시간 무료. 크레딧이 떨어지거나 학생 갱신을 안 하면 구독과 서버가 멈춘다(카드가 없어 요금이 청구되지는 않는다). 졸업하면 종량제로 바꾸거나 옮긴다. 디스크·공인 IP가 무료 범위인지는 확인 못 함(벗어나도 크레딧에서 나간다). 버린 후보: AWS Lightsail 2GB 월 $12(새 계정 크레딧 대상 아님), Oracle 무료(2026년 춘천 A1 비활성·유휴 회수), 네이버 Micro(디스크 10GB, 공인 IP 별도).
+- **서버**: **결정(2026-11-24): Vultr 서울, Cloud Compute(Regular Performance) 1 vCPU·1GB·25GB SSD 월 $5, Ubuntu 24.04 LTS.** 메모리가 모자라면 같은 서버를 2GB(월 $10)로 올린다(Vultr는 올리기만 되고 내리기는 안 된다). Vultr 자동 백업은 쓰지 않는다(보관 위치·기간 확인 못 함, 백업은 아래 덤프로). 버린 후보: Azure for Students(2026-11-23 골랐으나 학교 메일 인증 뒤 "무료 계정 자격 없음"으로 거절, 새 Microsoft 계정도 같음, 원인 확인 못 함), AWS Lightsail 2GB 월 $12(기존 계정이라 새 계정 크레딧 대상 아님), Oracle 무료(2026년 춘천 A1 비활성·유휴 회수), 네이버 Micro(디스크 10GB, 공인 IP 별도).
   - **1GB 메모리**: 로컬 MySQL 컨테이너가 기본 설정으로 531MB를 쓴다(2026-11-23). 1GB에 올리려면 JVM 힙 한도, MySQL `performance_schema` 끄기·버퍼 풀 축소, 스왑 2GB가 필요하다. 여는 조건: 컨테이너 메모리 한도 합 1GB에서 k6 부하를 버티는 측정(`docs/benchmarks/`). 백엔드 세션 작업, 011·012 다음.
-  - **포트**: 네트워크 보안 그룹 인바운드는 80·443(TCP)·443(UDP)과 SSH 22(내 IP만). Azure는 바깥으로 나가는 25를 막지만 587(Gmail SMTP)은 막지 않는다.
+  - **포트**: Vultr 방화벽 그룹으로 연다. 인바운드는 80·443(TCP)·443(UDP)과 SSH 22(내 IP만). 서버 안의 ufw는 Docker가 연 포트를 막지 못하므로(Docker가 iptables 규칙을 직접 넣는다) 방화벽 그룹이 기준이다. Vultr는 바깥으로 나가는 25만 막고 587(Gmail SMTP)은 막지 않는다.
 - **도메인**: 1년 단위로 하나 산다. HTTPS가 있어야 PWA 설치가 된다. 2026-11-22 조회: `camgong.com`·`camgong.co.kr`은 이미 남이 등록했고, `camgong.kr`·`camgong.app`은 비어 있다. 관제탑 추천은 Cloudflare에서 `camgong.app`(첫해 약 $8.20, 갱신 약 $14.20, 가격은 비공식 집계 기준이라 결제 화면에서 확인). Cloudflare Registrar는 Cloudflare DNS를 써야 한다. Caddy가 인증서를 받게 레코드는 프록시 끔(DNS only)으로 둔다. `.kr`은 카페24·가비아에서 첫해 약 1.5만원·갱신 약 2.2~2.4만원이고, 국내 주소가 필요하며 whois에 이름·주소가 공개된다(비공개 서비스 필요). **결정(2026-11-23): 가비아에서 `camgong.app` 구매.** `.env`의 `DOMAIN=camgong.app`. 유료 SSL 인증서는 사지 않는다(Caddy가 Let's Encrypt로 받는다). 서버 IP가 나오면 가비아 DNS에 `camgong.app` A 레코드를 그 IP로 넣고 80·443을 연다. 자동 갱신과 whois 정보 비공개는 사용자가 가비아에서 확인한다(확인 못 함).
 - **백업**: DB가 서버 한 대에만 있으므로 백업 없이 열지 않는다. 매일 `mysqldump`를 서버 밖(예: 객체 저장소)에 보관하거나 서버 자동 스냅샷을 켠다. 복구를 한 번 해 본다. **어느 쪽이든 7일이 지나면 지워지게 한다**(동의문 "백업과 인증 메일 발송 기록에서는 7일 안에 지워집니다", 2026-11-19 사용자 "7일"). 서버 스냅샷과 서버 디스크 덤프(7.1-5)를 같이 쓰면 스냅샷 안에 최대 7일 된 덤프가 들어가 약 13일 남는다. 스냅샷을 켜면 덤프 디렉터리를 빼거나 둘 중 하나만 쓴다.
-- Gmail SMTP는 587 포트를 쓴다. Azure는 587을 막지 않는다(위 서버 항목).
+- Gmail SMTP는 587 포트를 쓴다. Vultr는 587을 막지 않는다(위 서버 항목).
 - 결정되면 `Dockerfile`·`compose.yaml`·`Caddyfile`은 작업 세션이 만들고 관제탑이 검수한다. 시크릿은 서버의 `.env`에만 둔다.
 
 ### 7.1 운영 절차 (`deploy/`, 2026-11-19 백엔드 세션 초안 반영)
