@@ -31,6 +31,7 @@ class ConditionalUpdateQuantityGate implements QuantityGate {
                 UPDATE group_buy SET
                     secured_quantity = secured_quantity + :delta,
                     status = IF(secured_quantity = total_quantity, 'COMPLETED', status),
+                    ended_at = IF(status = 'COMPLETED', :now, ended_at),
                     version = version + 1, updated_at = :now
                 WHERE id = :id AND status = 'OPEN' AND deadline > :now
                     AND secured_quantity + :delta <= total_quantity""" + priceCondition)

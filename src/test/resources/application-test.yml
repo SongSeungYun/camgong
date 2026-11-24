@@ -16,3 +16,6 @@ camgong:
     retry-base-delay: 1ms
     cleanup:
       enabled: false
+  retention:
+    cleanup:
+      enabled: false      # 정리는 RetentionCleanupIT 가 직접 호출한다

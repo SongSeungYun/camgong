@@ -188,7 +188,8 @@ public class WithdrawService {
      * 이 회원이 연 모든 공구의 설명과 create_guard 를 지운다(결정 5). 설명은 자유 텍스트라 연락처·계좌가 들어갈 수 있고, 끝난 공구는 본인도
      * 고칠 수 없다. 익명화 트랜잭션 안에서 부른다(실패하면 탈퇴 전체가 되돌아가는지 테스트가 가로채는 지점이다).
      * 여기까지 왔으면 이 회원이 연 공구는 모두 종료 상태라 바꾸는 경로가 없다. 수정·취소·참여·마감·체크가 그 행을 잠글 수는 있지만,
-     * 잠근 뒤 회원 행을 기다리지 않으므로 잠깐 기다릴 뿐 교착하지 않는다. 잠금 순서는 member → group_buy 다.
+     * 잠근 뒤 회원 행을 기다리지 않으므로 잠깐 기다릴 뿐 교착하지 않는다. 잠금 순서는 member → group_buy 다. 012 보관 정리는 끝난 공구를
+     * 지우지만 같은 순서(개설자 회원 S → 공구 X)로 잡아, 이 UPDATE 와 교착하지 않는다.
      */
     void clearOwnContent(long memberId) {
         jdbc.sql(CLEAR_DESCRIPTIONS).param("id", memberId).update();

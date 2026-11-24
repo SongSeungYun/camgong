@@ -138,7 +138,8 @@ public class ParticipationCheckService {
                 .param("groupBuyId", groupBuyId).param("memberId", memberId)
                 .query((rs, i) -> new CheckQueryRepository.Raw(rs.getLong(1), rs.getString(2), rs.getInt(3),
                         instant(rs.getObject(4, LocalDateTime.class)), instant(rs.getObject(5, LocalDateTime.class))))
-                .single();
+                // 012 보관 정리가 그 사이 공구를 지웠다: 앞의 확인은 스냅샷이라 통과했고 UPDATE 는 정리 커밋을 기다린 뒤 0행이었다. 없는 공구다.
+                .optional().orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Not Found", "공구를 찾을 수 없습니다."));
     }
 
     private static Instant instant(LocalDateTime t) {

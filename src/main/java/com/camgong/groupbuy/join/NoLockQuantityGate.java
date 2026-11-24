@@ -50,7 +50,7 @@ class NoLockQuantityGate implements QuantityGate {
         int secured = r.secured() + delta;
         boolean completed = secured == r.total();
         jdbc.sql("UPDATE group_buy SET secured_quantity = :secured, status = :status, version = version + 1, "
-                + "updated_at = :now WHERE id = :id")
+                + "updated_at = :now, ended_at = IF(:status = 'COMPLETED', :now, NULL) WHERE id = :id")
                 .param("secured", secured).param("status", completed ? "COMPLETED" : "OPEN")
                 .param("now", LocalDateTime.ofInstant(now, ZoneOffset.UTC)).param("id", groupBuyId).update();
         return GateResult.reserved(secured, r.total(), r.price(), completed);

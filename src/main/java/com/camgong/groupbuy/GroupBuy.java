@@ -73,6 +73,10 @@ public class GroupBuy {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    /** 끝난 시각(012): COMPLETED·FAILED·CANCELLED 로 바뀐 순간. 보관 기간(1년)을 여기서 센다. 끝나지 않았으면 null. */
+    @Column(name = "ended_at")
+    private Instant endedAt;
+
     /** 개설자의 학교(009). 개설 때 복사하고 바뀌지 않는다. */
     private String school;
 
@@ -111,9 +115,10 @@ public class GroupBuy {
      *
      * @return 이번 호출로 COMPLETED 가 되었으면 true
      */
-    public boolean completeIfFull() {
+    public boolean completeIfFull(Instant now) {
         if (status == GroupBuyStatus.OPEN && securedQuantity == totalQuantity) {
             status = GroupBuyStatus.COMPLETED;
+            endedAt = now;
             return true;
         }
         return false;
@@ -138,6 +143,7 @@ public class GroupBuy {
         }
         status = GroupBuyStatus.FAILED;
         updatedAt = now;
+        endedAt = now;
     }
 
     /** OPEN 에서만 CANCELLED 로 간다. 행은 지우지 않는다. */
@@ -147,6 +153,7 @@ public class GroupBuy {
         }
         status = GroupBuyStatus.CANCELLED;
         updatedAt = now;
+        endedAt = now;
     }
 
     /** 개설자·생성 시각·상태는 바꾸지 않는다. 호출자가 락 안에서 검증한 값만 넘긴다. */

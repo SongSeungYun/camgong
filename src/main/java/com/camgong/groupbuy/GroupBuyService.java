@@ -115,7 +115,7 @@ public class GroupBuyService {
         g.update(r.title(), r.description(), r.itemName(), r.unitPrice(), r.totalQuantity(), newSecured,
                 newDeadline, r.category(), r.itemUrl(), r.openChatUrl(), now);
         organizerRow.changeQuantity(newOrganizerQuantity);
-        boolean completed = g.completeIfFull();
+        boolean completed = g.completeIfFull(now);
 
         List<Long> everyone = participations.findLockedByGroupBuyId(id).stream().map(Participation::getMemberId).toList();
         List<Long> others = everyone.stream().filter(m -> !m.equals(g.getOrganizerId())).toList();
