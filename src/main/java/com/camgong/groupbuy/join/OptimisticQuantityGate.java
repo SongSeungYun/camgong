@@ -37,7 +37,7 @@ class OptimisticQuantityGate implements QuantityGate {
             return GateResult.insufficient(g.getSecuredQuantity(), g.getTotalQuantity());
         }
         g.reserve(delta, now);
-        boolean completed = g.completeIfFull();
+        boolean completed = g.completeIfFull(now);
         groupBuys.saveAndFlush(g);          // 여기서 version 충돌이 드러난다(ObjectOptimisticLockingFailureException)
         return GateResult.reserved(g.getSecuredQuantity(), g.getTotalQuantity(), g.getUnitPrice(), completed);
     }

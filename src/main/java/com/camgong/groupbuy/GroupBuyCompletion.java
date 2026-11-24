@@ -11,7 +11,7 @@ import com.camgong.groupbuy.GroupBuyEvents.GroupBuyCompleted;
 /**
  * 모집 완료 이벤트 발행을 한곳에 모은다. 001 수정과 004 참여·수량 변경이 같은 방식으로 낸다:
  * 개설자를 포함한 모든 참여 행의 회원에게, 호출자의 트랜잭션이 커밋된 뒤에만 전달된다.
- * 완료 판정은 {@link GroupBuy#completeIfFull()} 한 곳에서 한다.
+ * 완료 판정은 {@link GroupBuy#completeIfFull(java.time.Instant)} 한 곳에서 한다.
  */
 @Component
 public class GroupBuyCompletion {

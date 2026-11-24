@@ -44,7 +44,7 @@ class PessimisticQuantityGate implements QuantityGate {
             return GateResult.insufficient(g.getSecuredQuantity(), g.getTotalQuantity());
         }
         g.reserve(delta, now);
-        boolean completed = g.completeIfFull();
+        boolean completed = g.completeIfFull(now);
         return GateResult.reserved(g.getSecuredQuantity(), g.getTotalQuantity(), g.getUnitPrice(), completed);
     }
 
