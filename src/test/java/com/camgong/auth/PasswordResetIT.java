@@ -152,6 +152,22 @@ class PasswordResetIT extends IntegrationTestBase {
                 .as("재설정 요청은 로그인 실패로 세지 않는다").isZero();
     }
 
+    /** FR-009: 로그인이 잠긴 회원도 요청할 수 있고, 요청은 잠금 기록을 건드리지 않는다(관제탑 검수 T016). */
+    @Test
+    void aLockedMemberCanStillRequestAndTheLockIsUntouched() throws Exception {
+        seedLoginMember(10, MEMBER, "회원", "password1");
+        LocalDateTime until = at(Duration.ofMinutes(15));
+        jdbc.update("INSERT INTO login_attempt (email_key, failed_count, locked_until, updated_at) VALUES (?, 5, ?, ?)",
+                MEMBER, until, at(Duration.ZERO));
+
+        request(MEMBER).andExpect(status().isAccepted());
+
+        assertThat(resetMails()).hasSize(1);
+        assertThat(jdbc.queryForMap("SELECT failed_count, locked_until, updated_at FROM login_attempt WHERE email_key = ?",
+                MEMBER)).containsEntry("failed_count", 5).containsEntry("locked_until", until)
+                .containsEntry("updated_at", at(Duration.ZERO));
+    }
+
     // ---- T005 ----
 
     @Test
@@ -219,15 +235,38 @@ class PasswordResetIT extends IntegrationTestBase {
         confirm(token, "new-password1").andExpect(status().isBadRequest()).andExpect(jsonPath("$.title").value("INVALID_TOKEN"));
     }
 
+    /**
+     * 같은 링크 두 건이 둘 다 사전 검사를 통과한 뒤 회원 잠금에서 겹치게 한다(관제탑 검수 T017). 그냥 동시에 보내면 대부분 하나가 먼저 끝나
+     * 사전 검사에서 409 가 나와, 트랜잭션 안의 토큰 재확인을 빼도 통과한다.
+     */
     @Test
-    void theSameLinkSubmittedTwiceAtOnceSucceedsOnce() throws Exception {
+    void theSameLinkSubmittedTwiceWhileBothWaitOnTheMemberSucceedsOnce() throws Exception {
         seedLoginMember(10, MEMBER, "회원", "password1");
-        for (int i = 0; i < 10; i++) {
-            clock.advance(Duration.ofDays(1));
-            String token = requestToken();
-            List<Integer> statuses = race(() -> confirm(token, "new-password1").andReturn().getResponse().getStatus(),
-                    () -> confirm(token, "new-password2").andReturn().getResponse().getStatus());
-            assertThat(statuses).containsExactlyInAnyOrder(204, 409);
+        String token = requestToken();
+        var tx = new org.springframework.transaction.support.TransactionTemplate(txManager);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(3);
+        try {
+            Future<?> holder = pool.submit(() -> tx.executeWithoutResult(s -> {
+                jdbc.queryForObject("SELECT id FROM member WHERE id = 10 FOR UPDATE", Long.class);
+                locked.countDown();
+                try {
+                    go.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            locked.await();
+            Future<Integer> first = pool.submit(() -> confirm(token, "new-password1").andReturn().getResponse().getStatus());
+            Future<Integer> second = pool.submit(() -> confirm(token, "new-password2").andReturn().getResponse().getStatus());
+            awaitLockWaits(2, 5000);
+            go.countDown();
+            holder.get();
+            assertThat(List.of(first.get(), second.get())).containsExactlyInAnyOrder(204, 409);
+        } finally {
+            go.countDown();
+            pool.shutdownNow();
         }
     }
 
@@ -251,6 +290,48 @@ class PasswordResetIT extends IntegrationTestBase {
         String fresh = login(MEMBER, "new-password1").andExpect(status().isOk()).andReturn().getResponse()
                 .getCookie("camgong_session").getValue();
         mockMvc.perform(get("/api/auth/me").cookie(new Cookie("camgong_session", fresh))).andExpect(status().isOk());
+    }
+
+    /**
+     * 관제탑 검수 T015: 커밋 뒤 세션 삭제가 잠금을 기다리는 사이 새 비밀번호로 로그인하면, 그 세션은 삭제에 휩쓸리지 않는다.
+     * 다른 트랜잭션이 옛 세션 행을 잡아 삭제를 세워 두고, 그 사이 로그인한다(새 세션은 색인에서 옛 세션 뒤라 아직 잠기지 않았다).
+     */
+    @Test
+    void aSessionMadeWithTheNewPasswordSurvivesTheDeleteAfterCommit() throws Exception {
+        seedLoginMember(10, MEMBER, "회원", "password1");
+        mockMvc.perform(get("/api/auth/me").with(as(10))).andExpect(status().isOk());
+        String token = requestToken();
+        long oldSession = jdbc.queryForObject("SELECT id FROM login_session WHERE member_id = 10", Long.class);
+        var tx = new org.springframework.transaction.support.TransactionTemplate(txManager);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> holder = pool.submit(() -> tx.executeWithoutResult(s -> {
+                jdbc.update("UPDATE login_session SET last_used_at = last_used_at WHERE id = ?", oldSession);   // PK: 그 행만
+                locked.countDown();
+                try {
+                    go.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            locked.await();
+            Future<Integer> confirmed = pool.submit(() -> confirm(token, "new-password1").andReturn().getResponse().getStatus());
+            awaitLockWait(5000);                                  // 커밋은 끝났고 세션 삭제가 옛 세션 행에서 막혔다
+            clock.advance(Duration.ofSeconds(1));
+            String fresh = login(MEMBER, "new-password1").andExpect(status().isOk()).andReturn().getResponse()
+                    .getCookie("camgong_session").getValue();
+            go.countDown();
+            holder.get();
+            assertThat(confirmed.get()).isEqualTo(204);
+            mockMvc.perform(get("/api/auth/me").cookie(new Cookie("camgong_session", fresh))).andExpect(status().isOk());
+            mockMvc.perform(get("/api/auth/me").cookie(new Cookie("camgong_session", "test-session-10")))
+                    .andExpect(status().isUnauthorized());
+        } finally {
+            go.countDown();
+            pool.shutdownNow();
+        }
     }
 
     /**
@@ -442,26 +523,47 @@ class PasswordResetIT extends IntegrationTestBase {
 
     // ---- T008 ----
 
+    /** 마지막 요청부터 1일(결정 7): 그때는 창·1분 간격·토큰 1시간이 모두 지나 없는 줄과 같다. 토큰 상태와 상관없이 그 전에는 남긴다. */
     @Test
-    void cleanupRemovesDayOldRecordsWithoutALiveToken() {
-        Duration old = Duration.ofHours(24).plusSeconds(1);
-        row("no-token@school.ac.kr", old, null, null);
-        row("expired@school.ac.kr", old, Duration.ofSeconds(-1), null);
-        row("used@school.ac.kr", old, Duration.ofMinutes(30), Duration.ofMinutes(-1));
-        row("live@school.ac.kr", old, Duration.ofMinutes(30), null);
-        row("recent@school.ac.kr", Duration.ofHours(23), null, null);
+    void cleanupRemovesRecordsWhoseLastRequestIsADayOld() {
+        Duration day = Duration.ofHours(24).plusSeconds(1);
+        Duration windowOld = Duration.ofHours(25);
+        row("old-no-token@school.ac.kr", windowOld, day, null, null);
+        row("old-used@school.ac.kr", windowOld, day, Duration.ofHours(-23), Duration.ofHours(-24));
+        row("no-token@school.ac.kr", windowOld, Duration.ofSeconds(30), null, null);
+        row("used@school.ac.kr", windowOld, Duration.ofSeconds(30), Duration.ofMinutes(59), Duration.ofSeconds(-10));
+        row("live@school.ac.kr", windowOld, Duration.ofSeconds(30), Duration.ofMinutes(59), null);
 
         cleanup.run();
 
         assertThat(jdbc.queryForList("SELECT email_key FROM password_reset ORDER BY email_key", String.class))
-                .containsExactly("live@school.ac.kr", "recent@school.ac.kr");
+                .containsExactly("live@school.ac.kr", "no-token@school.ac.kr", "used@school.ac.kr");
     }
 
-    private void row(String key, Duration windowAgo, Duration expiresIn, Duration usedIn) {
+    /** 관제탑 검수 T014: 창이 막 지난 직후의 정리가 비회원 줄만 지우면 다음 요청이 비회원 202·회원 429 로 갈려 가입이 드러난다. */
+    @Test
+    void cleanupRightAfterTheWindowEndsKeepsMemberAndNonMemberAlike() throws Exception {
+        seedLoginMember(10, MEMBER, "회원", "password1");
+        request(MEMBER).andExpect(status().isAccepted());
+        request(NOBODY).andExpect(status().isAccepted());
+        clock.advance(Duration.ofHours(24).minusSeconds(30));
+        request(MEMBER).andExpect(status().isAccepted());
+        request(NOBODY).andExpect(status().isAccepted());
+        clock.advance(Duration.ofSeconds(40));
+
+        cleanup.run();
+
+        clock.advance(Duration.ofSeconds(10));
+        request(MEMBER).andExpect(status().isTooManyRequests());
+        request(NOBODY).andExpect(status().isTooManyRequests());
+        assertThat(resetMails()).hasSize(2);
+    }
+
+    private void row(String key, Duration windowAgo, Duration lastSentAgo, Duration expiresIn, Duration usedIn) {
         jdbc.update("INSERT INTO password_reset (email_key, member_id, token_hash, token_expires_at, used_at, last_sent_at, "
-                + "window_started_at, sent_count, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?, 1, ?)",
+                + "window_started_at, sent_count, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?, 2, ?)",
                 key, expiresIn == null ? null : Tokens.sha256Hex(key), expiresIn == null ? null : at(expiresIn),
-                usedIn == null ? null : at(usedIn), at(windowAgo.negated()), at(windowAgo.negated()),
+                usedIn == null ? null : at(usedIn), at(lastSentAgo.negated()), at(windowAgo.negated()),
                 at(windowAgo.negated()));
     }
 

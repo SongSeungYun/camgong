@@ -64,10 +64,10 @@ class SessionCleanup {
                 + "OR used_at < :usedCut")
                 .param("expiredCut", at(now.minus(Duration.ofDays(7)))).param("usedCut", at(now.minus(Duration.ofDays(1))))
                 .update();
-        // 011 결정 7: 24시간 창이 지났고 쓸 수 있는 토큰이 없는 재설정 요청 기록. 한도 판정은 창이 지나면 어차피 새로 시작한다.
-        int resets = jdbc.sql("DELETE FROM password_reset WHERE window_started_at < :cut "
-                + "AND (token_hash IS NULL OR used_at IS NOT NULL OR token_expires_at <= :now)")
-                .param("cut", at(now.minus(Duration.ofDays(1)))).param("now", at(now)).update();
+        // 011 결정 7: 마지막 요청부터 1일 지난 재설정 요청 기록. 그때는 24시간 창·1분 간격·토큰 1시간이 모두 지나 줄이 없는 것과 같다.
+        // 토큰 상태로 고르면 안 된다: 창이 막 지난 직후 비회원 줄(토큰 없음)만 지우면 다음 요청이 비회원 202·회원 429 로 갈린다.
+        int resets = jdbc.sql("DELETE FROM password_reset WHERE last_sent_at < :cut")
+                .param("cut", at(now.minus(Duration.ofDays(1)))).update();
         log.info("cleanup: sessions={} attempts={} pending={} resets={}", sessions, attempts, pending, resets);
     }
 

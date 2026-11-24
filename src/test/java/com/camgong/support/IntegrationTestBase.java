@@ -138,11 +138,17 @@ public abstract class IntegrationTestBase {
      * 다른 대기가 동시에 있으면 잘못 통과할 수 있으니 호출하는 테스트는 락 대기가 하나뿐인 상황에서만 쓴다. 못 찾으면 테스트를 실패시킨다.
      */
     protected void awaitLockWait(long timeoutMillis) throws InterruptedException {
+        awaitLockWaits(1, timeoutMillis);
+    }
+
+    /** 대기 중인 잠금 요청이 n 개 이상 보일 때까지 기다린다(두 요청이 모두 막혔는지 볼 때). */
+    protected void awaitLockWaits(int n, long timeoutMillis) throws InterruptedException {
         var root = rootJdbc();
         long deadline = System.currentTimeMillis() + timeoutMillis;
         while (System.currentTimeMillis() < deadline) {
-            Long waits = root.queryForObject("SELECT COUNT(*) FROM performance_schema.data_lock_waits", Long.class);
-            if (waits != null && waits > 0) {
+            Long waits = root.queryForObject("SELECT COUNT(DISTINCT REQUESTING_ENGINE_TRANSACTION_ID) "
+                    + "FROM performance_schema.data_lock_waits", Long.class);
+            if (waits != null && waits >= n) {
                 return;
             }
             Thread.sleep(20);

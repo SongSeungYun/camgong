@@ -162,7 +162,7 @@ public class PasswordResetService {
         String passwordHash = encoder.encode(r.password());
         long memberId = reset.memberId();
 
-        tx.executeWithoutResult(s -> {
+        LocalDateTime changedAt = tx.execute(s -> {
             boolean active = jdbc.sql("SELECT withdrawn_at IS NULL FROM member WHERE id = :id FOR UPDATE")
                     .param("id", memberId).query(Boolean.class).optional().orElse(false);
             if (!active) {
@@ -183,12 +183,15 @@ public class PasswordResetService {
             jdbc.sql("UPDATE password_reset SET used_at = :at WHERE email_key = :key")
                     .param("at", at).param("key", reset.emailKey()).update();
             jdbc.sql("DELETE FROM login_attempt WHERE email_key = :key").param("key", reset.emailKey()).update();
+            return at;
         });
         log.info("password-reset memberId={}", memberId);
         // 세션은 커밋 뒤에 지운다(트랜잭션 안에서 지우면 로그인의 세션 INSERT 와 교착할 수 있다, 010 결정 5). 놓친 세션은 세션 조회가
-        // password_changed_at 보다 먼저 만든 세션이라 받지 않는다.
+        // password_changed_at 보다 먼저 만든 세션이라 받지 않는다. 변경 시각 뒤의 세션은 남긴다: 이 삭제가 잠금을 기다리는 사이 새 비밀번호로
+        // 로그인했을 수 있다. 같은 시각은 지운다(시각이 같으면 어느 쪽이 먼저인지 모른다, 잘못 지워도 다시 로그인하면 된다).
         try {
-            jdbc.sql("DELETE FROM login_session WHERE member_id = :id").param("id", memberId).update();
+            jdbc.sql("DELETE FROM login_session WHERE member_id = :id AND created_at <= :at")
+                    .param("id", memberId).param("at", changedAt).update();
         } catch (RuntimeException e) {
             log.warn("password-reset-session-cleanup-failed memberId={} reason={}", memberId, e.getClass().getSimpleName());
         }
