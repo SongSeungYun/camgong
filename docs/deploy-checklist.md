@@ -93,7 +93,10 @@
 
 - **서버 한 대 + Docker Compose**: MySQL 8.4, 백엔드 jar, Caddy 세 개를 한 서버에 둔다. Caddy가 HTTPS 인증서를 자동으로 받고, 프론트 정적 파일을 서빙하며 `/api`를 백엔드로 넘긴다. 같은 출처라 쿠키·Origin 문제가 없다. SPA 폴백도 Caddy `try_files` 한 줄이다.
 - **서버**: **결정(2026-11-24): Vultr 서울, Cloud Compute(Regular Performance) 1 vCPU·1GB·25GB SSD 월 $5, Ubuntu 26.04 LTS(2026-11-25 생성, 지원 2031-04까지).** 확인함: 위치 Seoul, `Ubuntu 26.04.1 LTS`, 루트 디스크 23G(6.1G 사용), 공인 IPv4가 `enp1s0`에 바로 붙음, Auto Backups Not Enabled, SSH 키 접속(방화벽 그룹 `camgong`). 처음 실수로 만든 Atlanta·26.10 서버는 지웠고, 월 청구 $5를 확인했다(2026-11-25 사용자). 메모리가 모자라면 같은 서버를 2GB(월 $10)로 올린다(Vultr는 올리기만 되고 내리기는 안 된다). Vultr 자동 백업은 쓰지 않는다(보관 위치·기간 확인 못 함, 백업은 아래 덤프로). 버린 후보: Azure for Students(2026-11-23 골랐으나 학교 메일 인증 뒤 "무료 계정 자격 없음"으로 거절, 새 Microsoft 계정도 같음, 원인 확인 못 함), AWS Lightsail 2GB 월 $12(기존 계정이라 새 계정 크레딧 대상 아님), Oracle 무료(2026년 춘천 A1 비활성·유휴 회수), 네이버 Micro(디스크 10GB, 공인 IP 별도).
-  - **1GB 메모리**: 로컬 MySQL 컨테이너가 기본 설정으로 531MB를 쓴다(2026-11-23). 1GB에 올리려면 JVM 힙 한도, MySQL `performance_schema` 끄기·버퍼 풀 축소, 스왑 2GB가 필요하다. 여는 조건: 컨테이너 메모리 한도 합 1GB에서 k6 부하를 버티는 측정(`docs/benchmarks/`). 백엔드 세션 작업, 011·012 다음.
+  - **1GB 메모리**: 로컬 MySQL 컨테이너가 기본 설정으로 531MB를 쓴다(2026-11-23). 013에서 한도를 정하고 로컬 측정을 통과했다(2026-11-25, 백엔드 PR #37 `9f25801`).
+    - 한도: mysql 288m(`deploy/mysql/camgong.cnf`), backend 460m(JVM 힙 224m 고정), web 128m. 합은 876m다.
+    - 서버에 스왑 2GB를 붙이고, 이미지는 서버 밖에서 빌드한다.
+    - 측정 기록은 `docs/benchmarks/one-gb-server.md`에 있다. 서버에서 할 확인은 7.1-4-1이다.
   - **포트**: Vultr 방화벽 그룹으로 연다. 인바운드는 80·443(TCP)·443(UDP)과 SSH 22(내 IP만). 서버 안의 ufw는 Docker가 연 포트를 막지 못하므로(Docker가 iptables 규칙을 직접 넣는다) 방화벽 그룹이 기준이다. Vultr는 바깥으로 나가는 25만 막고 587(Gmail SMTP)은 막지 않는다.
 - **도메인**: 1년 단위로 하나 산다. HTTPS가 있어야 PWA 설치가 된다. 2026-11-22 조회: `camgong.com`·`camgong.co.kr`은 이미 남이 등록했고, `camgong.kr`·`camgong.app`은 비어 있다. 관제탑 추천은 Cloudflare에서 `camgong.app`(첫해 약 $8.20, 갱신 약 $14.20, 가격은 비공식 집계 기준이라 결제 화면에서 확인). Cloudflare Registrar는 Cloudflare DNS를 써야 한다. Caddy가 인증서를 받게 레코드는 프록시 끔(DNS only)으로 둔다. `.kr`은 카페24·가비아에서 첫해 약 1.5만원·갱신 약 2.2~2.4만원이고, 국내 주소가 필요하며 whois에 이름·주소가 공개된다(비공개 서비스 필요). **결정(2026-11-23): 가비아에서 `camgong.app` 구매.** `.env`의 `DOMAIN=camgong.app`. 유료 SSL 인증서는 사지 않는다(Caddy가 Let's Encrypt로 받는다). 가비아 DNS 관리툴에 `camgong.app` A 레코드(호스트 `@`, TTL 600)를 Vultr 서버 IP로 넣었다(2026-11-25, 가비아 네임서버 3개와 1.1.1.1·8.8.8.8에서 조회 확인). AAAA·`www`는 없다. 가비아 부가서비스(포워딩·파킹·도메인 연결)는 .app이라 쓸 수 없고 쓰지 않는다. 자동 갱신과 whois 정보 비공개는 사용자가 가비아에서 확인한다(확인 못 함).
 - **백업**: DB가 서버 한 대에만 있으므로 백업 없이 열지 않는다. 매일 `mysqldump`를 서버 밖(예: 객체 저장소)에 보관하거나 서버 자동 스냅샷을 켠다. 복구를 한 번 해 본다. **어느 쪽이든 7일이 지나면 지워지게 한다**(동의문 "백업과 인증 메일 발송 기록에서는 7일 안에 지워집니다", 2026-11-19 사용자 "7일"). 서버 스냅샷과 서버 디스크 덤프(7.1-5)를 같이 쓰면 스냅샷 안에 최대 7일 된 덤프가 들어가 약 13일 남는다. 스냅샷을 켜면 덤프 디렉터리를 빼거나 둘 중 하나만 쓴다.
@@ -102,10 +105,40 @@
 
 ### 7.1 운영 절차 (`deploy/`, 2026-11-19 백엔드 세션 초안 반영)
 
-1. 서버: Docker 설치, 방화벽은 22·80·443만 연다. DNS A 레코드를 서버 IP로 먼저 잡는다(Caddy 인증서 발급 전에).
-2. `git clone` → `cd deploy && cp .env.example .env` → 값 채우기 → `chmod 600 .env`. `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`·`RESET_LINK_BASE_URL`은 compose가 `DOMAIN`으로 만든다.
-3. `docker compose up -d --build`. `docker compose logs backend`에서 Flyway 적용과 `Started`를 본 뒤 아래 §6 순서로 확인한다.
-4. 업데이트: `git pull && docker compose up -d --build`. 2GB 서버에서 백엔드·프론트 빌드를 같이 돌리면 메모리가 빠듯할 수 있다. swap을 켜거나 이미지를 서버 밖에서 빌드한다(확인 못 함).
+1. 서버 준비(처음 한 번, 사용자가 SSH로 한다). 방화벽 그룹과 DNS A 레코드는 이미 됐다(7). 아래 명령은 서버에서 돌려 보지 않았다(확인 못 함).
+   - 스왑 2GB(013 plan 결정 3):
+     - 먼저 `swapon --show`로 이미 있는지 본다.
+     - 없으면 `sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab`.
+     - 그다음 `echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-camgong.conf && sudo sysctl --system`.
+     - `free -m`의 Swap이 약 2047인지 본다. Docker를 띄우기 전의 `free -m` used 값도 적어 둔다(OS 몫).
+   - Docker: 공식 문서(docs.docker.com/engine/install/ubuntu)의 apt 저장소 방식으로 `docker-ce`·`docker-compose-plugin`을 설치한다. 26.04용 저장소(`resolute`)가 있다(2026-11-25 download.docker.com에서 확인). 설치 뒤 `docker compose version`을 본다.
+   - 작업 계정: root 대신 쓴다.
+     - `adduser deploy && usermod -aG sudo,docker deploy` → `rsync --archive --chown=deploy:deploy ~/.ssh /home/deploy`.
+     - **root 창을 닫지 말고** 새 터미널에서 `ssh deploy@<서버>` → `sudo true`가 되는지 본다.
+     - 된 뒤에 `/etc/ssh/sshd_config.d/99-camgong.conf`에 `PermitRootLogin no`와 `PasswordAuthentication no`를 적고 `sudo systemctl reload ssh`.
+     - `docker` 그룹은 root와 같은 권한이다.
+     - 집 IP가 바뀌면 SSH가 막힌다. Vultr 방화벽 그룹의 22 규칙을 고치거나, Vultr 웹 콘솔로 들어간다.
+2. `sudo mkdir -p /srv/camgong && sudo chown deploy: /srv/camgong && git clone https://github.com/SongSeungYun/camgong /srv/camgong/repo` → `cd /srv/camgong/repo/deploy && cp .env.example .env` → 값 채우기 → `chmod 600 .env`. `ALLOWED_ORIGINS`·`VERIFY_LINK_BASE_URL`·`RESET_LINK_BASE_URL`은 compose가 `DOMAIN`으로 만든다. 장부 디렉터리는 6번에 적힌 대로 같이 만든다.
+3. 이미지는 서버에서 빌드하지 않는다(013 plan 결정 4, 1GB에서 Gradle·Vite 빌드는 메모리가 모자란다).
+   - 맥(백엔드 세션이 할 수 있다)에서 빌드하고 묶는다: `cd deploy && DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build && docker save camgong/backend:latest camgong/web:latest | gzip > camgong-images.tar.gz`.
+     - compose가 `.env`와 필수 값을 읽으므로 맥에는 가짜 값의 임시 `deploy/.env`를 두고, 끝나면 지운다.
+     - web 빌드는 처리방침 자리표시 4개가 남아 있으면 일부러 멈춘다.
+   - 옮기기: `scp camgong-images.tar.gz deploy@<서버>:/srv/camgong/`.
+   - 서버에서 띄우기: `docker load -i /srv/camgong/camgong-images.tar.gz` → `docker image inspect -f '{{.Architecture}}' camgong/backend:latest`가 `amd64`인지 본다 → `cd /srv/camgong/repo/deploy && docker compose up -d --no-build`.
+   - `docker compose logs backend`에서 Flyway 적용과 `Started`를 본 뒤 아래 §6 순서로 확인한다.
+   - backend·web은 `pull_policy: never`다. `camgong/*` 이름은 Docker Hub의 남의 계정으로도 풀리기 때문이다. load를 빠뜨리면 `No such image`로 멈추는 게 정상이다. `docker compose pull`은 `mysql:8.4`만 받는다.
+4. 업데이트:
+   - compose·Caddyfile·cnf가 바뀌었으면 서버에서 `git pull`.
+   - 맥에서 3번대로 빌드해 옮긴 뒤, 서버에서 `docker load -i …` → `docker compose up -d --no-build`. 백엔드가 다시 뜨는 몇 초 동안은 요청이 실패한다.
+   - 태그가 빠진 옛 이미지는 가끔 `docker image prune`으로 지운다(태그 없는 것만 지운다).
+4-1. 메모리 확인(013): 배포 직후, 며칠 뒤, 백업(5) 도중에 본다. `deploy/`에서 돌린다.
+   - `free -m`, `swapon --show`, `docker stats --no-stream`
+   - `docker inspect -f '{{.Name}} oom={{.State.OOMKilled}} restarts={{.RestartCount}}' $(docker compose ps -q)`
+   - `for s in mysql backend web; do echo "== $s"; docker compose exec -T $s sh -c 'cat /sys/fs/cgroup/memory.peak /sys/fs/cgroup/memory.swap.current; grep oom_kill /sys/fs/cgroup/memory.events'; done`
+     - mysql·caddy 이미지에서 같은 명령이 되는 것은 로컬에서 확인했다.
+   - 통과: `oom=false`, `restarts=0`, `oom_kill 0`.
+   - `free`의 Swap used와 컨테이너 `memory.swap.current`가 배포 직후보다 며칠 뒤에 계속 늘어 있으면, 2GB(월 $10) 전환을 사용자에게 묻는다(013 plan 결정 6).
+   - backend `memory.peak`가 한도(460m)에 닿는 건 측정에서도 그랬다(페이지 캐시를 비우며 돈다). 볼 것은 스왑이다.
 5. 백업: crontab에 `0 4 * * * /경로/deploy/backup.sh`. 7일이 지난 덤프는 스크립트가 지운다(010 T017). **덤프가 실패한 날은 지우지 않는다**(남은 백업을 지키려고). 실패가 이어지면 7일을 넘겨 남는다. 그래서 healthchecks.io(무료)로 알아챈다(2026-11-22 사용자 선택, 010 plan 결정 5-3): 서비스 Gmail로 가입 → 주기 1일·유예 1시간 확인을 하나 만든다 → 그 주소를 `.env`의 `HC_PING_URL`에 넣는다. 스크립트가 성공하면 호출하고 실패하면 `/fail`을 호출한다. 호출이 끊기면(cron이 안 돎, 서버가 죽음) 메일이 온다(010 T036). 서버 밖 보관은 아직 TODO이고, 두게 되면 같은 7일 수명 규칙을 건다. **서버 밖 보관 전에는 서버가 사라지면 백업도 사라진다.** MySQL binlog는 compose에서 끈다(탈퇴 전 값이 30일 남기 때문, 010 plan 결정 5-1). binlog를 켠 채 돌던 볼륨이면 이미 남은 `binlog.*`는 끈 뒤에도 지워지지 않는다. 끄기 전에 `RESET BINARY LOGS AND GTIDS`를 한 번 실행한다. 새 볼륨으로 시작하면 필요 없다.
 6. 복구: 백엔드 중지(`docker compose stop backend`) → `gunzip -c <파일> | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot camgong'` → 백엔드 시작 → 로그에서 `reanonymized=N` 확인 → 5분 뒤 `retention-cleanup groupBuys=N members=M` 확인(012: 덤프에 남아 있던, 끝난 지 1년 지난 공구가 다시 지워진다). 장부 준비(처음 한 번, 2단계와 같이): `.env`의 `WITHDRAW_LEDGER_DIR`에 호스트 절대 경로(예: `/srv/camgong/ledger`)를 넣고 `mkdir -p /srv/camgong/ledger && sudo chown 10001 /srv/camgong/ledger`(백엔드는 uid 10001로 돈다). 비어 있거나 쓸 수 없으면 백엔드가 뜨지 않는다. **복구하면 백업 시점 뒤의 탈퇴가 되살아난다.** 앱이 탈퇴 장부(컨테이너 밖 `WITHDRAW_LEDGER` 파일, 8일 보관)를 기동 때 읽어 그 회원들을 다시 익명화한다(2026-11-22 사용자 선택 "장부 파일 + 자동 재적용", 010 plan 결정 5-2, T032~T037). WARN에 OPEN 공구 id가 나오면 그 공구를 확인한다(되살아난 상태에서 탈퇴자가 개설자·참여자인 공구). 장부도 서버 디스크에 있어서 서버째 잃으면 같이 사라진다. 서버 밖 백업을 둘 때 장부도 함께 옮길 방법을 정한다. 장부가 생긴 뒤에는 docker 로그 회전을 건다(가린 수신 주소가 기한 없이 남는 문제도 같이 풀린다, T035).
 6-1. Gmail 보낸편지함(서비스 계정): SMTP로 보낸 인증·재설정 메일이 자동 저장되고, 반송 메일은 받은편지함에 쌓인다. 서비스 계정의 Apps Script가 매일 6일 지난 보낸 메일·반송 메일을 휴지통을 거치지 않고 지운다. 설정 순서와 코드는 `docs/gmail-cleanup.md`. 돌려 보지는 않았다(확인 못 함).
@@ -113,7 +146,7 @@
 7. `docker compose down -v`는 쓰지 않는다. 볼륨(`mysql-data`, `caddy-data`)이 지워진다.
 8. `DB_USER`/`DB_PASSWORD`/`MYSQL_ROOT_PASSWORD`는 볼륨을 처음 만들 때만 쓰인다. 나중에 `.env`를 바꿔도 DB 계정은 바뀌지 않는다.
 
-로컬 확인(백엔드 세션, `DOMAIN=localhost`): 목록 200, 깊은 경로 index.html, 없는 자산 404, http→https 308, 다른 Origin 403, 백업 파일 복구까지 됐다. 메모리는 백엔드 약 480MiB, MySQL 약 485MiB, Caddy 15MiB(16GB 맥 기준, 실서버 확인 못 함). 실제 SMTP 발송은 확인 못 함.
+로컬 확인(백엔드 세션, `DOMAIN=localhost`): 목록 200, 깊은 경로 index.html, 없는 자산 404, http→https 308, 다른 Origin 403, 백업 파일 복구까지 됐다. 메모리는 백엔드 약 480MiB, MySQL 약 485MiB, Caddy 15MiB(16GB 맥 기준, 013 한도 전, 실서버 확인 못 함). 한도를 건 측정은 `docs/benchmarks/one-gb-server.md`. 실제 SMTP 발송은 확인 못 함.
 
 ## 8. README 문구 초안 (사용자가 넣는다)
 
@@ -131,3 +164,4 @@ README 상단의 "상태: 설계 단계. 코드는 아직 없고" 문구도 지�
 - 메일 업체별 SMTP 세부 설정(STARTTLS, 발신 주소 정책).
 - 프록시 뒤 실제 배포에서의 Origin·쿠키 동작.
 - 운영 규모 성능(측정은 모두 로컬 한 기계).
+- 1GB 서버의 실제 메모리 여유(OS·dockerd 몫)와 1 vCPU에서의 속도. 7.1-4-1로 확인하고, 서버 k6 재측정 방법은 서버가 준비되면 정한다.
