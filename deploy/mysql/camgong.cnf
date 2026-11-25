@@ -1,5 +1,5 @@
 # 1GB 서버용 MySQL 설정(013 plan 결정 1). compose 가 /etc/mysql/conf.d/ 에 읽기 전용으로 붙인다.
-# 기본 설정의 컨테이너는 부하 중 530MiB 까지 썼다(대부분 performance_schema). 값을 바꾸면 같은 k6 측정을 다시 한다.
+# performance_schema 등을 끄기 전 기본 설정의 컨테이너는 부하 중 530MiB 까지 썼다. 값을 바꾸면 같은 k6 측정을 다시 한다.
 [mysqld]
 # 앱은 쓰지 않는다(테스트 도우미만 쓰고, 테스트 컨테이너는 이 파일을 쓰지 않는다).
 performance_schema = OFF
@@ -12,5 +12,8 @@ innodb_log_buffer_size = 8M
 max_connections = 40
 tmp_table_size = 16M
 max_heap_table_size = 16M
+# 내부 임시 테이블(TempTable)이 쓰는 메모리 상한. 8.4 기본은 1GiB 라 컨테이너 한도보다 크다. 넘치는 몫은 InnoDB 디스크 임시 테이블로 간다
+# (temptable_max_mmap 기본 0).
+temptable_max_ram = 64M
 table_open_cache = 400
 table_definition_cache = 400

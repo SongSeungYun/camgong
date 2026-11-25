@@ -11,7 +11,7 @@ services:
     # binlog 를 끈다(010 결정 5-1). 8.4 는 기본으로 켜져 탈퇴 UPDATE 전의 값을 30일 남긴다. 복제·시점 복구는 쓰지 않는다.
     # 이미 binlog 를 켠 채 돌던 볼륨이면 남은 binlog.* 파일은 끈 뒤 자동으로 지워지지 않는다. 끄기 전에 한 번 RESET BINARY LOGS AND GTIDS 를 실행한다.
     command: ["--disable-log-bin"]
-    # 측정(013): performance_schema 를 끄고 최대 216MiB. 기본 설정이면 530MiB.
+    # 측정(013, mysql/camgong.cnf 적용): docker stats 최대 224MiB, cgroup memory.peak 284MiB(페이지 캐시 포함). 기본 설정이면 docker stats 530MiB.
     mem_limit: 288m
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
@@ -35,8 +35,12 @@ services:
       context: ..
       dockerfile: deploy/backend.Dockerfile
     image: camgong/backend:latest
+    # 이 이름은 Docker Hub 의 docker.io/camgong/* 로도 풀린다(그 계정은 우리 것이 아니다). 절대 받아 오지 않는다: load 를 빠뜨리거나
+    # 태그가 틀리면 남의 이미지가 .env 비밀값을 받고 뜨는 대신 오류로 멈춘다. `docker compose pull` 도 이 둘은 건너뛴다.
+    pull_policy: never
     restart: unless-stopped
-    # 측정(013): 힙 224MiB 에 메타스페이스·심볼·코드 캐시 등을 더해 JVM 이 약 430MiB 를 커밋한다(NMT). 420m 이면 한도에 붙어 스왑했다.
+    # 측정(013): 힙 224MiB 에 메타스페이스·심볼·코드 캐시 등을 더해 JVM 이 약 430MiB 를 커밋한다(NMT), 익명 메모리 최대 416MiB.
+    # 420m 이면 한도에 붙어 스왑했다. 460m 에서도 페이지 캐시까지 합치면 한도에 닿아 캐시를 비우며 돈다(스왑 4MiB 이하).
     mem_limit: 460m
     env_file: .env
     environment:
@@ -76,11 +80,13 @@ services:
       context: ../frontend
       dockerfile: ../deploy/web.Dockerfile
     image: camgong/web:latest
+    pull_policy: never           # backend 와 같은 이유
     restart: unless-stopped
-    mem_limit: 96m
+    # 측정(013): 한도 없을 때 최대 95.5MiB. 운영은 dist 를 서빙해 페이지 캐시도 붙는다.
+    mem_limit: 128m
     environment:
       DOMAIN: ${DOMAIN:?}
-      # Go 런타임이 이 근처에서 GC 를 서두른다(한도 96m 안쪽).
+      # Go 런타임이 이 근처에서 GC 를 서두른다(한도 128m 안쪽).
       GOMEMLIMIT: 64MiB
     ports:
       - "80:80"
