@@ -9,6 +9,8 @@
 - [x] T003 같은 시나리오를 한도를 건 채 돌려 plan 결정 5의 통과 조건을 확인하고, 기준선과 나란히 보고한다. 통과하지 못하면 결정 6
 - [x] T004 맥에서 `linux/amd64` 이미지를 빌드해 `docker save`로 묶는 명령을 실제로 한 번 해 보고(크기 포함), 서버에서 할 `docker load` → `docker compose up -d --no-build` 명령과 함께 그대로 보고한다. 서버 접속은 사용자만 한다(관제탑이 체크리스트에 옮긴다)
 
+검수 반영(2026-11-25, faefffd 검수): backend·web `pull_policy: never`(`camgong/*`가 Docker Hub 남의 계정으로도 풀림), web 96m → 128m, `temptable_max_ram=64M`, 같은 측정 다시. 517dc8f, 백엔드 PR #37(`9f25801`). 결과는 `docs/benchmarks/one-gb-server.md`.
+
 ## 의존 관계
 
 012 머지 → T001 → T002 → T003 → T004.
