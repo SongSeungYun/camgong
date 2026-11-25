@@ -1,5 +1,6 @@
 # 빌드 컨텍스트는 저장소 루트(compose.yaml 의 context: ..). 테스트는 여기서 돌리지 않는다(Testcontainers 가 Docker 를 요구).
-FROM eclipse-temurin:21-jdk AS build
+# 빌드 단계는 빌드하는 기계의 플랫폼에서 돈다(맥에서 linux/amd64 이미지를 만들 때 Gradle 을 에뮬레이션하지 않게). jar 는 플랫폼과 무관하다.
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk AS build
 WORKDIR /src
 COPY gradlew settings.gradle build.gradle ./
 COPY gradle gradle

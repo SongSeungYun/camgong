@@ -1,5 +1,7 @@
 # 서버 한 대: MySQL 8.4 + 백엔드 + Caddy(HTTPS, 프론트 정적 파일, /api 프록시).
 # 값은 같은 디렉터리의 .env(저장소에 넣지 않는다, .env.example 참고). 밖으로 여는 포트는 Caddy 80/443 뿐이다.
+# 1GB 서버(013): 서비스마다 mem_limit 을 둔다(합이 1GB 안쪽, OS 몫을 남긴다). 넘으면 그 컨테이너만 OOM 으로 죽고 restart 가 다시 띄운다.
+# 이미지는 서버에서 빌드하지 않는다: 맥에서 linux/amd64 로 빌드해 docker save | ssh … docker load 로 옮기고 서버는 up -d --no-build 로 띄운다.
 name: camgong
 
 services:
@@ -9,6 +11,8 @@ services:
     # binlog 를 끈다(010 결정 5-1). 8.4 는 기본으로 켜져 탈퇴 UPDATE 전의 값을 30일 남긴다. 복제·시점 복구는 쓰지 않는다.
     # 이미 binlog 를 켠 채 돌던 볼륨이면 남은 binlog.* 파일은 끈 뒤 자동으로 지워지지 않는다. 끄기 전에 한 번 RESET BINARY LOGS AND GTIDS 를 실행한다.
     command: ["--disable-log-bin"]
+    # 측정(013): performance_schema 를 끄고 최대 216MiB. 기본 설정이면 530MiB.
+    mem_limit: 288m
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?}
       MYSQL_DATABASE: camgong
@@ -18,6 +22,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD:?}
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./mysql/camgong.cnf:/etc/mysql/conf.d/camgong.cnf:ro
     healthcheck:
       # TCP 로 확인한다: 초기화 중의 임시 서버는 소켓만 열어서, 소켓 ping 은 초기화가 끝나기 전에 성공한다.
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]
@@ -29,7 +34,10 @@ services:
     build:
       context: ..
       dockerfile: deploy/backend.Dockerfile
+    image: camgong/backend:latest
     restart: unless-stopped
+    # 측정(013): 힙 224MiB 에 메타스페이스·심볼·코드 캐시 등을 더해 JVM 이 약 430MiB 를 커밋한다(NMT). 420m 이면 한도에 붙어 스왑했다.
+    mem_limit: 460m
     env_file: .env
     environment:
       # 도메인에서 만든다(빠뜨리면 모든 쓰기가 403 이거나 메일 링크가 깨진다). Caddy 가 HTTPS 를 끝내 백엔드는 http 로 받으므로 Origin 허용이 필요하다.
@@ -42,6 +50,13 @@ services:
       # 탈퇴 장부(010 결정 5-2). 컨테이너 안 경로는 고정이고, 호스트 디렉터리(WITHDRAW_LEDGER_DIR)를 바인드 마운트한다.
       # 컨테이너를 다시 만들어도(up -d --build) 남아야 복구 때 되살아난 탈퇴를 다시 익명화할 수 있다.
       WITHDRAW_LEDGER: /var/lib/camgong/ledger/withdraw-ledger.tsv
+      # 1GB 서버(013 plan 결정 2): 힙·메타스페이스·코드 캐시·스레드 스택 상한. 힙이 모자라 OutOfMemoryError 가 나면 프로세스를 끝내
+      # restart 가 다시 띄운다(반쯤 죽은 채 응답하지 않게). 값을 바꾸면 같은 k6 측정을 다시 한다.
+      JAVA_TOOL_OPTIONS: >-
+        -Xms224m -Xmx224m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m -Xss512k
+        -XX:MaxDirectMemorySize=32m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
+      # glibc 가 스레드마다 malloc 아레나를 늘리지 않게 한다(코어 수 × 8 까지 늘어 RSS 가 커진다). 측정에서 스왑 118MiB → 0.
+      MALLOC_ARENA_MAX: "2"
     volumes:
       # 앱은 uid 10001 로 돈다(backend.Dockerfile). 디렉터리를 먼저 만들고 넘겨준다: mkdir -p <디렉터리> && sudo chown 10001 <디렉터리>
       # 못 쓰면 백엔드가 뜨지 않는다(조용히 장부 없이 돌지 않게).
@@ -60,9 +75,13 @@ services:
     build:
       context: ../frontend
       dockerfile: ../deploy/web.Dockerfile
+    image: camgong/web:latest
     restart: unless-stopped
+    mem_limit: 96m
     environment:
       DOMAIN: ${DOMAIN:?}
+      # Go 런타임이 이 근처에서 GC 를 서두른다(한도 96m 안쪽).
+      GOMEMLIMIT: 64MiB
     ports:
       - "80:80"
       - "443:443"
