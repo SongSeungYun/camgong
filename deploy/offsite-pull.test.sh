@@ -46,6 +46,8 @@ echo b > "$dst/camgong-20261124-040000.sql.gz"; recent "$dst/camgong-20261124-04
 echo l1 > "$dst/withdraw-ledger.tsv"
 chmod 755 "$dst"
 echo half > "$dst/.camgong-20261125-040000.sql.gz.tmp"   # 지난번에 옮기다 멈춘 것
+mkdir -p "$dst/.incoming"; echo half > "$dst/.incoming/.camgong-20261125-040000.sql.gz.Ab12"   # rsync 가 받다 멈춘 것
+echo gone > "$dst/.incoming/camgong-20261118-040000.sql.gz"   # 서버에서 이미 지운 것
 pull "$src/" "$dst"
 check "1 성공" '[ $rc -eq 0 ]'
 check "1 새 덤프 받음" '[ -f "$dst/camgong-20261126-040000.sql.gz" ]'
@@ -55,14 +57,15 @@ check "1 장부 덮어씀" '[ "$(cat "$dst/withdraw-ledger.tsv")" = l2 ]'
 check "1 쓰는 중인 .tmp 는 안 받음" '[ -z "$(find "$dst" -name "camgong-20261126-050000.sql.gz.tmp")" ]'
 check "1 성공 알림" '[ "$(cat "$PINGS")" = https://hc.example/mac ]'
 check "1 보관 디렉터리·파일은 소유자만" '[ "$(stat -f %Lp "$dst")" = 700 ] && [ "$(stat -f %Lp "$dst/camgong-20261126-040000.sql.gz")" = 600 ] && [ "$(stat -f %Lp "$dst/withdraw-ledger.tsv")" = 600 ]'
-check "1 남은 임시 파일 없음" '[ -z "$(find "$dst" -maxdepth 1 -name ".*.tmp")" ]'
+check "1 남은 임시 파일 없음" '[ -z "$(find "$dst" -name ".camgong-*")" ]'
+check "1 거울은 서버를 따라 지운다" '[ ! -e "$dst/.incoming/camgong-20261118-040000.sql.gz" ]'
 
-# 2. 원천이 비었다 → 아무것도 안 지운다
+# 2. 원천이 비었다 → 아무것도 안 지운다. 2일 안의 덤프가 없어 실패 알림
 src="$t/2/src"; dst="$t/2/dst"; mkdir -p "$src" "$dst"
 echo a > "$dst/camgong-20261119-040000.sql.gz"; old "$dst/camgong-20261119-040000.sql.gz"
 echo l1 > "$dst/withdraw-ledger.tsv"
 pull "$src/" "$dst"
-check "2 성공" '[ $rc -eq 0 ]'
+check "2 실패 알림" '[ $rc -ne 0 ] && [ "$(cat "$PINGS")" = https://hc.example/mac/fail ]'
 check "2 7일 넘은 사본도 남음" '[ -f "$dst/camgong-20261119-040000.sql.gz" ]'
 check "2 장부 남음" '[ "$(cat "$dst/withdraw-ledger.tsv")" = l1 ]'
 
@@ -75,12 +78,12 @@ check "3 실패" '[ $rc -ne 0 ]'
 check "3 7일 넘은 사본도 남음" '[ -f "$dst/camgong-20261119-040000.sql.gz" ]'
 check "3 실패 알림" '[ "$(cat "$PINGS")" = https://hc.example/mac/fail ]'
 
-# 4. 서버 덤프가 실패하는 중이라 맥이 이미 지운 옛 덤프만 다시 온다 → 새 덤프가 아니라 지우지 않는다
+# 4. 서버 덤프가 실패하는 중이라 맥이 이미 지운 옛 덤프만 다시 온다 → 새 덤프가 아니라 지우지 않는다. 실패 알림
 src="$t/4/src"; dst="$t/4/dst"; mkdir -p "$src" "$dst"
 echo a > "$src/camgong-20261119-040000.sql.gz"; old "$src/camgong-20261119-040000.sql.gz"; echo l1 > "$src/withdraw-ledger.tsv"
 echo b > "$dst/camgong-20261120-040000.sql.gz"; old "$dst/camgong-20261120-040000.sql.gz"
 pull "$src/" "$dst"
-check "4 성공" '[ $rc -eq 0 ]'
+check "4 실패 알림" '[ $rc -ne 0 ] && [ "$(cat "$PINGS")" = https://hc.example/mac/fail ]'
 check "4 맥에 있던 옛 사본 남음" '[ -f "$dst/camgong-20261120-040000.sql.gz" ]'
 check "4 옮긴 사본은 서버 덤프 시각을 지닌다(6일 규칙)" '[ -n "$(find "$dst/camgong-20261119-040000.sql.gz" -mmin +$((6 * 24 * 60)))" ]'
 
@@ -89,6 +92,28 @@ src="$t/5/src"; dst="$t/5/dst"; mkdir -p "$src" "$dst"
 echo new > "$src/camgong-20261126-040000.sql.gz"
 pull "$src/" "$dst"
 check "5 장부 없으면 실패" '[ $rc -ne 0 ] && [ "$(cat "$PINGS")" = https://hc.example/mac/fail ]'
+
+# 5-1. 맥 디스크가 가득 차 옮기지 못한다 → 실패 알림(2일 안의 덤프가 이미 있어도). 덤프·장부 각각
+printf '#!/bin/sh\ncase "$*" in *"$CP_FAIL"*) echo "No space left on device" >&2; exit 1;; esac\nexec /bin/cp "$@"\n' > "$t/bin/cp"; chmod +x "$t/bin/cp"
+n=0
+for what in camgong-20261126 withdraw-ledger; do
+	n=$((n + 1)); src="$t/5a$n/src"; dst="$t/5a$n/dst"; mkdir -p "$src" "$dst"   # 경로에 $what 이 들어가지 않게
+	echo new > "$src/camgong-20261126-040000.sql.gz"; echo l2 > "$src/withdraw-ledger.tsv"
+	echo b > "$dst/camgong-20261125-040000.sql.gz"; echo l1 > "$dst/withdraw-ledger.tsv"
+	CP_FAIL="$what" pull "$src/" "$dst"
+	check "5-1 $what 옮기기 실패면 실패 알림" '[ $rc -ne 0 ] && [ "$(cat "$PINGS")" = https://hc.example/mac/fail ]'
+done
+rm "$t/bin/cp"
+
+# 5-2. 서버가 먼 미래 이름의 덤프를 한 번 보냈다 → 그 뒤에도 새 덤프가 오면 지우기가 멈추지 않는다
+src="$t/5b/src"; dst="$t/5b/dst"; mkdir -p "$src" "$dst"
+echo junk > "$src/camgong-99991231-000000.sql.gz"; echo l > "$src/withdraw-ledger.tsv"
+pull "$src/" "$dst"
+rm "$src/camgong-99991231-000000.sql.gz"; echo new > "$src/camgong-20261126-040000.sql.gz"
+echo a > "$dst/camgong-20261118-040000.sql.gz"; old "$dst/camgong-20261118-040000.sql.gz"
+pull "$src/" "$dst"
+check "5-2 성공" '[ $rc -eq 0 ]'
+check "5-2 7일 넘은 사본 지움" '[ ! -e "$dst/camgong-20261118-040000.sql.gz" ]'
 
 # 6. backup.sh: 덤프 뒤 장부를 덮어써 둔다
 b="$t/6"; mkdir -p "$b"
