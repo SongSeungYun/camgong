@@ -34,6 +34,7 @@ keep=$((6 * 24 * 60))   # 분. backup.sh 와 같은 기준
 in="$DEST/.incoming"
 mkdir -p "$in"
 chmod 700 "$DEST" "$in"
+ref="$DEST/.started"; touch "$ref"   # 이번 실행 시작 시각(아래 미래 시각 검사)
 # 지난번에 도중에 멈춘 것(rsync 임시 파일은 --exclude 에 걸려 --delete 가 지우지 않는다)
 rm -f "$in"/.camgong-* "$in"/.withdraw-ledger.tsv.* "$DEST"/.camgong-*.tmp "$DEST/.withdraw-ledger.tsv.tmp"
 
@@ -62,6 +63,9 @@ fi
 chmod -R go= "$DEST"   # openrsync 는 -p 없이 받으면 umask 를 따르지 않고 서버 권한(644 등)으로 만든다
 # 장부가 한 번도 안 왔으면 복구할 수 없다. 조용히 넘어가지 않는다.
 [ -f "$DEST/withdraw-ledger.tsv" ] || { echo "error: 탈퇴 장부가 없다" >&2; exit 1; }
+
+# 시각 검사는 모두 서버의 수정 시각을 쓴다. 미래 시각의 덤프(서버 시계가 앞섬, 털림)는 2일 검사를 늘 통과시키고 6일 규칙에도 걸리지 않으니 실패로 알린다.
+[ -z "$(find "$DEST" -maxdepth 1 -name 'camgong-*.sql.gz' -newer "$ref")" ] || { echo "error: 수정 시각이 미래인 덤프가 있다" >&2; exit 1; }
 
 # 이번 실행에서 6일이 안 된 덤프를 새로 옮겼을 때만 6일 지난 사본을 지운다. 이름이 아니라 수정 시각으로 본다(서버가 이상한 이름을 보내도
 # 지우기가 멈추지 않게). 맥이 먼저 지운 옛 덤프를 서버가 아직 갖고 있으면(서버 덤프 실패 중) 다시 옮기지만, 6일이 지나 있어 지우는 조건이

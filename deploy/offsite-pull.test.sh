@@ -115,6 +115,18 @@ pull "$src/" "$dst"
 check "5-2 성공" '[ $rc -eq 0 ]'
 check "5-2 7일 넘은 사본 지움" '[ ! -e "$dst/camgong-20261118-040000.sql.gz" ]'
 
+# 5-3. 수정 시각이 미래인 덤프 → 실패 알림
+src="$t/5c/src"; dst="$t/5c/dst"; mkdir -p "$src" "$dst"
+echo x > "$src/camgong-20261126-040000.sql.gz"; touch -t 203001010000 "$src/camgong-20261126-040000.sql.gz"; echo l > "$src/withdraw-ledger.tsv"
+pull "$src/" "$dst"
+check "5-3 미래 시각이면 실패 알림" '[ $rc -ne 0 ] && [ "$(cat "$PINGS")" = https://hc.example/mac/fail ]'
+
+# 5-4. 가장 새 덤프가 3일 전이다(2일 기준) → 실패 알림
+src="$t/5d/src"; dst="$t/5d/dst"; mkdir -p "$src" "$dst"
+echo x > "$src/camgong-20261123-040000.sql.gz"; touch -t "$(date -v-3d +%Y%m%d%H%M)" "$src/camgong-20261123-040000.sql.gz"; echo l > "$src/withdraw-ledger.tsv"
+pull "$src/" "$dst"
+check "5-4 3일 된 덤프뿐이면 실패 알림" '[ $rc -ne 0 ] && [ "$(cat "$PINGS")" = https://hc.example/mac/fail ]'
+
 # 6. backup.sh: 덤프 뒤 장부를 덮어써 둔다
 b="$t/6"; mkdir -p "$b"
 echo a > "$b/camgong-20261119-040000.sql.gz"; old "$b/camgong-20261119-040000.sql.gz"
