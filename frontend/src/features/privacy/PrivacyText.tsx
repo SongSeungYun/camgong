@@ -70,7 +70,7 @@ export function PrivacyText() {
         </thead>
         <tbody>
           <tr><th scope="row">Google LLC</th><td>인증·재설정 메일 발송과 발송 기록 보관(Gmail)</td></tr>
-          <tr><th scope="row">[계약 회사명 확인 뒤: The Constant Company, LLC(Vultr)]</th><td>서버, 데이터베이스, 백업 보관(Vultr 서울 리전)</td></tr>
+          <tr><th scope="row">The Constant Company, LLC(Vultr)</th><td>서버, 데이터베이스, 백업 보관(Vultr 서울 리전)</td></tr>
         </tbody>
       </table>
       <h2>6. 국외 이전</h2>
@@ -100,7 +100,7 @@ export function PrivacyText() {
         <li>비밀번호는 복원할 수 없는 방식(bcrypt)으로 암호화해 저장합니다.</li>
         <li>모든 통신은 HTTPS로 암호화합니다. 로그인 쿠키는 스크립트가 읽을 수 없게(HttpOnly) 설정합니다.</li>
         <li>로그인 실패가 5번 이어지면 15분 동안 잠그고, 메일 발송 횟수를 제한합니다.</li>
-        <li>서버와 데이터베이스에는 운영자 한 명만 접근합니다. 백업 파일은 운영자 계정만 읽을 수 있게 두고 7일 뒤 지웁니다.</li>
+        <li>서버와 데이터베이스에는 운영자 한 명만 접근합니다. 백업 파일은 서버와 운영자의 컴퓨터(디스크 암호화)에 운영자만 읽을 수 있게 두고 7일 뒤 지웁니다.</li>
         <li>서비스 기록(로그)에는 이메일과 표시 이름을 남기지 않습니다.</li>
       </ul>
       <h2>9. 쿠키</h2>
@@ -114,8 +114,8 @@ export function PrivacyText() {
       <h2>11. 개인정보 보호책임자</h2>
       <table aria-label="개인정보 보호책임자">
         <tbody>
-          <tr><th scope="row">성명</th><td>[보호책임자 실명]</td></tr>
-          <tr><th scope="row">연락처</th><td>[서비스 Gmail 주소]</td></tr>
+          <tr><th scope="row">성명</th><td>송승윤</td></tr>
+          <tr><th scope="row">연락처</th><td>sundakgukbab1234@gmail.com</td></tr>
         </tbody>
       </table>
       <p>개인정보 열람 청구도 위 보호책임자가 받습니다.</p>
