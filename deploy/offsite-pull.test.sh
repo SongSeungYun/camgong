@@ -33,7 +33,8 @@ recent() { touch -t "$(date -v-2d +%Y%m%d%H%M)" "$@"; }    # 2일 전: 남는다
 pull() {
 	printf 'SOURCE=%s\nDEST=%s\nHC_PING_URL=https://hc.example/mac\n' "$1" "$2" > "$t/conf"
 	: > "$PINGS"
-	rc=0; CAMGONG_OFFSITE_CONF="$t/conf" bash "$here/offsite-pull.sh" > "$t/out" 2>&1 || rc=$?
+	# launchd 가 쓰는 /bin/bash(맥 기본 3.2)로 돌린다. PATH 의 bash(Homebrew 등)가 아니라 실제로 도는 인터프리터를 검사한다
+	rc=0; CAMGONG_OFFSITE_CONF="$t/conf" /bin/bash "$here/offsite-pull.sh" > "$t/out" 2>&1 || rc=$?
 }
 
 # 1. 새 덤프가 왔고 7일 넘은 사본이 있다 → 그 사본만 지운다
