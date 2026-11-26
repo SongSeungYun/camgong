@@ -40,17 +40,22 @@ pull() {
 src="$t/1/src"; dst="$t/1/dst"; mkdir -p "$src" "$dst"
 echo new > "$src/camgong-20261126-040000.sql.gz"; echo l2 > "$src/withdraw-ledger.tsv"
 echo writing > "$src/camgong-20261126-050000.sql.gz.tmp"
+: > "$src/camgong-20261124-040000.sql.gz"   # 서버에서 같은 이름이 망가졌다(털림·디스크 오류)
 echo a > "$dst/camgong-20261119-040000.sql.gz"; old "$dst/camgong-20261119-040000.sql.gz"
 echo b > "$dst/camgong-20261124-040000.sql.gz"; recent "$dst/camgong-20261124-040000.sql.gz"
 echo l1 > "$dst/withdraw-ledger.tsv"
+chmod 755 "$dst"
+echo half > "$dst/.camgong-20261125-040000.sql.gz.tmp"   # 지난번에 옮기다 멈춘 것
 pull "$src/" "$dst"
 check "1 성공" '[ $rc -eq 0 ]'
 check "1 새 덤프 받음" '[ -f "$dst/camgong-20261126-040000.sql.gz" ]'
 check "1 7일 넘은 사본 지움" '[ ! -e "$dst/camgong-20261119-040000.sql.gz" ]'
-check "1 2일 된 사본 남음" '[ -f "$dst/camgong-20261124-040000.sql.gz" ]'
+check "1 2일 된 사본 남음, 서버 내용으로 덮어쓰지 않음" '[ "$(cat "$dst/camgong-20261124-040000.sql.gz")" = b ]'
 check "1 장부 덮어씀" '[ "$(cat "$dst/withdraw-ledger.tsv")" = l2 ]'
-check "1 쓰는 중인 .tmp 는 안 받음" '[ ! -e "$dst/camgong-20261126-050000.sql.gz.tmp" ]'
+check "1 쓰는 중인 .tmp 는 안 받음" '[ -z "$(find "$dst" -name "camgong-20261126-050000.sql.gz.tmp")" ]'
 check "1 성공 알림" '[ "$(cat "$PINGS")" = https://hc.example/mac ]'
+check "1 보관 디렉터리·파일은 소유자만" '[ "$(stat -f %Lp "$dst")" = 700 ] && [ "$(stat -f %Lp "$dst/camgong-20261126-040000.sql.gz")" = 600 ] && [ "$(stat -f %Lp "$dst/withdraw-ledger.tsv")" = 600 ]'
+check "1 남은 임시 파일 없음" '[ -z "$(find "$dst" -maxdepth 1 -name ".*.tmp")" ]'
 
 # 2. 원천이 비었다 → 아무것도 안 지운다
 src="$t/2/src"; dst="$t/2/dst"; mkdir -p "$src" "$dst"
@@ -77,6 +82,7 @@ echo b > "$dst/camgong-20261120-040000.sql.gz"; old "$dst/camgong-20261120-04000
 pull "$src/" "$dst"
 check "4 성공" '[ $rc -eq 0 ]'
 check "4 맥에 있던 옛 사본 남음" '[ -f "$dst/camgong-20261120-040000.sql.gz" ]'
+check "4 옮긴 사본은 서버 덤프 시각을 지닌다(6일 규칙)" '[ -n "$(find "$dst/camgong-20261119-040000.sql.gz" -mmin +$((6 * 24 * 60)))" ]'
 
 # 5. 장부가 한 번도 안 왔다 → 실패
 src="$t/5/src"; dst="$t/5/dst"; mkdir -p "$src" "$dst"
@@ -96,14 +102,14 @@ check "6 장부 복사" 'cmp -s "$t/ledger" "$b/withdraw-ledger.tsv"'
 check "6 장부는 소유자만 읽음" '[ "$(stat -f %Lp "$b/withdraw-ledger.tsv")" = 600 ]'
 check "6 옛 덤프 지움" '[ ! -e "$b/camgong-20261119-040000.sql.gz" ]'
 
-# 7. backup.sh: 장부를 못 읽으면 실패하고 옛 덤프를 지우지 않는다
+# 7. backup.sh: 장부를 못 읽으면 실패한다. 새 덤프는 성공했으니 옛 덤프는 지우고, 전날 장부는 남긴다
 b="$t/7"; mkdir -p "$b"
 echo a > "$b/camgong-20261119-040000.sql.gz"; old "$b/camgong-20261119-040000.sql.gz"
 echo old > "$b/withdraw-ledger.tsv"
 : > "$PINGS"
 rc=0; BACKUP_DIR="$b" HC_PING_URL=https://hc.example/srv LEDGER="$t/missing" bash "$here/backup.sh" > "$t/out" 2>&1 || rc=$?
 check "7 실패" '[ $rc -ne 0 ]'
-check "7 옛 덤프 남음" '[ -f "$b/camgong-20261119-040000.sql.gz" ]'
+check "7 옛 덤프 지움" '[ ! -e "$b/camgong-20261119-040000.sql.gz" ]'
 check "7 이전 장부 남음" '[ "$(cat "$b/withdraw-ledger.tsv")" = old ]'
 check "7 .tmp 안 남음" '[ -z "$(find "$b" -name "*.tmp")" ]'
 check "7 실패 알림" '[ "$(cat "$PINGS")" = https://hc.example/srv/fail ]'
