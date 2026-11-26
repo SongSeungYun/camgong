@@ -149,7 +149,7 @@
 
 로컬 확인(백엔드 세션, `DOMAIN=localhost`): 목록 200, 깊은 경로 index.html, 없는 자산 404, http→https 308, 다른 Origin 403, 백업 파일 복구까지 됐다. 메모리는 백엔드 약 480MiB, MySQL 약 485MiB, Caddy 15MiB(16GB 맥 기준, 013 한도 전, 실서버 확인 못 함). 한도를 건 측정은 `docs/benchmarks/one-gb-server.md`. 실제 SMTP 발송은 확인 못 함.
 
-### 7.2 서버 밖 백업: 운영자 맥이 내려받기 (014, 백엔드 PR 머지 뒤)
+### 7.2 서버 밖 백업: 운영자 맥이 내려받기 (014, 백엔드 PR #39 `8b6e93c`)
 
 2026-11-26 사용자 선택 "열기 전, 맥으로 받기". 설계는 `specs/014-offsite-backup/plan.md`, 코드는 `deploy/offsite-pull.sh`·`deploy/app.camgong.offsite-pull.plist`, `deploy/backup.sh`(장부 복사)다. 맥·서버 명령은 사용자가 한다. 실서버에서는 돌려 보지 않았다(확인 못 함). 로컬 디렉터리를 원천으로 한 검사(`bash deploy/offsite-pull.test.sh`, 35개)와 로컬 DB 덤프 → 맥 스크립트 → 버리는 MySQL 복구(표 10개 행 수 일치)는 했다.
 
