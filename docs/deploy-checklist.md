@@ -106,6 +106,7 @@
 ### 7.1 운영 절차 (`deploy/`, 2026-11-19 백엔드 세션 초안 반영)
 
 1. 서버 준비(처음 한 번, 사용자가 SSH로 한다). 방화벽 그룹과 DNS A 레코드는 이미 됐다(7). 아래 명령은 서버에서 돌려 보지 않았다(확인 못 함).
+   - 시간대: `sudo timedatectl set-timezone Asia/Seoul` → `timedatectl`로 확인한다. 클라우드 이미지는 보통 UTC라 그대로 두면 crontab의 04:00(7.1-5)이 한국 13:00이 된다. 맥 내려받기(7.2, 05:00)가 서버 백업 뒤에 돌게 맞춘다. 컨테이너와 앱의 시간(UTC 저장)은 바뀌지 않는다.
    - 스왑 2GB(013 plan 결정 3):
      - 먼저 `swapon --show`로 이미 있는지 본다.
      - 없으면 `sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab`.
@@ -139,14 +140,76 @@
    - 통과: `oom=false`, `restarts=0`, `oom_kill 0`.
    - `free`의 Swap used와 컨테이너 `memory.swap.current`가 배포 직후보다 며칠 뒤에 계속 늘어 있으면, 2GB(월 $10) 전환을 사용자에게 묻는다(013 plan 결정 6).
    - backend `memory.peak`가 한도(460m)에 닿는 건 측정에서도 그랬다(페이지 캐시를 비우며 돈다). 볼 것은 스왑이다.
-5. 백업: crontab에 `0 4 * * * /경로/deploy/backup.sh`. 7일이 지난 덤프는 스크립트가 지운다(010 T017). **덤프가 실패한 날은 지우지 않는다**(남은 백업을 지키려고). 실패가 이어지면 7일을 넘겨 남는다. 그래서 healthchecks.io(무료)로 알아챈다(2026-11-22 사용자 선택, 010 plan 결정 5-3): 서비스 Gmail로 가입 → 주기 1일·유예 1시간 확인을 하나 만든다 → 그 주소를 `.env`의 `HC_PING_URL`에 넣는다. 스크립트가 성공하면 호출하고 실패하면 `/fail`을 호출한다. 호출이 끊기면(cron이 안 돎, 서버가 죽음) 메일이 온다(010 T036). 서버 밖 보관은 운영자 맥이 매일 내려받는다(014, 열기 전에 한다). 맥에서도 같은 7일 수명 규칙을 건다. **014가 끝나기 전에는 서버가 사라지면 백업도 사라진다.** MySQL binlog는 compose에서 끈다(탈퇴 전 값이 30일 남기 때문, 010 plan 결정 5-1). binlog를 켠 채 돌던 볼륨이면 이미 남은 `binlog.*`는 끈 뒤에도 지워지지 않는다. 끄기 전에 `RESET BINARY LOGS AND GTIDS`를 한 번 실행한다. 새 볼륨으로 시작하면 필요 없다.
-6. 복구: 백엔드 중지(`docker compose stop backend`) → `gunzip -c <파일> | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot camgong'` → 백엔드 시작 → 로그에서 `reanonymized=N` 확인 → 5분 뒤 `retention-cleanup groupBuys=N members=M` 확인(012: 덤프에 남아 있던, 끝난 지 1년 지난 공구가 다시 지워진다). 장부 준비(처음 한 번, 2단계와 같이): `.env`의 `WITHDRAW_LEDGER_DIR`에 호스트 절대 경로(예: `/srv/camgong/ledger`)를 넣고 `mkdir -p /srv/camgong/ledger && sudo chown 10001 /srv/camgong/ledger`(백엔드는 uid 10001로 돈다). 비어 있거나 쓸 수 없으면 백엔드가 뜨지 않는다. **복구하면 백업 시점 뒤의 탈퇴가 되살아난다.** 앱이 탈퇴 장부(컨테이너 밖 `WITHDRAW_LEDGER` 파일, 8일 보관)를 기동 때 읽어 그 회원들을 다시 익명화한다(2026-11-22 사용자 선택 "장부 파일 + 자동 재적용", 010 plan 결정 5-2, T032~T037). WARN에 OPEN 공구 id가 나오면 그 공구를 확인한다(되살아난 상태에서 탈퇴자가 개설자·참여자인 공구). 장부도 서버 디스크에 있어서 서버째 잃으면 같이 사라진다. 014에서 덤프와 함께 맥으로 내려받는다. 장부가 생긴 뒤에는 docker 로그 회전을 건다(가린 수신 주소가 기한 없이 남는 문제도 같이 풀린다, T035).
+5. 백업: crontab에 `0 4 * * * /경로/deploy/backup.sh`. 7일이 지난 덤프는 스크립트가 지운다(010 T017). **덤프가 실패한 날은 지우지 않는다**(남은 백업을 지키려고). 실패가 이어지면 7일을 넘겨 남는다. 그래서 healthchecks.io(무료)로 알아챈다(2026-11-22 사용자 선택, 010 plan 결정 5-3): 서비스 Gmail로 가입 → 주기 1일·유예 1시간 확인을 하나 만든다 → 그 주소를 `.env`의 `HC_PING_URL`에 넣는다. 스크립트가 성공하면 호출하고 실패하면 `/fail`을 호출한다. 호출이 끊기면(cron이 안 돎, 서버가 죽음) 메일이 온다(010 T036). 서버 밖 보관은 운영자 맥이 매일 내려받는다(014, 7.2, 열기 전에 한다). 맥에서도 같은 7일 수명 규칙을 건다. **014가 끝나기 전에는 서버가 사라지면 백업도 사라진다.** MySQL binlog는 compose에서 끈다(탈퇴 전 값이 30일 남기 때문, 010 plan 결정 5-1). binlog를 켠 채 돌던 볼륨이면 이미 남은 `binlog.*`는 끈 뒤에도 지워지지 않는다. 끄기 전에 `RESET BINARY LOGS AND GTIDS`를 한 번 실행한다. 새 볼륨으로 시작하면 필요 없다.
+6. 복구: 백엔드 중지(`docker compose stop backend`) → `gunzip -c <파일> | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot camgong'` → 백엔드 시작 → 로그에서 `reanonymized=N` 확인 → 5분 뒤 `retention-cleanup groupBuys=N members=M` 확인(012: 덤프에 남아 있던, 끝난 지 1년 지난 공구가 다시 지워진다). 장부 준비(처음 한 번, 2단계와 같이): `.env`의 `WITHDRAW_LEDGER_DIR`에 호스트 절대 경로(예: `/srv/camgong/ledger`)를 넣고 `mkdir -p /srv/camgong/ledger && sudo chown 10001 /srv/camgong/ledger`(백엔드는 uid 10001로 돈다). 비어 있거나 쓸 수 없으면 백엔드가 뜨지 않는다. **복구하면 백업 시점 뒤의 탈퇴가 되살아난다.** 앱이 탈퇴 장부(컨테이너 밖 `WITHDRAW_LEDGER` 파일, 8일 보관)를 기동 때 읽어 그 회원들을 다시 익명화한다(2026-11-22 사용자 선택 "장부 파일 + 자동 재적용", 010 plan 결정 5-2, T032~T037). WARN에 OPEN 공구 id가 나오면 그 공구를 확인한다(되살아난 상태에서 탈퇴자가 개설자·참여자인 공구). 장부도 서버 디스크에 있어서 서버째 잃으면 같이 사라진다. 014에서 덤프와 함께 맥으로 내려받는다(7.2). 장부가 생긴 뒤에는 docker 로그 회전을 건다(가린 수신 주소가 기한 없이 남는 문제도 같이 풀린다, T035).
 6-1. Gmail 보낸편지함(서비스 계정): SMTP로 보낸 인증·재설정 메일이 자동 저장되고, 반송 메일은 받은편지함에 쌓인다. 서비스 계정의 Apps Script가 매일 6일 지난 보낸 메일·반송 메일을 휴지통을 거치지 않고 지운다. 설정 순서와 코드는 `docs/gmail-cleanup.md`. 돌려 보지는 않았다(확인 못 함).
 6-2. 개인정보 처리방침: 배포 전에 만들어 공개한다. 보호책임자 연락처는 서비스 Gmail로 한다(2026-11-19 사용자 선택 "동의문엔 빼고 처리방침엔 서비스 메일"). 비밀번호를 잊은 회원은 학교 메일로 비밀번호를 재설정한 뒤 직접 탈퇴한다(2026-11-22 사용자 "다시 본인인증하면되지", 선택 "비밀번호 재설정", `specs/011-password-reset`). 학교 메일을 더는 받을 수 없는 회원(졸업 등)은 본인 확인 수단이 없다. 처리방침에 그렇게 적는다.
 7. `docker compose down -v`는 쓰지 않는다. 볼륨(`mysql-data`, `caddy-data`)이 지워진다.
 8. `DB_USER`/`DB_PASSWORD`/`MYSQL_ROOT_PASSWORD`는 볼륨을 처음 만들 때만 쓰인다. 나중에 `.env`를 바꿔도 DB 계정은 바뀌지 않는다.
 
 로컬 확인(백엔드 세션, `DOMAIN=localhost`): 목록 200, 깊은 경로 index.html, 없는 자산 404, http→https 308, 다른 Origin 403, 백업 파일 복구까지 됐다. 메모리는 백엔드 약 480MiB, MySQL 약 485MiB, Caddy 15MiB(16GB 맥 기준, 013 한도 전, 실서버 확인 못 함). 한도를 건 측정은 `docs/benchmarks/one-gb-server.md`. 실제 SMTP 발송은 확인 못 함.
+
+### 7.2 서버 밖 백업: 운영자 맥이 내려받기 (014, 백엔드 PR 머지 뒤)
+
+2026-11-26 사용자 선택 "열기 전, 맥으로 받기". 설계는 `specs/014-offsite-backup/plan.md`, 코드는 `deploy/offsite-pull.sh`·`deploy/app.camgong.offsite-pull.plist`, `deploy/backup.sh`(장부 복사)다. 맥·서버 명령은 사용자가 한다. 실서버에서는 돌려 보지 않았다(확인 못 함). 로컬 디렉터리를 원천으로 한 검사(`bash deploy/offsite-pull.test.sh`, 35개)와 로컬 DB 덤프 → 맥 스크립트 → 버리는 MySQL 복구(표 10개 행 수 일치)는 했다.
+
+- 맥이 서버 22번에 닿아야 받는다. 방화벽 그룹은 22를 집 IP에만 연다(7). 그래서 노트북을 학교에서 처음 깨우면 그날은 실패 알림이 온다. 집 IP가 바뀌어도 그렇다.
+
+**맥 (처음 한 번)**
+1. 전용 키(암호 없음, 무인 실행용): `ssh-keygen -t ed25519 -N '' -C camgong-offsite -f ~/.ssh/camgong_offsite`
+2. 설정 파일 `~/.config/camgong-offsite.conf`(`chmod 600`). 저장소에 넣지 않는다.
+   ```
+   SOURCE=deploy@<서버 IP 또는 camgong.app>:
+   DEST=$HOME/camgong-offsite
+   SSH_KEY=$HOME/.ssh/camgong_offsite
+   HC_PING_URL=https://hc-ping.com/<맥용 확인 주소>
+   ```
+   healthchecks.io에 서버용(7.1-5)과 별개로 확인을 하나 더 만든다(주기 1일, 유예 1시간).
+3. 스크립트: `install -m 700 deploy/offsite-pull.sh ~/.local/bin/camgong-offsite-pull.sh`. 저장소에서 바뀌면 다시 복사한다.
+4. 보관 디렉터리: `mkdir -m 700 ~/camgong-offsite && tmutil addexclusion ~/camgong-offsite` → `tmutil isexcluded ~/camgong-offsite`가 `[Excluded]`인지 본다. Time Machine에 남으면 7일 규칙이 깨진다. iCloud로 동기화되는 Desktop·Documents 아래에 두지 않는다.
+5. FileVault: `fdesetup status`가 `FileVault is On.`인지 본다. 아니면 시스템 설정 → 개인정보 보호 및 보안 → FileVault에서 켠다(처리방침 8 "디스크 암호화").
+6. 아래 **서버** 2까지 한 뒤 호스트 키를 한 번 받아 둔다: `ssh -i ~/.ssh/camgong_offsite -o IdentitiesOnly=yes deploy@<서버>`. launchd는 BatchMode라 처음 보는 호스트 키면 실패한다.
+   - 지문을 확인하고 yes.
+   - 셸이 열리지 않아야 정상이다. 아무것도 안 나오고 멈추면 Ctrl-C로 끊는다(고정 rsync 명령이 입력을 기다리는 것). rsync 프로토콜 오류로 끊겨도 정상이다.
+   - 셸 프롬프트가 뜨면 제한이 안 걸린 것이다(실패).
+7. 손으로 한 번 돌린다: `/bin/bash ~/.local/bin/camgong-offsite-pull.sh` → `received camgong-…`가 나오고 healthchecks 맥용 확인이 초록인지 본다. `ls -la ~/camgong-offsite`에서 파일은 `-rw-------`, 디렉터리는 `drwx------`여야 한다.
+8. launchd(매일 05:00, 자고 있으면 깨어날 때):
+   - plist의 `/Users/USER`를 본인 홈으로 바꿔 `~/Library/LaunchAgents/`에 둔다.
+   - `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/app.camgong.offsite-pull.plist` → `launchctl kickstart gui/$(id -u)/app.camgong.offsite-pull`(바로 한 번) → `tail ~/Library/Logs/camgong-offsite-pull.log`.
+   - 멈추기: `launchctl bootout gui/$(id -u)/app.camgong.offsite-pull`.
+
+**서버 (deploy 계정)**
+1. `command -v rsync`. 없으면 `sudo apt install rsync`.
+2. `~/.ssh/authorized_keys`에 한 줄을 더한다(맥의 `~/.ssh/camgong_offsite.pub` 내용):
+   `restrict,command="rsync --server --sender --delete-before -r -t --dirs . /home/deploy/camgong-backups/" ssh-ed25519 AAAA… camgong-offsite`
+   - 클라이언트가 무엇을 요청하든 이 보내기 전용 명령(이 디렉터리만)이 돈다. 셸·포워딩은 `restrict`가 막는다.
+   - 백업 디렉터리를 바꿨으면(`BACKUP_DIR`) 경로를 맞춘다. 끝의 `/`를 지킨다.
+   - `rrsync -ro`는 맥 기본 rsync(openrsync)가 보내는 `--dirs`를 거부해서 쓰지 않는다(plan 결정 2).
+   - macOS 업데이트로 맥 rsync가 보내는 명령이 바뀌면 실패 알림이 온다. 그때 `/usr/bin/rsync -rt --delete -e 'ssh -v -i ~/.ssh/camgong_offsite' deploy@<서버>: /tmp/x/ 2>&1 | grep 'Sending command'`로 새 명령을 보고, `.` 자리만 백업 디렉터리로 바꿔 `command=`를 맞춘다.
+3. 제한 확인(맥에서):
+   - `ssh -i ~/.ssh/camgong_offsite -o IdentitiesOnly=yes deploy@<서버> id` → 아무것도 안 나오고 멈추면 Ctrl-C, 이게 정상이다. `uid=…`가 나오면 실패다.
+   - `echo x > /tmp/x && /usr/bin/rsync -e 'ssh -i ~/.ssh/camgong_offsite -o IdentitiesOnly=yes' /tmp/x deploy@<서버>:` → 실패하거나 멈춰야 한다(Ctrl-C). 서버 백업 디렉터리에 `x`가 없어야 한다.
+4. 다음 백업(04:00) 뒤 `ls -l ~/camgong-backups`에 `withdraw-ledger.tsv`(`-rw-------`)가 있는지 본다. `backup.sh`는 장부를 백엔드 컨테이너 안에서 읽는다. 백엔드가 내려가 있으면 그날 백업은 실패로 알린다(덤프는 남는다).
+
+**복구: 서버를 통째로 잃었을 때 맥 사본으로**
+0. 맥 launchd를 먼저 멈춘다(`launchctl bootout …`). 새 서버를 같은 주소로 붙이면 빈 장부가 맥의 마지막 장부를 덮는다. 가장 새 덤프와 `withdraw-ledger.tsv`를 다른 작업 디렉터리로 `cp -p` 해 둔다.
+1. 새 서버를 7.1-1~3대로 준비한다(`.env`, 장부 디렉터리 `/srv/camgong/ledger`를 만들고 `chown 10001`, 이미지 load).
+2. 맥에서 옮긴다: `scp <덤프> <장부> deploy@<새 서버>:/srv/camgong/`
+3. 서버에서 장부를 먼저 둔다: `sudo install -o 10001 -m 600 /srv/camgong/withdraw-ledger.tsv /srv/camgong/ledger/withdraw-ledger.tsv`
+4. DB만 먼저 띄우고 덤프를 넣는다:
+   - `cd /srv/camgong/repo/deploy && docker compose up -d mysql`
+   - 처음 기동이면 계정을 만드는 몇십 초를 기다린다.
+   - `gunzip -c /srv/camgong/camgong-<…>.sql.gz | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot camgong'`
+5. `docker compose up -d --no-build` → 로그에서 `reanonymized=N`을 보고, 5분 뒤 `retention-cleanup`을 본다(7.1-6과 같다).
+6. 확인한 뒤 서버의 `/srv/camgong/*.sql.gz`와 `/srv/camgong/withdraw-ledger.tsv`를 지운다(7일 규칙 밖에 남지 않게).
+7. 맥에서 `ssh-keygen -R <서버>`로 옛 호스트 키를 지우고, 새 서버에 **서버** 2를 다시 한 뒤 맥 6·8을 다시 한다.
+
+**맥용 알림이 실패(/fail)를 받는 경우**
+- 서버에 닿지 않음: 서버 다운, IP·호스트 키 바뀜, 맥이 집 밖, 맥 rsync 명령이 서버 고정 명령과 어긋남.
+- 장부가 한 번도 안 옴, 또는 맥 디스크가 가득 참.
+- 맥 보관본에 2일 안의 덤프가 없음: 서버 덤프가 멈췄거나, `BACKUP_DIR`과 `authorized_keys` 경로가 어긋남.
+- 수정 시각이 미래인 덤프가 있음: 서버 시계를 `timedatectl`로 본다.
+- 어느 경우든 맥 사본은 지우지 않는다. 맥이 아예 안 돌면(꺼짐) 알림 호출이 끊겨 healthchecks가 메일을 보낸다. 로그는 `~/Library/Logs/camgong-offsite-pull.log`.
 
 ## 8. README 문구 초안 (사용자가 넣는다)
 
