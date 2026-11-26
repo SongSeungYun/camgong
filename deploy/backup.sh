@@ -27,7 +27,7 @@ hc_ping() {
 
 finish() {
 	status=$?
-	rm -f "$out.tmp"
+	rm -f "$out.tmp" "$dir/withdraw-ledger.tsv.tmp"
 	if [ "$status" -eq 0 ]; then hc_ping ""; else hc_ping "/fail"; fi
 	exit "$status"
 }
@@ -41,10 +41,17 @@ docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -
 mv "$out.tmp" "$out"
 echo "$out"
 
+# 탈퇴 장부(014 결정 3)를 같은 디렉터리에 덮어써 둔다. 복구 때는 덤프 뒤의 탈퇴를 다시 적용하려고 가장 새 장부가 필요하다(010 결정 5-2).
+# 호스트 파일은 uid 10001 것이고 앱이 줄을 정리할 때 600 으로 바뀐다(임시 파일을 옮겨 넣는다). 그래서 컨테이너 안에서 같은 uid 로 읽는다.
+# 장부가 없거나 못 읽으면(백엔드가 떠 있지 않음 등) 실패로 끝낸다. 오래된 덤프도 지우지 않는다.
+ledger="$dir/withdraw-ledger.tsv"
+docker compose exec -T backend cat /var/lib/camgong/ledger/withdraw-ledger.tsv > "$ledger.tmp"
+mv "$ledger.tmp" "$ledger"
+
 # 6일(분 단위)이 지난 덤프를 지운다. 매일 돌면 어떤 덤프도 7일을 넘기지 않는다(010 결정 5-1: 동의문의 "7일 안에").
 # -mtime +6 은 7일이 꽉 찬 파일만 골라, 덤프 시간이 조금만 흔들려도 하루 더(8일) 남는다.
 # 패턴 끝의 * 는 강제 종료(SIGKILL)로 trap 이 못 지운 .tmp 도 함께 지우려는 것이다.
 # 새 덤프가 성공한 뒤에만 지운다(set -e): 덤프가 며칠 실패하면 남은 백업까지 지우지 않는다. 그동안은 7일을 넘길 수 있다.
 find "$dir" -name 'camgong-*.sql.gz*' -mmin +$((6 * 24 * 60)) -delete
 
-# TODO: 서버 밖(객체 저장소 등)으로 보낸다. 서버가 사라지면 이 디렉터리도 같이 사라진다. 밖의 사본에도 같은 7일 규칙을 건다.
+# 서버 밖 사본은 운영자 맥이 이 디렉터리를 읽기 전용으로 당겨 간다(014, offsite-pull.sh). 맥에도 같은 7일 규칙을 건다.
